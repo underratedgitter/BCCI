@@ -577,15 +577,18 @@
               </div>
               <div class="form-group">
                 <label class="form-label">GSTIN Number <span class="req">*</span></label>
-                <input type="text" class="form-control" name="gstNo" placeholder="24AAAAA0000A1Z5" required />
+                <input type="text" class="form-control" name="gstNo" placeholder="e.g. 24AAAAA0000A1Z5" maxlength="15" pattern="^[0-9]{2}[A-Za-z]{5}[0-9]{4}[A-Za-z]{1}[1-9A-Za-z]{1}[Zz][0-9A-Za-z]{1}$" autocomplete="off" required />
+                <small class="form-hint">15-character GSTIN (auto-uppercase)</small>
               </div>
               <div class="form-group">
                 <label class="form-label">PAN Number <span class="req">*</span></label>
-                <input type="text" class="form-control" name="panNo" placeholder="AAAAA0000A" required />
+                <input type="text" class="form-control" name="panNo" placeholder="e.g. ABCDE1234F" maxlength="10" pattern="^[A-Za-z]{5}[0-9]{4}[A-Za-z]{1}$" autocomplete="off" required />
+                <small class="form-hint">10-character PAN (auto-uppercase)</small>
               </div>
               <div class="form-group">
                 <label class="form-label">CIN (If Corporate)</label>
-                <input type="text" class="form-control" name="cin" placeholder="L24110GJ1998PLC034120" />
+                <input type="text" class="form-control" name="cin" placeholder="e.g. L24110GJ1998PLC034120" maxlength="21" pattern="^[LUu][0-9]{5}[A-Za-z]{2}[0-9]{4}[A-Za-z]{3}[0-9]{6}$" autocomplete="off" />
+                <small class="form-hint">21-character Corporate ID (if applicable)</small>
               </div>
 
               <div class="form-group full-width" style="margin-top: 1rem;">
@@ -609,7 +612,8 @@
               </div>
               <div class="form-group">
                 <label class="form-label">Pincode <span class="req">*</span></label>
-                <input type="text" class="form-control" name="pincode" placeholder="392001" required />
+                <input type="text" class="form-control" name="pincode" placeholder="e.g. 392001" maxlength="6" pattern="^[1-9][0-9]{5}$" autocomplete="off" required />
+                <small class="form-hint">6-digit postal pincode</small>
               </div>
 
               <div class="form-group full-width" style="margin-top: 1rem;">
@@ -628,10 +632,12 @@
               <div class="form-group">
                 <label class="form-label">Official Email <span class="req">*</span></label>
                 <input type="email" class="form-control" name="email" placeholder="admin@company.com" required />
+                <small class="form-hint">Valid official email ID</small>
               </div>
               <div class="form-group">
                 <label class="form-label">Mobile Number <span class="req">*</span></label>
-                <input type="tel" class="form-control" name="phone" placeholder="+91 98000 00000" required />
+                <input type="tel" class="form-control" name="phone" placeholder="e.g. 9825012345" maxlength="10" pattern="^[6-9][0-9]{9}$" autocomplete="off" required />
+                <small class="form-hint">10-digit Indian Mobile Number</small>
               </div>
 
               <!-- MEMBERSHIP FEE PAYMENT & QR CODE SECTION AT LAST -->

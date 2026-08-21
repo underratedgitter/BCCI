@@ -1190,6 +1190,52 @@ textarea.form-control {
   min-height: 110px;
 }
 
+/* Form Validation & Error Feedback Styles */
+.form-control.is-invalid, 
+.form-select.is-invalid {
+  border-color: #EF4444 !important;
+  background-color: #FEF2F2 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+}
+
+.form-control.is-valid, 
+.form-select.is-valid {
+  border-color: #10B981 !important;
+  background-color: #F0FDF4 !important;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12) !important;
+}
+
+.error-msg {
+  color: #DC2626;
+  font-size: 0.8rem;
+  font-weight: 500;
+  margin-top: 0.35rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  animation: formErrorFade 0.2s ease-in-out;
+}
+
+.error-msg::before {
+  content: "\f06a";
+  font-family: "Font Awesome 6 Free";
+  font-weight: 900;
+  font-size: 0.8rem;
+}
+
+.form-hint {
+  color: #64748B;
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+  display: block;
+}
+
+@keyframes formErrorFade {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+
 /* Admin Dashboard */
 .admin-layout {
   display: grid;

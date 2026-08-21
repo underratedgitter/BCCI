@@ -16,6 +16,7 @@ class App {
     this.bindNavigation();
     this.updateNavAuthUI();
     this.renderView('home');
+    this.setupFormValidation();
     this.setupFormHandlers();
     this.setupModalEvents();
     this.setupLightboxEvents();
@@ -188,12 +189,206 @@ class App {
     }
   }
 
+  setupFormValidation() {
+    const forms = [document.getElementById('membershipForm'), document.getElementById('enquiryForm')];
+    
+    forms.forEach(form => {
+      if (!form) return;
+
+      const phoneInput = form.querySelector('input[name="phone"]');
+      const panInput = form.querySelector('input[name="panNo"]');
+      const gstInput = form.querySelector('input[name="gstNo"]');
+      const cinInput = form.querySelector('input[name="cin"]');
+      const pincodeInput = form.querySelector('input[name="pincode"]');
+
+      // 1. Phone number live sanitization (digits only, max 10 chars)
+      if (phoneInput) {
+        phoneInput.addEventListener('input', (e) => {
+          e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10);
+          this.validateField(phoneInput);
+        });
+        phoneInput.addEventListener('blur', () => this.validateField(phoneInput));
+      }
+
+      // 2. PAN Card live formatting (auto-uppercase, alphanumeric only, max 10 chars)
+      if (panInput) {
+        panInput.addEventListener('input', (e) => {
+          e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+          this.validateField(panInput);
+        });
+        panInput.addEventListener('blur', () => this.validateField(panInput));
+      }
+
+      // 3. GSTIN live formatting (auto-uppercase, alphanumeric only, max 15 chars)
+      if (gstInput) {
+        gstInput.addEventListener('input', (e) => {
+          e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15);
+          this.validateField(gstInput);
+        });
+        gstInput.addEventListener('blur', () => this.validateField(gstInput));
+      }
+
+      // 4. CIN live formatting (auto-uppercase, alphanumeric only, max 21 chars)
+      if (cinInput) {
+        cinInput.addEventListener('input', (e) => {
+          e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 21);
+          this.validateField(cinInput);
+        });
+        cinInput.addEventListener('blur', () => this.validateField(cinInput));
+      }
+
+      // 5. Pincode live formatting (digits only, max 6 chars)
+      if (pincodeInput) {
+        pincodeInput.addEventListener('input', (e) => {
+          e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
+          this.validateField(pincodeInput);
+        });
+        pincodeInput.addEventListener('blur', () => this.validateField(pincodeInput));
+      }
+
+      // Bind validation triggers to all input fields
+      form.querySelectorAll('input, select, textarea').forEach(input => {
+        if (!['phone', 'panNo', 'gstNo', 'cin', 'pincode'].includes(input.name)) {
+          input.addEventListener('blur', () => this.validateField(input));
+          input.addEventListener('input', () => {
+            if (input.classList.contains('is-invalid')) {
+              this.validateField(input);
+            }
+          });
+        }
+      });
+    });
+  }
+
+  validateField(input) {
+    const name = input.name;
+    const val = input.value.trim();
+    let isValid = true;
+    let errorMsg = '';
+
+    // Find or create error container
+    let errorDiv = input.parentNode.querySelector('.error-msg');
+    if (!errorDiv) {
+      errorDiv = document.createElement('div');
+      errorDiv.className = 'error-msg';
+      input.parentNode.appendChild(errorDiv);
+    }
+
+    if (input.hasAttribute('required') && !val) {
+      isValid = false;
+      errorMsg = 'This field is required.';
+    } else if (val) {
+      switch (name) {
+        case 'phone':
+          if (!/^[6-9]\d{9}$/.test(val)) {
+            isValid = false;
+            errorMsg = 'Please enter a valid 10-digit mobile number (starting 6-9).';
+          }
+          break;
+        case 'panNo':
+          if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(val)) {
+            isValid = false;
+            errorMsg = 'Invalid PAN format. Must be 10 characters (e.g. ABCDE1234F).';
+          }
+          break;
+        case 'gstNo':
+          if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}[Zz][0-9A-Z]{1}$/.test(val)) {
+            isValid = false;
+            errorMsg = 'Invalid GSTIN format. Must be 15 characters (e.g. 24AAAAA0000A1Z5).';
+          }
+          break;
+        case 'pincode':
+          if (!/^[1-9][0-9]{5}$/.test(val)) {
+            isValid = false;
+            errorMsg = 'Please enter a valid 6-digit Pincode (e.g. 392001).';
+          }
+          break;
+        case 'cin':
+          if (val.length > 0 && !/^[LUu][0-9]{5}[A-Za-z]{2}[0-9]{4}[A-Za-z]{3}[0-9]{6}$/.test(val)) {
+            isValid = false;
+            errorMsg = 'Invalid CIN format. Must be 21 characters (e.g. L24110GJ1998PLC034120).';
+          }
+          break;
+        case 'email':
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+            isValid = false;
+            errorMsg = 'Please enter a valid email address (e.g. admin@company.com).';
+          }
+          break;
+        case 'company':
+        case 'repName':
+        case 'name':
+        case 'repDesignation':
+        case 'address':
+        case 'message':
+          if (val.length < 2) {
+            isValid = false;
+            errorMsg = 'Must be at least 2 characters.';
+          }
+          break;
+        case 'employees':
+          if (parseInt(val, 10) < 1) {
+            isValid = false;
+            errorMsg = 'Employee headcount must be at least 1.';
+          }
+          break;
+        case 'paymentRef':
+          if (val.length > 0 && val.length < 6) {
+            isValid = false;
+            errorMsg = 'UTR Reference must be at least 6 characters.';
+          }
+          break;
+      }
+    }
+
+    if (!isValid) {
+      input.classList.add('is-invalid');
+      input.classList.remove('is-valid');
+      errorDiv.textContent = errorMsg;
+      errorDiv.style.display = 'flex';
+    } else {
+      input.classList.remove('is-invalid');
+      if (val) {
+        input.classList.add('is-valid');
+      } else {
+        input.classList.remove('is-valid');
+      }
+      errorDiv.textContent = '';
+      errorDiv.style.display = 'none';
+    }
+
+    return isValid;
+  }
+
   setupFormHandlers() {
     // Membership Form Submission
     const membershipForm = document.getElementById('membershipForm');
     if (membershipForm) {
       membershipForm.addEventListener('submit', (e) => {
         e.preventDefault();
+        
+        // Validate all fields
+        let firstInvalidInput = null;
+        let isFormValid = true;
+
+        const inputs = membershipForm.querySelectorAll('input, select, textarea');
+        inputs.forEach(input => {
+          const isFieldValid = this.validateField(input);
+          if (!isFieldValid && !firstInvalidInput) {
+            firstInvalidInput = input;
+            isFormValid = false;
+          }
+        });
+
+        if (!isFormValid) {
+          if (firstInvalidInput) {
+            firstInvalidInput.focus();
+            firstInvalidInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+          this.showToast('Please fix the highlighted errors in red before submitting.', 'warning');
+          return;
+        }
+
         const formData = new FormData(membershipForm);
         const data = Object.fromEntries(formData.entries());
 
@@ -220,8 +415,13 @@ class App {
           'Status': 'Pending Admin Approval'
         });
 
-        // Reset Form
+        // Reset Form & Clear validation classes
         membershipForm.reset();
+        membershipForm.querySelectorAll('input, select, textarea').forEach(input => {
+          input.classList.remove('is-valid', 'is-invalid');
+          const errDiv = input.parentNode.querySelector('.error-msg');
+          if (errDiv) errDiv.style.display = 'none';
+        });
 
         // Show Success Confirmation Modal
         this.showModal({
@@ -252,6 +452,29 @@ class App {
     if (enquiryForm) {
       enquiryForm.addEventListener('submit', (e) => {
         e.preventDefault();
+
+        // Validate enquiry form fields
+        let firstInvalidInput = null;
+        let isFormValid = true;
+
+        const inputs = enquiryForm.querySelectorAll('input, select, textarea');
+        inputs.forEach(input => {
+          const isFieldValid = this.validateField(input);
+          if (!isFieldValid && !firstInvalidInput) {
+            firstInvalidInput = input;
+            isFormValid = false;
+          }
+        });
+
+        if (!isFormValid) {
+          if (firstInvalidInput) {
+            firstInvalidInput.focus();
+            firstInvalidInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+          this.showToast('Please fix the highlighted errors in red before submitting.', 'warning');
+          return;
+        }
+
         const formData = new FormData(enquiryForm);
         const data = Object.fromEntries(formData.entries());
 
@@ -270,6 +493,11 @@ class App {
         });
 
         enquiryForm.reset();
+        enquiryForm.querySelectorAll('input, select, textarea').forEach(input => {
+          input.classList.remove('is-valid', 'is-invalid');
+          const errDiv = input.parentNode.querySelector('.error-msg');
+          if (errDiv) errDiv.style.display = 'none';
+        });
 
         this.showModal({
           title: 'Enquiry Received',
