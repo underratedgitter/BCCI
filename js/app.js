@@ -26,43 +26,53 @@ class App {
   }
 
   updateNavAuthUI() {
-    const container = document.getElementById('navAuthContainer');
-    if (!container) return;
+    const desktopContainer = document.getElementById('navAuthContainer');
+    const drawerContainer = document.getElementById('mobileDrawerAuthContainer');
 
-    if (this.adminAuthed) {
-      container.innerHTML = `
+    const html = this.adminAuthed ? `
+      <button class="btn-admin-access" data-view-nav="admin" title="Admin Portal Active" style="width: 100%; justify-content: center;">
+        <i class="fas fa-user-shield"></i> Admin Portal
+      </button>
+      <button class="btn-signout-nav btnNavSignOut" title="Sign Out Admin Session" style="width: 100%; justify-content: center; margin-top: 0.5rem;">
+        <i class="fas fa-sign-out-alt"></i> Sign Out
+      </button>
+    ` : `
+      <button class="btn-signin-nav" data-view-nav="signin" style="width: 100%; justify-content: center;">
+        <i class="fas fa-sign-in-alt"></i> Admin Sign In
+      </button>
+    `;
+
+    if (desktopContainer) {
+      desktopContainer.innerHTML = this.adminAuthed ? `
         <button class="btn-admin-access" data-view-nav="admin" title="Admin Portal Active">
           <i class="fas fa-user-shield"></i> Admin Portal
         </button>
-        <button class="btn-signout-nav" id="btnNavSignOut" title="Sign Out Admin Session">
+        <button class="btn-signout-nav btnNavSignOut" title="Sign Out Admin Session">
           <i class="fas fa-sign-out-alt"></i> Sign Out
         </button>
-      `;
-
-      const signOutBtn = document.getElementById('btnNavSignOut');
-      if (signOutBtn) {
-        signOutBtn.addEventListener('click', () => this.handleSignOut());
-      }
-      container.querySelectorAll('[data-view-nav]').forEach(el => {
-        el.addEventListener('click', (e) => {
-          e.preventDefault();
-          this.renderView(el.getAttribute('data-view-nav'));
-        });
-      });
-    } else {
-      container.innerHTML = `
+      ` : `
         <button class="btn-signin-nav" data-view-nav="signin">
           <i class="fas fa-sign-in-alt"></i> Admin Sign In
         </button>
       `;
-
-      container.querySelectorAll('[data-view-nav]').forEach(el => {
-        el.addEventListener('click', (e) => {
-          e.preventDefault();
-          this.renderView(el.getAttribute('data-view-nav'));
-        });
-      });
     }
+
+    if (drawerContainer) {
+      drawerContainer.innerHTML = html;
+    }
+
+    // Bind click events on auth buttons
+    document.querySelectorAll('.btnNavSignOut').forEach(btn => {
+      btn.addEventListener('click', () => this.handleSignOut());
+    });
+
+    document.querySelectorAll('#navAuthContainer [data-view-nav], #mobileDrawerAuthContainer [data-view-nav]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.closeMobileDrawer();
+        this.renderView(el.getAttribute('data-view-nav'));
+      });
+    });
   }
 
   handleSignOut() {
@@ -73,22 +83,66 @@ class App {
     this.renderView('home');
   }
 
+  openMobileDrawer() {
+    const drawer = document.getElementById('mobileNavDrawer');
+    const backdrop = document.getElementById('mobileDrawerBackdrop');
+    if (drawer) drawer.classList.add('open');
+    if (backdrop) backdrop.classList.add('show');
+    document.body.style.overflow = 'hidden';
+  }
+
+  closeMobileDrawer() {
+    const drawer = document.getElementById('mobileNavDrawer');
+    const backdrop = document.getElementById('mobileDrawerBackdrop');
+    if (drawer) drawer.classList.remove('open');
+    if (backdrop) backdrop.classList.remove('show');
+    document.body.style.overflow = '';
+  }
+
   bindNavigation() {
     document.querySelectorAll('[data-view-nav]').forEach(element => {
       element.addEventListener('click', (e) => {
         e.preventDefault();
         const targetView = element.getAttribute('data-view-nav');
+        this.closeMobileDrawer();
         this.renderView(targetView);
       });
     });
 
-    // Mobile nav toggle
+    // Mobile nav drawer open / close handlers
     const mobileBtn = document.getElementById('mobileMenuBtn');
-    const navLinks = document.getElementById('navLinks');
-    if (mobileBtn && navLinks) {
-      mobileBtn.addEventListener('click', () => {
-        navLinks.classList.toggle('show');
-      });
+    const closeBtn = document.getElementById('mobileDrawerCloseBtn');
+    const backdrop = document.getElementById('mobileDrawerBackdrop');
+    const drawer = document.getElementById('mobileNavDrawer');
+
+    if (mobileBtn) {
+      mobileBtn.addEventListener('click', () => this.openMobileDrawer());
+    }
+
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => this.closeMobileDrawer());
+    }
+
+    if (backdrop) {
+      backdrop.addEventListener('click', () => this.closeMobileDrawer());
+    }
+
+    // Touch Swipe Gesture for Mobile Drawer (Swipe Right to Close)
+    if (drawer) {
+      let touchStartX = 0;
+      let touchEndX = 0;
+
+      drawer.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+      }, { passive: true });
+
+      drawer.addEventListener('touchend', (e) => {
+        touchEndX = e.changedTouches[0].screenX;
+        if (touchEndX - touchStartX > 50) {
+          // Swiped right -> close drawer
+          this.closeMobileDrawer();
+        }
+      }, { passive: true });
     }
   }
 
@@ -101,9 +155,17 @@ class App {
 
     this.currentView = viewId;
 
-    // Highlight Active Nav
+    // Highlight Active Nav across Desktop, Mobile Drawer, and Mobile Bottom Bar
     document.querySelectorAll('.nav-link').forEach(link => {
       link.classList.toggle('active', link.getAttribute('data-view-nav') === viewId);
+    });
+
+    document.querySelectorAll('.mobile-drawer-link').forEach(link => {
+      link.classList.toggle('active', link.getAttribute('data-view-nav') === viewId);
+    });
+
+    document.querySelectorAll('.mobile-bottom-tab').forEach(tab => {
+      tab.classList.toggle('active', tab.getAttribute('data-view-nav') === viewId);
     });
 
     // Hide all view containers
@@ -677,10 +739,12 @@ class App {
     document.getElementById('metricApproved').textContent = approvedApps.length;
     document.getElementById('metricRejected').textContent = rejectedApps.length;
 
-    // Render Pending Applications Table
+    // Render Pending Applications (Table & Mobile Cards)
     const pendingTableBody = document.getElementById('pendingAppsBody');
-    if (pendingTableBody) {
-      if (pendingApps.length === 0) {
+    const pendingCards = document.getElementById('pendingAppsCards');
+
+    if (pendingApps.length === 0) {
+      if (pendingTableBody) {
         pendingTableBody.innerHTML = `
           <tr>
             <td colspan="7" style="text-align: center; color: #94A3B8; padding: 2rem;">
@@ -689,7 +753,17 @@ class App {
             </td>
           </tr>
         `;
-      } else {
+      }
+      if (pendingCards) {
+        pendingCards.innerHTML = `
+          <div class="admin-mobile-card" style="text-align: center; color: #94A3B8; padding: 2rem;">
+            <i class="fas fa-check-double" style="font-size: 1.8rem; margin-bottom: 0.5rem; display: block;"></i>
+            No pending applications requiring approval.
+          </div>
+        `;
+      }
+    } else {
+      if (pendingTableBody) {
         pendingTableBody.innerHTML = pendingApps.map(app => `
           <tr>
             <td><strong>${app.id}</strong></td>
@@ -717,18 +791,55 @@ class App {
           </tr>
         `).join('');
       }
+      if (pendingCards) {
+        pendingCards.innerHTML = pendingApps.map(app => `
+          <div class="admin-mobile-card">
+            <div class="admin-card-header">
+              <div>
+                <div class="admin-card-company">${app.company}</div>
+                <small style="color: #64748B;">${app.legalStatus} • ${app.enterpriseType}</small>
+              </div>
+              <span class="admin-card-id">${app.id}</span>
+            </div>
+            <div class="admin-card-meta">
+              <div><strong>Rep:</strong> ${app.repName || app.firstName + ' ' + app.lastName}</div>
+              <div><strong>Sector:</strong> ${app.businessServices}</div>
+              <div><strong>Status:</strong> <span class="badge-status badge-pending"><i class="fas fa-clock"></i> Pending</span></div>
+              <div><strong>Date:</strong> ${new Date(app.submittedAt).toLocaleDateString()}</div>
+            </div>
+            <div class="admin-card-actions">
+              <button class="btn-action-approve" data-approve-id="${app.id}">
+                <i class="fas fa-check"></i> Approve
+              </button>
+              <button class="btn-action-reject" data-reject-id="${app.id}">
+                <i class="fas fa-times"></i> Reject
+              </button>
+              <button class="btn-secondary" data-inspect-id="${app.id}">
+                <i class="fas fa-eye"></i> Inspect
+              </button>
+            </div>
+          </div>
+        `).join('');
+      }
     }
 
-    // Render Approved Members Directory Table
+    // Render Approved Members Directory (Table & Mobile Cards)
     const approvedTableBody = document.getElementById('approvedAppsBody');
-    if (approvedTableBody) {
-      if (approvedApps.length === 0) {
+    const approvedCards = document.getElementById('approvedAppsCards');
+
+    if (approvedApps.length === 0) {
+      if (approvedTableBody) {
         approvedTableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 2rem; color: #94A3B8;">No approved members yet.</td></tr>`;
-      } else {
+      }
+      if (approvedCards) {
+        approvedCards.innerHTML = `<div class="admin-mobile-card" style="text-align: center; color: #94A3B8; padding: 2rem;">No approved members yet.</div>`;
+      }
+    } else {
+      if (approvedTableBody) {
         approvedTableBody.innerHTML = approvedApps.map(app => `
           <tr>
             <td><strong>${app.id}</strong></td>
-            <td><strong style="color: #FFF;">${app.company}</strong></td>
+            <td><strong style="color: var(--primary);">${app.company}</strong></td>
             <td>${app.repName || app.firstName + ' ' + app.lastName}</td>
             <td>${app.email}</td>
             <td><span class="badge-status badge-approved"><i class="fas fa-check-circle"></i> Active Member</span></td>
@@ -736,20 +847,67 @@ class App {
           </tr>
         `).join('');
       }
+      if (approvedCards) {
+        approvedCards.innerHTML = approvedApps.map(app => `
+          <div class="admin-mobile-card">
+            <div class="admin-card-header">
+              <div>
+                <div class="admin-card-company">${app.company}</div>
+                <small style="color: #64748B;">${app.email}</small>
+              </div>
+              <span class="admin-card-id">${app.id}</span>
+            </div>
+            <div class="admin-card-meta">
+              <div><strong>Rep:</strong> ${app.repName || app.firstName + ' ' + app.lastName}</div>
+              <div><strong>Status:</strong> <span class="badge-status badge-approved"><i class="fas fa-check-circle"></i> Active Member</span></div>
+              <div><strong>Approved:</strong> ${app.approvedAt ? new Date(app.approvedAt).toLocaleDateString() : 'Active'}</div>
+            </div>
+          </div>
+        `).join('');
+      }
     }
 
-    // Render Enquiries Table
+    // Render Enquiries (Table & Mobile Cards)
     const enquiriesTableBody = document.getElementById('enquiriesBody');
-    if (enquiriesTableBody) {
-      enquiriesTableBody.innerHTML = enquiries.map(enq => `
-        <tr>
-          <td><strong>${enq.id}</strong></td>
-          <td>${enq.name}<br/><small style="color: #94A3B8;">${enq.company || '-'}</small></td>
-          <td>${enq.email}<br/><small style="color: #94A3B8;">${enq.phone}</small></td>
-          <td>${enq.subject}</td>
-          <td>${new Date(enq.submittedAt).toLocaleDateString()}</td>
-        </tr>
-      `).join('');
+    const enquiriesCards = document.getElementById('enquiriesCards');
+
+    if (enquiries.length === 0) {
+      if (enquiriesTableBody) {
+        enquiriesTableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 2rem; color: #94A3B8;">No enquiries yet.</td></tr>`;
+      }
+      if (enquiriesCards) {
+        enquiriesCards.innerHTML = `<div class="admin-mobile-card" style="text-align: center; color: #94A3B8; padding: 2rem;">No enquiries yet.</div>`;
+      }
+    } else {
+      if (enquiriesTableBody) {
+        enquiriesTableBody.innerHTML = enquiries.map(enq => `
+          <tr>
+            <td><strong>${enq.id}</strong></td>
+            <td>${enq.name}<br/><small style="color: #94A3B8;">${enq.company || '-'}</small></td>
+            <td>${enq.email}<br/><small style="color: #94A3B8;">${enq.phone}</small></td>
+            <td>${enq.subject}</td>
+            <td>${new Date(enq.submittedAt).toLocaleDateString()}</td>
+          </tr>
+        `).join('');
+      }
+      if (enquiriesCards) {
+        enquiriesCards.innerHTML = enquiries.map(enq => `
+          <div class="admin-mobile-card">
+            <div class="admin-card-header">
+              <div>
+                <div class="admin-card-company">${enq.subject}</div>
+                <small style="color: #64748B;">From: ${enq.name} (${enq.company || 'Individual'})</small>
+              </div>
+              <span class="admin-card-id">${enq.id}</span>
+            </div>
+            <div class="admin-card-meta">
+              <div><strong>Email:</strong> ${enq.email}</div>
+              <div><strong>Phone:</strong> ${enq.phone}</div>
+              <div><strong>Date:</strong> ${new Date(enq.submittedAt).toLocaleDateString()}</div>
+            </div>
+          </div>
+        `).join('');
+      }
     }
 
     // Bind Action Buttons

@@ -2,7 +2,10 @@
 <html lang="en-IN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0F2C59" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>Bharuch Chamber of Commerce & Industry (BCCI) | Official Portal</title>
   <meta name="description" content="Official website of Bharuch Chamber of Commerce & Industry (BCCI) - Asia's largest industrial hub representing 12,000+ MSMEs and 625+ large industries." />
   
@@ -54,6 +57,50 @@
       </button>
     </div>
   </nav>
+
+  <!-- Mobile Off-Canvas Drawer Backdrop & Drawer -->
+  <div class="mobile-drawer-backdrop" id="mobileDrawerBackdrop"></div>
+  <aside class="mobile-drawer" id="mobileNavDrawer" aria-label="Mobile navigation menu">
+    <div class="mobile-drawer-header">
+      <div class="mobile-drawer-brand">
+        <img src="assets/BCCIBHARUCH.webp" alt="BCCI Logo" class="mobile-drawer-logo" />
+        <div>
+          <div class="mobile-drawer-title">BCCI Bharuch</div>
+          <div class="mobile-drawer-subtitle">Asia's Industrial Hub</div>
+        </div>
+      </div>
+      <button class="mobile-drawer-close" id="mobileDrawerCloseBtn" aria-label="Close menu">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <div class="mobile-drawer-body">
+      <ul class="mobile-drawer-links">
+        <li><a href="#" class="mobile-drawer-link active" data-view-nav="home"><i class="fas fa-home"></i> Home</a></li>
+        <li><a href="#" class="mobile-drawer-link" data-view-nav="about"><i class="fas fa-info-circle"></i> About Us</a></li>
+        <li><a href="#" class="mobile-drawer-link" data-view-nav="services"><i class="fas fa-th-list"></i> Services</a></li>
+        <li><a href="#" class="mobile-drawer-link" data-view-nav="gallery"><i class="fas fa-newspaper"></i> News &amp; Blogs</a></li>
+        <li><a href="#" class="mobile-drawer-link" data-view-nav="qrcode"><i class="fas fa-qrcode"></i> Scan &amp; Pay QR</a></li>
+        <li><a href="#" class="mobile-drawer-link" data-view-nav="enquiry"><i class="fas fa-paper-plane"></i> Enquiry Form</a></li>
+      </ul>
+
+      <div class="mobile-drawer-actions">
+        <button class="btn-primary" data-view-nav="membership" style="width: 100%; justify-content: center; margin-bottom: 0.75rem;">
+          <i class="fas fa-building"></i> Apply for Membership
+        </button>
+        <div id="mobileDrawerAuthContainer"></div>
+      </div>
+
+      <div class="mobile-drawer-contact">
+        <div class="mobile-contact-item"><i class="fas fa-phone-alt"></i> +91 7861906384</div>
+        <div class="mobile-contact-item"><i class="fas fa-envelope"></i> admin@bccibharuch.in</div>
+        <div class="mobile-contact-item"><i class="fas fa-map-marker-alt"></i> City Center, Station Road, Bharuch</div>
+        <a href="https://wa.me/917861906384" target="_blank" rel="noopener" class="mobile-whatsapp-btn">
+          <i class="fab fa-whatsapp"></i> Chat on WhatsApp
+        </a>
+      </div>
+    </div>
+  </aside>
 
   <!-- MAIN VIEW CONTAINERS -->
 
@@ -829,7 +876,7 @@
               <h3 style="margin-bottom: 1.5rem; font-size: 1.2rem; color: var(--accent-gold);">
                 <i class="fas fa-exclamation-circle"></i> Applications Awaiting Admin Approval
               </h3>
-              <div class="table-responsive">
+              <div class="table-responsive desktop-only-table">
                 <table class="data-table">
                   <thead>
                     <tr>
@@ -845,6 +892,7 @@
                   <tbody id="pendingAppsBody"></tbody>
                 </table>
               </div>
+              <div class="admin-mobile-cards" id="pendingAppsCards"></div>
             </div>
 
             <!-- Tab 2: Approved Members -->
@@ -852,7 +900,7 @@
               <h3 style="margin-bottom: 1.5rem; font-size: 1.2rem; color: var(--success);">
                 <i class="fas fa-check-circle"></i> Active Approved BCCI Members Directory
               </h3>
-              <div class="table-responsive">
+              <div class="table-responsive desktop-only-table">
                 <table class="data-table">
                   <thead>
                     <tr>
@@ -867,6 +915,7 @@
                   <tbody id="approvedAppsBody"></tbody>
                 </table>
               </div>
+              <div class="admin-mobile-cards" id="approvedAppsCards"></div>
             </div>
 
             <!-- Tab 3: Enquiry Inbox -->
@@ -874,7 +923,7 @@
               <h3 style="margin-bottom: 1.5rem; font-size: 1.2rem; color: var(--accent-blue);">
                 <i class="fas fa-inbox"></i> Incoming General Enquiries
               </h3>
-              <div class="table-responsive">
+              <div class="table-responsive desktop-only-table">
                 <table class="data-table">
                   <thead>
                     <tr>
@@ -888,6 +937,7 @@
                   <tbody id="enquiriesBody"></tbody>
                 </table>
               </div>
+              <div class="admin-mobile-cards" id="enquiriesCards"></div>
             </div>
           </div>
         </div>
@@ -947,6 +997,30 @@
       </div>
     </div>
   </footer>
+
+  <!-- Native Mobile Bottom Navigation Bar -->
+  <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Mobile application navigation">
+    <a href="#" class="mobile-bottom-tab active" data-view-nav="home">
+      <i class="fas fa-home"></i>
+      <span>Home</span>
+    </a>
+    <a href="#" class="mobile-bottom-tab" data-view-nav="services">
+      <i class="fas fa-th-list"></i>
+      <span>Services</span>
+    </a>
+    <a href="#" class="mobile-bottom-tab" data-view-nav="gallery">
+      <i class="fas fa-newspaper"></i>
+      <span>News</span>
+    </a>
+    <a href="#" class="mobile-bottom-tab" data-view-nav="membership">
+      <i class="fas fa-file-signature"></i>
+      <span>Apply</span>
+    </a>
+    <a href="#" class="mobile-bottom-tab" data-view-nav="qrcode">
+      <i class="fas fa-qrcode"></i>
+      <span>QR Pay</span>
+    </a>
+  </nav>
 
   <!-- App Main ES Module -->
   <script type="module" src="js/app.js"></script>
