@@ -47,70 +47,16 @@ class App {
       });
     } else {
       container.innerHTML = `
-        <button class="btn-signin-nav" id="btnNavSignIn">
+        <button class="btn-signin-nav" data-view-nav="signin">
           <i class="fas fa-sign-in-alt"></i> Admin Sign In
         </button>
       `;
 
-      const signInBtn = document.getElementById('btnNavSignIn');
-      if (signInBtn) {
-        signInBtn.addEventListener('click', () => this.showAdminSignInModal());
-      }
-    }
-  }
-
-  showAdminSignInModal() {
-    this.showModal({
-      title: 'Admin Sign In Portal',
-      content: `
-        <form id="adminLoginForm" style="padding-top: 0.5rem;">
-          <div style="text-align: center; margin-bottom: 1.5rem;">
-            <div style="width: 56px; height: 56px; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--primary); font-size: 1.5rem; margin-bottom: 0.75rem;">
-              <i class="fas fa-user-shield"></i>
-            </div>
-            <h4 style="color: var(--primary); font-size: 1.15rem; margin-bottom: 0.3rem;">BCCI Admin Authentication</h4>
-            <p style="color: var(--text-muted); font-size: 0.85rem;">Sign in with official administrator credentials to access approval portal.</p>
-          </div>
-
-          <div style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.25rem;">
-            <div class="form-group">
-              <label class="form-label">Username / Official Email <span class="req">*</span></label>
-              <input type="text" id="adminUser" class="form-control" placeholder="e.g. admin" required value="admin" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Password <span class="req">*</span></label>
-              <input type="password" id="adminPass" class="form-control" placeholder="Enter password" required value="admin123" />
-            </div>
-          </div>
-
-          <div style="background: #F8FAFC; border: 1px solid var(--border-color); padding: 0.75rem 1rem; border-radius: var(--radius-sm); font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1.5rem;">
-            <i class="fas fa-key" style="color: var(--accent-gold-dark);"></i> <strong>Admin Credentials:</strong> Username: <code style="font-weight: 700; color: var(--primary);">admin</code> | Password: <code style="font-weight: 700; color: var(--primary);">admin123</code>
-          </div>
-
-          <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.8rem;">
-            <i class="fas fa-sign-in-alt"></i> Sign In to Admin Portal
-          </button>
-        </form>
-      `
-    });
-
-    const form = document.getElementById('adminLoginForm');
-    if (form) {
-      form.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const user = document.getElementById('adminUser').value.trim();
-        const pass = document.getElementById('adminPass').value.trim();
-
-        if (this.store.validateAdminCredentials(user, pass)) {
-          this.store.setAdminAuth(true);
-          this.adminAuthed = true;
-          this.closeModal();
-          this.updateNavAuthUI();
-          this.showToast('Admin signed in successfully!', 'success');
-          this.renderView('admin');
-        } else {
-          this.showToast('Invalid Username or Password. Please try again.', 'warning');
-        }
+      container.querySelectorAll('[data-view-nav]').forEach(el => {
+        el.addEventListener('click', (e) => {
+          e.preventDefault();
+          this.renderView(el.getAttribute('data-view-nav'));
+        });
       });
     }
   }
@@ -145,7 +91,7 @@ class App {
   renderView(viewId) {
     // PROTECT ADMIN VIEW - REQUIRE ADMIN AUTHENTICATION
     if (viewId === 'admin' && !this.adminAuthed) {
-      this.showAdminSignInModal();
+      this.renderView('signin');
       return;
     }
 
@@ -253,6 +199,27 @@ class App {
 
         const newApp = this.store.addApplication(data);
 
+        // Send instant email notification to admin
+        this.sendEmailNotification(`New BCCI Membership Application: ${data.company || newApp.id}`, {
+          'Application ID': newApp.id,
+          'Company Name': data.company,
+          'Legal Status': data.legalStatus,
+          'Enterprise Scale': data.enterpriseType,
+          'Business Sector': data.businessServices,
+          'GSTIN Number': data.gstNo,
+          'PAN Number': data.panNo,
+          'CIN Number': data.cin || 'N/A',
+          'Turnover': data.annualTurnover || 'N/A',
+          'Employees': data.employees || 'N/A',
+          'Office Address': `${data.address}, ${data.district}, Pincode: ${data.pincode}`,
+          'Authorized Representative': data.repName,
+          'Designation': data.repDesignation,
+          'Official Email': data.email,
+          'Mobile Number': data.phone,
+          'Payment UTR Ref': data.paymentRef || 'Not Provided',
+          'Status': 'Pending Admin Approval'
+        });
+
         // Reset Form
         membershipForm.reset();
 
@@ -261,14 +228,15 @@ class App {
           title: 'Membership Registration Submitted',
           content: `
             <div style="text-align: center; padding: 1rem 0;">
-              <i class="fas fa-clock" style="font-size: 3.5rem; color: #F59E0B; margin-bottom: 1.25rem;"></i>
-              <h3 style="margin-bottom: 0.8rem;">Application Pending Admin Approval</h3>
+              <i class="fas fa-check-circle" style="font-size: 3.5rem; color: #10B981; margin-bottom: 1.25rem;"></i>
+              <h3 style="margin-bottom: 0.8rem;">Application Submitted &amp; Email Sent</h3>
               <p style="color: #94A3B8; margin-bottom: 1.5rem; font-size: 0.95rem;">
                 Thank you for applying to join <strong>Bharuch Chamber of Commerce & Industry</strong>.<br/>
-                Your Application ID is <strong style="color: #FFD700;">${newApp.id}</strong>.
+                Your Application ID is <strong style="color: #FFD700;">${newApp.id}</strong>.<br/>
+                An instant notification has been dispatched to <strong>sp9023156004@gmail.com</strong>.
               </p>
-              <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); padding: 1rem; border-radius: 8px; font-size: 0.85rem; color: #F59E0B; text-align: left; margin-bottom: 1.5rem;">
-                <i class="fas fa-info-circle"></i> <strong>Note:</strong> As per BCCI policy, user accounts are activated <u>only after explicit Admin verification</u>. You can check the Admin Portal to view your application status.
+              <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 1rem; border-radius: 8px; font-size: 0.85rem; color: #059669; text-align: left; margin-bottom: 1.5rem;">
+                <i class="fas fa-info-circle"></i> <strong>Admin Review:</strong> As per BCCI policy, user accounts are activated after Admin verification.
               </div>
               <button class="btn-primary" id="modalCloseBtn" style="width: 100%; justify-content: center;">
                 Understood & Continue
@@ -288,6 +256,19 @@ class App {
         const data = Object.fromEntries(formData.entries());
 
         const newEnq = this.store.addEnquiry(data);
+
+        // Send instant email notification to admin
+        this.sendEmailNotification(`New BCCI General Enquiry: ${data.subject || newEnq.id}`, {
+          'Enquiry Ref ID': newEnq.id,
+          'Sender Name': data.name,
+          'Company': data.company || 'N/A',
+          'Email': data.email,
+          'Phone': data.phone,
+          'Membership Interest': data.membershipType,
+          'Subject': data.subject,
+          'Message': data.message
+        });
+
         enquiryForm.reset();
 
         this.showModal({
@@ -297,12 +278,33 @@ class App {
               <i class="fas fa-check-circle" style="font-size: 3.5rem; color: #10B981; margin-bottom: 1.25rem;"></i>
               <h3 style="margin-bottom: 0.8rem;">Thank You for Contacting BCCI</h3>
               <p style="color: #94A3B8; margin-bottom: 1.5rem; font-size: 0.95rem;">
-                Your enquiry (Ref: <strong style="color: #FFD700;">${newEnq.id}</strong>) has been routed to our secretarial team. We will respond within 24 hours.
+                Your enquiry (Ref: <strong style="color: #FFD700;">${newEnq.id}</strong>) has been routed to <strong>sp9023156004@gmail.com</strong>. We will respond within 24 hours.
               </p>
               <button class="btn-primary" id="modalCloseBtn" style="width: 100%; justify-content: center;">Close</button>
             </div>
           `
         });
+      });
+    }
+
+    // Page Admin Login Form Submission
+    const pageAdminLoginForm = document.getElementById('pageAdminLoginForm');
+    if (pageAdminLoginForm) {
+      pageAdminLoginForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const user = document.getElementById('pageAdminUser').value.trim();
+        const pass = document.getElementById('pageAdminPass').value.trim();
+
+        if (this.store.validateAdminCredentials(user, pass)) {
+          this.store.setAdminAuth(true);
+          this.adminAuthed = true;
+          pageAdminLoginForm.reset();
+          this.updateNavAuthUI();
+          this.showToast('Admin signed in successfully!', 'success');
+          this.renderView('admin');
+        } else {
+          this.showToast('Invalid Username or Password. Please try again.', 'warning');
+        }
       });
     }
   }
@@ -555,6 +557,31 @@ class App {
       toast.style.transform = 'translateY(10px)';
       setTimeout(() => toast.remove(), 300);
     }, 3500);
+  }
+
+  sendEmailNotification(subject, payload) {
+    const targetEmail = 'sp9023156004@gmail.com';
+    const emailPayload = {
+      _subject: subject,
+      _template: 'table',
+      _captcha: 'false',
+      ...payload
+    };
+
+    fetch(`https://formsubmit.co/ajax/${targetEmail}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(emailPayload)
+    }).then(res => res.json())
+      .then(data => {
+        console.log('Email notification dispatched to admin:', data);
+      })
+      .catch(err => {
+        console.warn('Email dispatch notice:', err);
+      });
   }
 
   setupLightboxEvents() {

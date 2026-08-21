@@ -80,12 +80,6 @@
             <button class="btn-secondary" data-view-nav="services">
               <i class="fas fa-th-list"></i> Explore Services
             </button>
-            <button class="btn-secondary" data-view-nav="qrcode" style="border-color: var(--accent-gold); color: var(--primary);">
-              <i class="fas fa-qrcode"></i> Scan QR &amp; Pay
-            </button>
-            <button class="btn-secondary" data-view-nav="admin" style="border-color: rgba(56, 189, 248, 0.3); color: var(--accent-blue);">
-              <i class="fas fa-lock"></i> Admin Dashboard
-            </button>
           </div>
         </div>
 
@@ -699,7 +693,45 @@
     </section>
   </main>
 
-  <!-- 8. ADMIN DASHBOARD VIEW PORTAL -->
+  <!-- 8. ADMIN SIGN IN PAGE VIEW -->
+  <main id="view-signin" class="view-page" style="display: none;">
+    <section class="section-padding">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-tag"><i class="fas fa-lock"></i> Administration Access</span>
+          <h2 class="section-title">Admin Sign In Portal</h2>
+          <p class="section-desc">Authenticate with official BCCI administrator credentials to access the approval portal.</p>
+        </div>
+
+        <div class="form-container" style="max-width: 480px;">
+          <form id="pageAdminLoginForm">
+            <div style="text-align: center; margin-bottom: 2rem;">
+              <div style="width: 64px; height: 64px; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--primary); font-size: 1.75rem; margin-bottom: 1rem;">
+                <i class="fas fa-user-shield"></i>
+              </div>
+              <h3 style="color: var(--primary); font-size: 1.3rem;">Administrator Login</h3>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 1.25rem;">
+              <label class="form-label">Username / Official Email <span class="req">*</span></label>
+              <input type="text" id="pageAdminUser" class="form-control" placeholder="Enter Admin Email or Username" required autocomplete="username" />
+            </div>
+
+            <div class="form-group" style="margin-bottom: 1.75rem;">
+              <label class="form-label">Password <span class="req">*</span></label>
+              <input type="password" id="pageAdminPass" class="form-control" placeholder="Enter Password" required autocomplete="current-password" />
+            </div>
+
+            <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.85rem; font-size: 1rem;">
+              <i class="fas fa-sign-in-alt"></i> Sign In to Admin Portal
+            </button>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 9. ADMIN DASHBOARD VIEW PORTAL -->
   <main id="view-admin" class="view-page" style="display: none;">
     <section class="section-padding">
       <div class="container">
