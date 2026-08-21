@@ -9,6 +9,8 @@ class App {
     this.store = new Store();
     this.currentView = 'home';
     this.adminAuthed = this.store.isAdminAuthed();
+    this.currentPaymentProofBase64 = null;
+    this.currentPaymentProofFile = null;
     this.init();
   }
 
@@ -16,6 +18,7 @@ class App {
     this.bindNavigation();
     this.updateNavAuthUI();
     this.renderView('home');
+    this.setupFileUploadHandlers();
     this.setupFormValidation();
     this.setupFormHandlers();
     this.setupModalEvents();
@@ -189,6 +192,99 @@ class App {
     }
   }
 
+  setupFileUploadHandlers() {
+    const fileInput = document.getElementById('paymentProofInput');
+    const placeholder = document.getElementById('paymentProofPlaceholder');
+    const preview = document.getElementById('paymentProofPreview');
+    const imgEl = document.getElementById('paymentProofImg');
+    const fileNameEl = document.getElementById('paymentProofFileName');
+    const removeBtn = document.getElementById('removePaymentProofBtn');
+    const dropzone = document.getElementById('paymentProofDropzone');
+
+    if (!fileInput) return;
+
+    const handleFile = (file) => {
+      if (!file || !file.type.startsWith('image/')) {
+        this.showToast('Please select a valid image file (PNG, JPG, WEBP).', 'warning');
+        return;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        this.showToast('File size exceeds 5MB limit. Please select a smaller screenshot.', 'warning');
+        return;
+      }
+
+      this.currentPaymentProofFile = file;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        this.currentPaymentProofBase64 = e.target.result;
+        imgEl.src = e.target.result;
+        imgEl.setAttribute('data-lightbox', 'true');
+        fileNameEl.textContent = file.name;
+        preview.style.display = 'block';
+        placeholder.style.display = 'none';
+
+        if (dropzone) {
+          dropzone.classList.remove('is-invalid');
+          dropzone.classList.add('is-valid');
+          const container = dropzone.closest('.form-group') || dropzone.parentNode;
+          const errDiv = container.querySelector('.error-msg');
+          if (errDiv) errDiv.style.display = 'none';
+        }
+      };
+      reader.readAsDataURL(file);
+    };
+
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) {
+        handleFile(e.target.files[0]);
+      }
+    });
+
+    if (removeBtn) {
+      removeBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        fileInput.value = '';
+        this.currentPaymentProofBase64 = null;
+        this.currentPaymentProofFile = null;
+        imgEl.src = '';
+        fileNameEl.textContent = '';
+        preview.style.display = 'none';
+        placeholder.style.display = 'block';
+        if (dropzone) {
+          dropzone.classList.remove('is-valid', 'is-invalid');
+        }
+      });
+    }
+
+    if (dropzone) {
+      ['dragenter', 'dragover'].forEach(eventName => {
+        dropzone.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropzone.classList.add('dragover');
+        }, false);
+      });
+      ['dragleave', 'drop'].forEach(eventName => {
+        dropzone.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropzone.classList.remove('dragover');
+        }, false);
+      });
+      dropzone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        if (files && files[0]) {
+          fileInput.files = files;
+          handleFile(files[0]);
+        }
+      });
+    }
+  }
+
   setupFormValidation() {
     const forms = [document.getElementById('membershipForm'), document.getElementById('enquiryForm')];
     
@@ -267,14 +363,32 @@ class App {
     let errorMsg = '';
 
     // Find or create error container
-    let errorDiv = input.parentNode.querySelector('.error-msg');
+    let container = input.closest('.form-group') || input.parentNode;
+    let errorDiv = container.querySelector('.error-msg');
     if (!errorDiv) {
       errorDiv = document.createElement('div');
       errorDiv.className = 'error-msg';
-      input.parentNode.appendChild(errorDiv);
+      container.appendChild(errorDiv);
     }
 
-    if (input.hasAttribute('required') && !val) {
+    if (name === 'paymentProof') {
+      if (input.hasAttribute('required') && !this.currentPaymentProofBase64) {
+        isValid = false;
+        errorMsg = 'Please upload a screenshot/image of your payment confirmation.';
+      }
+      const dropzone = document.getElementById('paymentProofDropzone');
+      if (dropzone) {
+        if (!isValid) {
+          dropzone.classList.add('is-invalid');
+          dropzone.classList.remove('is-valid');
+        } else if (this.currentPaymentProofBase64) {
+          dropzone.classList.remove('is-invalid');
+          dropzone.classList.add('is-valid');
+        } else {
+          dropzone.classList.remove('is-invalid', 'is-valid');
+        }
+      }
+    } else if (input.hasAttribute('required') && !val) {
       isValid = false;
       errorMsg = 'This field is required.';
     } else if (val) {
@@ -342,15 +456,15 @@ class App {
     }
 
     if (!isValid) {
-      input.classList.add('is-invalid');
-      input.classList.remove('is-valid');
+      if (name !== 'paymentProof') input.classList.add('is-invalid');
+      if (name !== 'paymentProof') input.classList.remove('is-valid');
       errorDiv.textContent = errorMsg;
       errorDiv.style.display = 'flex';
     } else {
-      input.classList.remove('is-invalid');
-      if (val) {
+      if (name !== 'paymentProof') input.classList.remove('is-invalid');
+      if (val && name !== 'paymentProof') {
         input.classList.add('is-valid');
-      } else {
+      } else if (name !== 'paymentProof') {
         input.classList.remove('is-valid');
       }
       errorDiv.textContent = '';
@@ -391,10 +505,11 @@ class App {
 
         const formData = new FormData(membershipForm);
         const data = Object.fromEntries(formData.entries());
+        data.paymentProof = this.currentPaymentProofBase64 || '';
 
         const newApp = this.store.addApplication(data);
 
-        // Send instant email notification to admin
+        // Send instant email notification to admin with file attachment
         this.sendEmailNotification(`New BCCI Membership Application: ${data.company || newApp.id}`, {
           'Application ID': newApp.id,
           'Company Name': data.company,
@@ -413,13 +528,23 @@ class App {
           'Mobile Number': data.phone,
           'Payment UTR Ref': data.paymentRef || 'Not Provided',
           'Status': 'Pending Admin Approval'
-        });
+        }, this.currentPaymentProofFile);
 
-        // Reset Form & Clear validation classes
+        // Reset Form & Clear validation classes & file preview
         membershipForm.reset();
+        this.currentPaymentProofBase64 = null;
+        this.currentPaymentProofFile = null;
+        const preview = document.getElementById('paymentProofPreview');
+        const placeholder = document.getElementById('paymentProofPlaceholder');
+        const dropzone = document.getElementById('paymentProofDropzone');
+        if (preview) preview.style.display = 'none';
+        if (placeholder) placeholder.style.display = 'block';
+        if (dropzone) dropzone.classList.remove('is-valid', 'is-invalid');
+
         membershipForm.querySelectorAll('input, select, textarea').forEach(input => {
           input.classList.remove('is-valid', 'is-invalid');
-          const errDiv = input.parentNode.querySelector('.error-msg');
+          const container = input.closest('.form-group') || input.parentNode;
+          const errDiv = container.querySelector('.error-msg');
           if (errDiv) errDiv.style.display = 'none';
         });
 
@@ -679,8 +804,16 @@ class App {
                   <div><strong>Employees:</strong> ${app.employees || 'N/A'}</div>
                   <div><strong>Contact Person:</strong> ${app.repName || app.firstName}</div>
                   <div><strong>Phone:</strong> ${app.phone || 'N/A'}</div>
-                  <div style="grid-column: 1 / -1;"><strong>Address:</strong> ${app.address || ''}, ${app.district || ''}, ${app.state || ''}</div>
                   ${app.paymentRef ? `<div style="grid-column: 1 / -1; background: #EFF6FF; border: 1px solid #BFDBFE; padding: 0.5rem 0.8rem; border-radius: 6px; color: #1E3E62;"><strong>UPI Payment UTR Ref:</strong> <code style="font-weight:700; color:#0284C7;">${app.paymentRef}</code></div>` : ''}
+                  ${app.paymentProof ? `
+                    <div style="grid-column: 1 / -1; margin-top: 0.5rem; background: #F8FAFC; border: 1px solid #CBD5E1; padding: 1rem; border-radius: 8px;">
+                      <strong style="color: var(--primary); display: block; margin-bottom: 0.5rem;">
+                        <i class="fas fa-file-invoice-dollar" style="color: var(--accent-gold-dark);"></i> Uploaded Payment Confirmation Receipt Screenshot:
+                      </strong>
+                      <img src="${app.paymentProof}" alt="Payment Receipt Screenshot" data-lightbox style="max-height: 220px; border-radius: 6px; border: 1px solid #CBD5E1; cursor: pointer; box-shadow: var(--shadow-sm);" />
+                      <small style="display: block; color: #64748B; margin-top: 0.35rem;"><i class="fas fa-search-plus"></i> Tap image to enlarge in full resolution modal</small>
+                    </div>
+                  ` : ''}
                 </div>
                 <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.5rem;">
                   ${app.status === 'Pending' ? `
@@ -787,22 +920,25 @@ class App {
     }, 3500);
   }
 
-  sendEmailNotification(subject, payload) {
+  sendEmailNotification(subject, payload, fileAttachment = null) {
     const targetEmail = 'sp9023156004@gmail.com';
-    const emailPayload = {
-      _subject: subject,
-      _template: 'table',
-      _captcha: 'false',
-      ...payload
-    };
+    const formData = new FormData();
+
+    formData.append('_subject', subject);
+    formData.append('_template', 'table');
+    formData.append('_captcha', 'false');
+
+    for (const [key, value] of Object.entries(payload)) {
+      formData.append(key, value);
+    }
+
+    if (fileAttachment) {
+      formData.append('Payment Proof Receipt Screenshot', fileAttachment, fileAttachment.name || 'payment_receipt.jpg');
+    }
 
     fetch(`https://formsubmit.co/ajax/${targetEmail}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(emailPayload)
+      body: formData
     }).then(res => res.json())
       .then(data => {
         console.log('Email notification dispatched to admin:', data);
