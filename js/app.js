@@ -849,6 +849,12 @@ class App {
       });
     });
 
+    // Export CSV Button Action
+    const exportBtn = document.getElementById('btnExportCSV');
+    if (exportBtn) {
+      exportBtn.addEventListener('click', () => this.exportApplicationsCSV());
+    }
+
     // Tab Switcher inside Admin
     document.querySelectorAll('.admin-menu-item').forEach(item => {
       item.addEventListener('click', () => {
@@ -861,6 +867,55 @@ class App {
         if (targetPane) targetPane.style.display = 'block';
       });
     });
+  }
+
+  exportApplicationsCSV() {
+    const apps = this.store.getApplications();
+    if (!apps || apps.length === 0) {
+      this.showToast('No application records available to export.', 'warning');
+      return;
+    }
+
+    const headers = [
+      'Application ID', 'Company Name', 'Legal Status', 'Enterprise Scale', 'Business Services',
+      'GSTIN', 'PAN', 'CIN', 'Turnover', 'Employees', 'Representative Name', 'Designation',
+      'Email', 'Mobile Number', 'District', 'Address', 'Pincode', 'Payment Ref', 'Status', 'Submitted At'
+    ];
+
+    const rows = apps.map(a => [
+      `"${a.id || ''}"`,
+      `"${(a.company || '').replace(/"/g, '""')}"`,
+      `"${a.legalStatus || ''}"`,
+      `"${a.enterpriseType || ''}"`,
+      `"${a.businessServices || ''}"`,
+      `"${a.gstNo || ''}"`,
+      `"${a.panNo || ''}"`,
+      `"${a.cin || ''}"`,
+      `"${a.annualTurnover || ''}"`,
+      `"${a.employees || ''}"`,
+      `"${(a.repName || a.firstName || '').replace(/"/g, '""')}"`,
+      `"${a.repDesignation || ''}"`,
+      `"${a.email || ''}"`,
+      `"${a.phone || ''}"`,
+      `"${a.district || ''}"`,
+      `"${(a.address || '').replace(/"/g, '""')}"`,
+      `"${a.pincode || ''}"`,
+      `"${a.paymentRef || ''}"`,
+      `"${a.status || ''}"`,
+      `"${a.submittedAt || ''}"`
+    ]);
+
+    const csvData = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `BCCI_Membership_Applications_Backup_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    this.showToast('Applications backup CSV exported successfully!', 'success');
   }
 
   showModal({ title, content }) {

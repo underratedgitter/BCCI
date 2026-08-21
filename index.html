@@ -775,10 +775,15 @@
   <main id="view-admin" class="view-page" style="display: none;">
     <section class="section-padding">
       <div class="container">
-        <div class="section-header">
-          <span class="section-tag">BCCI Administration</span>
-          <h2 class="section-title">Admin Approval Portal</h2>
-          <p class="section-desc">Manage pending membership applications, approve member registrations, and review inquiries.</p>
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
+          <div>
+            <span class="section-tag">BCCI Administration</span>
+            <h2 class="section-title" style="margin-bottom: 0.25rem;">Admin Approval Portal</h2>
+            <p class="section-desc" style="margin-bottom: 0;">Manage pending membership applications, approve member registrations, and review inquiries.</p>
+          </div>
+          <button id="btnExportCSV" class="btn-secondary" style="padding: 0.65rem 1.25rem; font-size: 0.875rem; background: #FFFFFF; border: 1px solid var(--border-color); color: var(--primary); font-weight: 600; box-shadow: var(--shadow-sm); border-radius: var(--radius-sm);">
+            <i class="fas fa-file-csv" style="color: #10B981; font-size: 1rem;"></i> Export Backup CSV
+          </button>
         </div>
 
         <div class="admin-layout">
