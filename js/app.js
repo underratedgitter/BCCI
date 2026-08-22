@@ -549,10 +549,55 @@ class App {
     return isValid;
   }
 
+  async sendResendEmail({ to, subject, html, text, from = 'BCCI Bharuch <onboarding@resend.dev>' }) {
+    const apiKey = window.BCCI_RESEND_API_KEY || localStorage.getItem('bcci_resend_api_key') || '';
+    if (!apiKey) {
+      console.warn('[Resend API] No API key configured. Falling back to native web dispatch.');
+      return false;
+    }
+
+    try {
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: from,
+          to: Array.isArray(to) ? to : [to],
+          subject: subject,
+          html: html || `<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1E293B;"><pre style="white-space: pre-wrap;">${text}</pre></div>`,
+          text: text
+        })
+      });
+
+      const resData = await response.json();
+      if (response.ok) {
+        console.log('[Resend API Email Sent Successfully]', resData);
+        return resData;
+      } else {
+        console.error('[Resend API Error]', resData);
+        return false;
+      }
+    } catch (err) {
+      console.error('[Resend API Network Error]', err);
+      return false;
+    }
+  }
+
   sendEmailNotification(subject, fieldsData) {
     const adminEmail = 'admin@bccibharuch.in';
     const bodyLines = Object.entries(fieldsData).map(([key, val]) => `${key}: ${val}`).join('\n');
     const mailtoUrl = `mailto:${encodeURIComponent(adminEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyLines)}`;
+    
+    // Trigger Resend API if configured
+    this.sendResendEmail({
+      to: adminEmail,
+      subject: subject,
+      text: bodyLines
+    });
+
     console.log(`[BCCI EMAIL NOTIFICATION DISPATCHED]`, { subject, adminEmail, fieldsData });
     return mailtoUrl;
   }
@@ -930,6 +975,14 @@ class App {
     if (!updated) return;
 
     const emailLog = this.store.sendApprovalEmail(updated);
+
+    // Dispatch background email via Resend API
+    this.sendResendEmail({
+      to: updated.email,
+      subject: emailLog.subject,
+      text: emailLog.body
+    });
+
     this.renderAdminPortal();
     this.showToast(`Application ${id} approved! Confirmation email dispatched to ${updated.email}.`, 'success');
 
