@@ -555,39 +555,69 @@ class App {
 
   async sendResendEmail({ to, subject, html, text, from = 'BCCI Bharuch <onboarding@resend.dev>' }) {
     const apiKey = localStorage.getItem('bcci_resend_api_key') || window.BCCI_RESEND_API_KEY || '';
-    if (!apiKey) {
-      console.warn('[Resend API] No API key configured. Falling back to native web dispatch.');
-      return false;
-    }
+    if (apiKey) {
+      try {
+        const response = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            from: from,
+            to: Array.isArray(to) ? to : [to],
+            subject: subject,
+            html: html || `<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1E293B;"><pre style="white-space: pre-wrap;">${text}</pre></div>`,
+            text: text
+          })
+        });
 
-    try {
-      const response = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          from: from,
-          to: Array.isArray(to) ? to : [to],
-          subject: subject,
-          html: html || `<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1E293B;"><pre style="white-space: pre-wrap;">${text}</pre></div>`,
-          text: text
-        })
-      });
-
-      const resData = await response.json();
-      if (response.ok) {
-        console.log('[Resend API Email Sent Successfully]', resData);
-        return resData;
-      } else {
-        console.error('[Resend API Error]', resData);
-        return false;
+        const resData = await response.json();
+        if (response.ok) {
+          console.log('[Resend API Email Sent Successfully]', resData);
+          return resData;
+        } else {
+          console.warn('[Resend API Error, falling back to Web Dispatch]', resData);
+        }
+      } catch (err) {
+        console.warn('[Resend API Network Error, falling back to Web Dispatch]', err);
       }
-    } catch (err) {
-      console.error('[Resend API Network Error]', err);
-      return false;
     }
+
+    // Zero-config live web email dispatch fallback via FormSubmit AJAX service
+    return this.sendFormSubmitEmail({ to, subject, text });
+  }
+
+  async sendFormSubmitEmail({ to, subject, text }) {
+    const recipients = Array.isArray(to) ? to : [to];
+    let successCount = 0;
+
+    for (const recipient of recipients) {
+      if (!recipient || !recipient.includes('@')) continue;
+      try {
+        const response = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(recipient.trim())}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            _subject: subject,
+            _captcha: "false",
+            _template: "table",
+            "Message": text
+          })
+        });
+        const data = await response.json();
+        console.log(`[FormSubmit Email Sent to ${recipient}]`, data);
+        if (response.ok || data.success === "true" || data.message) {
+          successCount++;
+        }
+      } catch (err) {
+        console.error(`[FormSubmit Email Dispatch Error for ${recipient}]`, err);
+      }
+    }
+    return successCount > 0;
   }
 
   sendEmailNotification(subject, fieldsData) {
