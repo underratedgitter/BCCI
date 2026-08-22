@@ -230,6 +230,21 @@ export class Store {
     return notification;
   }
 
+  sendApplicantReceivedEmail(application) {
+    const repName = application.repName || `${application.firstName || ''} ${application.lastName || ''}`.trim() || 'Valued Applicant';
+    const emailData = {
+      id: `ACK-${Math.floor(1000 + Math.random() * 9000)}`,
+      appId: application.id,
+      company: application.company,
+      recipientName: repName,
+      recipientEmail: application.email,
+      subject: `BCCI Membership Application Received (${application.id}) - Pending Admin Verification`,
+      sentAt: new Date().toISOString(),
+      body: `Dear ${repName},\n\nThank you for applying for Institutional Membership with the Bharuch Chamber of Commerce & Industry (BCCI).\n\nWe have successfully received your membership application for "${application.company}".\n\nApplication Record Details:\n- Application Reference ID: ${application.id}\n- Enterprise / Firm: ${application.company}\n- Representative: ${repName}\n- Date Submitted: ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}\n- Status: PENDING ADMIN APPROVAL & VERIFICATION\n\nNext Steps:\nAs per BCCI institutional regulations, your application credentials, legal documentation, and payment proof reference are currently undergoing verification by the BCCI Secretariat Administration.\n\nOnce reviewed and approved by the Secretariat Board, you will receive a formal Membership Confirmation & Welcome Email activating your institutional membership privileges.\n\nFor urgent enquiries, you may contact the BCCI Secretariat office at admin@bccibharuch.in or +91 7861906384.\n\nWarm Regards,\nBCCI Secretariat & Membership Board\nBharuch Chamber of Commerce & Industry\nStation Road, Bharuch - 392001`
+    };
+    return emailData;
+  }
+
   // Static Data Providers
   getLeadership() {
     return [

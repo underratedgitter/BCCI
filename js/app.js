@@ -2,7 +2,7 @@
    BCCI BHARUCH - Application Logic & UI Router
    ========================================================================== */
 
-import { Store } from './store.js?v=2.0.7';
+import { Store } from './store.js?v=2.0.8';
 
 class App {
   constructor() {
@@ -641,8 +641,24 @@ class App {
 
         const newApp = this.store.addApplication(data);
 
-        // Send instant admin email notification
+        // 1. Send instant Admin email alert via Resend API
         const adminNotif = this.store.sendAdminNewApplicationNotification(newApp);
+        this.sendResendEmail({
+          to: 'admin@bccibharuch.in',
+          subject: adminNotif.subject,
+          text: adminNotif.body
+        });
+
+        // 2. Send instant Applicant receipt email ("Application Received & Pending Approval")
+        const ackNotif = this.store.sendApplicantReceivedEmail(newApp);
+        if (newApp.email) {
+          this.sendResendEmail({
+            to: newApp.email,
+            subject: ackNotif.subject,
+            text: ackNotif.body
+          });
+        }
+
         const mailtoUrl = `mailto:admin@bccibharuch.in?subject=${encodeURIComponent(adminNotif.subject)}&body=${encodeURIComponent(adminNotif.body)}`;
 
         // Reset Form & Clear validation classes & file preview
