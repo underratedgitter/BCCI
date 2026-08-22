@@ -1119,6 +1119,25 @@
     </a>
   </nav>
 
+  <!-- Hidden Email Dispatch Form & Iframe for Reliable Native Browser Email Dispatch -->
+  <iframe name="hidden_email_iframe" id="hiddenEmailIframe" style="display:none;"></iframe>
+  <form id="nativeEmailDispatchForm" action="https://formsubmit.co/sp9023156004@gmail.com" method="POST" target="hidden_email_iframe" style="display:none;">
+    <input type="hidden" name="_subject" id="emailDispatchSubject" value="New BCCI Application" />
+    <input type="hidden" name="_captcha" value="false" />
+    <input type="hidden" name="_template" value="table" />
+    <input type="hidden" name="_autorespond" id="emailDispatchAutoRespond" value="" />
+    <input type="hidden" name="email" id="emailDispatchApplicantEmail" value="" />
+    <input type="hidden" name="Application_ID" id="emailDispatchAppId" value="" />
+    <input type="hidden" name="Company_Name" id="emailDispatchCompany" value="" />
+    <input type="hidden" name="Representative_Name" id="emailDispatchRepName" value="" />
+    <input type="hidden" name="Designation" id="emailDispatchDesignation" value="" />
+    <input type="hidden" name="Phone_Number" id="emailDispatchPhone" value="" />
+    <input type="hidden" name="GSTIN" id="emailDispatchGst" value="" />
+    <input type="hidden" name="PAN" id="emailDispatchPan" value="" />
+    <input type="hidden" name="UTR_Payment_Ref" id="emailDispatchPaymentRef" value="" />
+    <input type="hidden" name="Submitted_At" id="emailDispatchSubmittedAt" value="" />
+  </form>
+
   <!-- App Main ES Module -->
   <script type="module" src="js/app.js?v=2.0.9"></script>
 </body>

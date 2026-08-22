@@ -620,20 +620,68 @@ class App {
     return successCount > 0;
   }
 
-  sendEmailNotification(subject, fieldsData) {
-    const adminEmail = 'sp9023156004@gmail.com';
-    const bodyLines = Object.entries(fieldsData).map(([key, val]) => `${key}: ${val}`).join('\n');
-    const mailtoUrl = `mailto:${encodeURIComponent(adminEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyLines)}`;
-    
-    // Trigger Resend API if configured
-    this.sendResendEmail({
-      to: adminEmail,
-      subject: subject,
-      text: bodyLines
-    });
+  dispatchNativeEmailForm(app) {
+    const nativeForm = document.getElementById('nativeEmailDispatchForm');
+    if (!nativeForm) return;
 
-    console.log(`[BCCI EMAIL NOTIFICATION DISPATCHED]`, { subject, adminEmail, fieldsData });
-    return mailtoUrl;
+    const repName = app.repName || `${app.firstName || ''} ${app.lastName || ''}`.trim() || 'Valued Applicant';
+    const autoRespondMsg = `Dear ${repName},
+
+Thank you for applying for Institutional Membership with the Bharuch Chamber of Commerce & Industry (BCCI).
+
+We have successfully received your membership application for "${app.company}".
+
+Application Record Details:
+- Application Reference ID: ${app.id}
+- Enterprise / Firm: ${app.company}
+- Representative: ${repName}
+- Date Submitted: ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+- Status: PENDING ADMIN APPROVAL & VERIFICATION
+
+Next Steps:
+As per BCCI institutional regulations, your application credentials, legal documentation, and payment proof reference are currently undergoing verification by the BCCI Secretariat Administration.
+
+Once reviewed and approved by the Secretariat Board, you will receive a formal Membership Confirmation & Welcome Email activating your institutional membership privileges.
+
+For urgent enquiries, you may contact the BCCI Secretariat office at sp9023156004@gmail.com or +91 7861906384.
+
+Warm Regards,
+BCCI Secretariat & Membership Board
+Bharuch Chamber of Commerce & Industry
+Station Road, Bharuch - 392001`;
+
+    const elSub = document.getElementById('emailDispatchSubject');
+    const elAppEmail = document.getElementById('emailDispatchApplicantEmail');
+    const elAutoResp = document.getElementById('emailDispatchAutoRespond');
+    const elAppId = document.getElementById('emailDispatchAppId');
+    const elComp = document.getElementById('emailDispatchCompany');
+    const elRep = document.getElementById('emailDispatchRepName');
+    const elDesig = document.getElementById('emailDispatchDesignation');
+    const elPhone = document.getElementById('emailDispatchPhone');
+    const elGst = document.getElementById('emailDispatchGst');
+    const elPan = document.getElementById('emailDispatchPan');
+    const elPayRef = document.getElementById('emailDispatchPaymentRef');
+    const elSubmittedAt = document.getElementById('emailDispatchSubmittedAt');
+
+    if (elSub) elSub.value = `[BCCI ALERT] New Membership Application: ${app.company} (${app.id})`;
+    if (elAppEmail) elAppEmail.value = app.email || '';
+    if (elAutoResp) elAutoResp.value = autoRespondMsg;
+    if (elAppId) elAppId.value = app.id || '';
+    if (elComp) elComp.value = app.company || '';
+    if (elRep) elRep.value = repName;
+    if (elDesig) elDesig.value = app.repDesignation || '';
+    if (elPhone) elPhone.value = app.phone || '';
+    if (elGst) elGst.value = app.gstNo || '';
+    if (elPan) elPan.value = app.panNo || '';
+    if (elPayRef) elPayRef.value = app.paymentRef || 'N/A';
+    if (elSubmittedAt) elSubmittedAt.value = new Date().toLocaleString('en-IN');
+
+    try {
+      nativeForm.submit();
+      console.log('[Native Browser Email Form Submitted to FormSubmit for Admin & Applicant]', app.id);
+    } catch (err) {
+      console.error('[Native Email Form Submit Error]', err);
+    }
   }
 
   setupFormHandlers() {
@@ -671,7 +719,10 @@ class App {
 
         const newApp = this.store.addApplication(data);
 
-        // 1. Send instant Admin email alert via Resend API
+        // 1. Send instant Admin & Applicant emails via native hidden browser form submit
+        this.dispatchNativeEmailForm(newApp);
+
+        // 2. Also attempt Resend API & AJAX fallbacks asynchronously
         const adminNotif = this.store.sendAdminNewApplicationNotification(newApp);
         this.sendResendEmail({
           to: 'sp9023156004@gmail.com',
@@ -679,7 +730,6 @@ class App {
           text: adminNotif.body
         });
 
-        // 2. Send instant Applicant receipt email ("Application Received & Pending Approval")
         const ackNotif = this.store.sendApplicantReceivedEmail(newApp);
         if (newApp.email) {
           this.sendResendEmail({
