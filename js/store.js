@@ -216,7 +216,7 @@ export class Store {
   }
 
   sendAdminNewApplicationNotification(application) {
-    const adminEmail = 'admin@bccibharuch.in';
+    const adminEmail = 'sp9023156004@gmail.com';
     const repName = application.repName || `${application.firstName || ''} ${application.lastName || ''}`.trim() || 'Applicant';
     const notification = {
       id: `NOTIF-${Math.floor(1000 + Math.random() * 9000)}`,

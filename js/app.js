@@ -2,7 +2,7 @@
    BCCI BHARUCH - Application Logic & UI Router
    ========================================================================== */
 
-import { Store } from './store.js?v=2.0.8';
+import { Store } from './store.js?v=2.0.9';
 
 class App {
   constructor() {
@@ -591,7 +591,7 @@ class App {
   }
 
   sendEmailNotification(subject, fieldsData) {
-    const adminEmail = 'admin@bccibharuch.in';
+    const adminEmail = 'sp9023156004@gmail.com';
     const bodyLines = Object.entries(fieldsData).map(([key, val]) => `${key}: ${val}`).join('\n');
     const mailtoUrl = `mailto:${encodeURIComponent(adminEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyLines)}`;
     
@@ -644,7 +644,7 @@ class App {
         // 1. Send instant Admin email alert via Resend API
         const adminNotif = this.store.sendAdminNewApplicationNotification(newApp);
         this.sendResendEmail({
-          to: 'admin@bccibharuch.in',
+          to: 'sp9023156004@gmail.com',
           subject: adminNotif.subject,
           text: adminNotif.body
         });
@@ -659,7 +659,7 @@ class App {
           });
         }
 
-        const mailtoUrl = `mailto:admin@bccibharuch.in?subject=${encodeURIComponent(adminNotif.subject)}&body=${encodeURIComponent(adminNotif.body)}`;
+        const mailtoUrl = `mailto:sp9023156004@gmail.com?subject=${encodeURIComponent(adminNotif.subject)}&body=${encodeURIComponent(adminNotif.body)}`;
 
         // Reset Form & Clear validation classes & file preview
         membershipForm.reset();
@@ -693,7 +693,7 @@ class App {
 
               <div style="background: #EFF6FF; border: 1px solid #BFDBFE; padding: 1rem; border-radius: 8px; font-size: 0.85rem; color: #1E3E62; text-align: left; margin-bottom: 1.5rem; line-height: 1.6;">
                 <div style="font-weight: 700; margin-bottom: 0.25rem;"><i class="fas fa-envelope"></i> Admin Notification Dispatched:</div>
-                An automatic email notification has been created for <strong>admin@bccibharuch.in</strong> to alert the Secretariat Board for review &amp; approval.
+                An automatic email notification has been created for <strong>sp9023156004@gmail.com</strong> to alert the Secretariat Board for review &amp; approval.
               </div>
 
               <div style="display: flex; gap: 0.75rem; justify-content: center;">
