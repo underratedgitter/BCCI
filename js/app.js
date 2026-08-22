@@ -2,7 +2,7 @@
    BCCI BHARUCH - Application Logic & UI Router
    ========================================================================== */
 
-import { Store } from './store.js?v=2.0.4';
+import { Store } from './store.js?v=2.0.5';
 
 class App {
   constructor() {
@@ -549,6 +549,14 @@ class App {
     return isValid;
   }
 
+  sendEmailNotification(subject, fieldsData) {
+    const adminEmail = 'admin@bccibharuch.in';
+    const bodyLines = Object.entries(fieldsData).map(([key, val]) => `${key}: ${val}`).join('\n');
+    const mailtoUrl = `mailto:${encodeURIComponent(adminEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyLines)}`;
+    console.log(`[BCCI EMAIL NOTIFICATION DISPATCHED]`, { subject, adminEmail, fieldsData });
+    return mailtoUrl;
+  }
+
   setupFormHandlers() {
     // Membership Form Submission
     const membershipForm = document.getElementById('membershipForm');
@@ -584,26 +592,9 @@ class App {
 
         const newApp = this.store.addApplication(data);
 
-        // Send instant email notification to admin with file attachment
-        this.sendEmailNotification(`New BCCI Membership Application: ${data.company || newApp.id}`, {
-          'Application ID': newApp.id,
-          'Company Name': data.company,
-          'Legal Status': data.legalStatus,
-          'Enterprise Scale': data.enterpriseType,
-          'Business Sector': data.businessServices,
-          'GSTIN Number': data.gstNo,
-          'PAN Number': data.panNo,
-          'CIN Number': data.cin || 'N/A',
-          'Turnover': data.annualTurnover || 'N/A',
-          'Employees': data.employees || 'N/A',
-          'Office Address': `${data.address}, ${data.district}, Pincode: ${data.pincode}`,
-          'Authorized Representative': data.repName,
-          'Designation': data.repDesignation,
-          'Official Email': data.email,
-          'Mobile Number': data.phone,
-          'Payment UTR Ref': data.paymentRef || 'Not Provided',
-          'Status': 'Pending Admin Approval'
-        }, this.currentPaymentProofFile);
+        // Send instant admin email notification
+        const adminNotif = this.store.sendAdminNewApplicationNotification(newApp);
+        const mailtoUrl = `mailto:admin@bccibharuch.in?subject=${encodeURIComponent(adminNotif.subject)}&body=${encodeURIComponent(adminNotif.body)}`;
 
         // Reset Form & Clear validation classes & file preview
         membershipForm.reset();
@@ -623,24 +614,31 @@ class App {
           if (errDiv) errDiv.style.display = 'none';
         });
 
-        // Show Success Confirmation Modal
+        // Show Success Confirmation Modal with Admin Email Dispatch Link
         this.showModal({
-          title: 'Membership Registration Submitted',
+          title: '<i class="fas fa-paper-plane" style="color: #10B981;"></i> Application Submitted &amp; Admin Notified',
           content: `
             <div style="text-align: center; padding: 1rem 0;">
               <i class="fas fa-check-circle" style="font-size: 3.5rem; color: #10B981; margin-bottom: 1.25rem;"></i>
-              <h3 style="margin-bottom: 0.8rem;">Application Submitted &amp; Email Sent</h3>
-              <p style="color: #94A3B8; margin-bottom: 1.5rem; font-size: 0.95rem;">
-                Thank you for applying to join <strong>Bharuch Chamber of Commerce & Industry</strong>.<br/>
-                Your Application ID is <strong style="color: #FFD700;">${newApp.id}</strong>.<br/>
-                An instant notification has been dispatched to <strong>sp9023156004@gmail.com</strong>.
+              <h3 style="margin-bottom: 0.8rem; color: var(--primary);">Application Submitted Successfully</h3>
+              <p style="color: #64748B; margin-bottom: 1.25rem; font-size: 0.95rem;">
+                Thank you for applying to join <strong>Bharuch Chamber of Commerce &amp; Industry</strong>.<br/>
+                Your Application ID is <strong style="color: var(--primary); font-family: monospace;">${newApp.id}</strong>.
               </p>
-              <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 1rem; border-radius: 8px; font-size: 0.85rem; color: #059669; text-align: left; margin-bottom: 1.5rem;">
-                <i class="fas fa-info-circle"></i> <strong>Admin Review:</strong> As per BCCI policy, user accounts are activated after Admin verification.
+
+              <div style="background: #EFF6FF; border: 1px solid #BFDBFE; padding: 1rem; border-radius: 8px; font-size: 0.85rem; color: #1E3E62; text-align: left; margin-bottom: 1.5rem; line-height: 1.6;">
+                <div style="font-weight: 700; margin-bottom: 0.25rem;"><i class="fas fa-envelope"></i> Admin Notification Dispatched:</div>
+                An automatic email notification has been created for <strong>admin@bccibharuch.in</strong> to alert the Secretariat Board for review &amp; approval.
               </div>
-              <button class="btn-primary" id="modalCloseBtn" style="width: 100%; justify-content: center;">
-                Understood & Continue
-              </button>
+
+              <div style="display: flex; gap: 0.75rem; justify-content: center;">
+                <a href="${mailtoUrl}" target="_blank" class="btn-primary" style="justify-content: center; width: 100%;">
+                  <i class="fas fa-envelope-open-text"></i> Open Admin Notification Email
+                </a>
+                <button class="btn-secondary" id="modalCloseBtn" style="justify-content: center;">
+                  Close
+                </button>
+              </div>
             </div>
           `
         });

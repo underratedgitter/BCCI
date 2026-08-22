@@ -215,6 +215,21 @@ export class Store {
     return emailData;
   }
 
+  sendAdminNewApplicationNotification(application) {
+    const adminEmail = 'admin@bccibharuch.in';
+    const repName = application.repName || `${application.firstName || ''} ${application.lastName || ''}`.trim() || 'Applicant';
+    const notification = {
+      id: `NOTIF-${Math.floor(1000 + Math.random() * 9000)}`,
+      appId: application.id,
+      company: application.company,
+      adminEmail: adminEmail,
+      subject: `[ADMIN ALERT] New BCCI Membership Application: ${application.company} (${application.id})`,
+      sentAt: new Date().toISOString(),
+      body: `ATTN: BCCI Secretariat & Admin Board,\n\nA new membership application has been submitted on the BCCI Official Portal and is pending your review & approval.\n\nApplication Summary:\n- Application ID: ${application.id}\n- Company Name: ${application.company}\n- Representative: ${repName} (${application.repDesignation || 'Delegate'})\n- Sector: ${application.businessServices || 'N/A'}\n- Scale: ${application.enterpriseType || 'N/A'} • ${application.legalStatus || 'N/A'}\n- Email: ${application.email}\n- Phone: ${application.phone}\n- GSTIN: ${application.gstNo || 'N/A'}\n- UTR Ref: ${application.paymentRef || 'N/A'}\n- Date Submitted: ${new Date().toLocaleString('en-IN')}\n\nPlease sign in to the BCCI Admin Portal to inspect details and approve or reject this membership.`
+    };
+    return notification;
+  }
+
   // Static Data Providers
   getLeadership() {
     return [
