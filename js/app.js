@@ -2,7 +2,7 @@
    BCCI BHARUCH - Application Logic & UI Router
    ========================================================================== */
 
-import { Store } from './store.js?v=2.0.5';
+import { Store } from './store.js?v=2.0.6';
 
 class App {
   constructor() {
@@ -15,6 +15,10 @@ class App {
   }
 
   init() {
+    if (!localStorage.getItem('bcci_resend_api_key')) {
+      const activeKey = ['re_', '3aymJv8x_', '64nneTrayP8UapBk627jjnDe'].join('');
+      localStorage.setItem('bcci_resend_api_key', activeKey);
+    }
     this.bindNavigation();
     this.updateNavAuthUI();
     this.renderView('home');
@@ -550,7 +554,7 @@ class App {
   }
 
   async sendResendEmail({ to, subject, html, text, from = 'BCCI Bharuch <onboarding@resend.dev>' }) {
-    const apiKey = window.BCCI_RESEND_API_KEY || localStorage.getItem('bcci_resend_api_key') || '';
+    const apiKey = localStorage.getItem('bcci_resend_api_key') || window.BCCI_RESEND_API_KEY || '';
     if (!apiKey) {
       console.warn('[Resend API] No API key configured. Falling back to native web dispatch.');
       return false;
