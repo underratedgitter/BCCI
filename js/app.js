@@ -2,7 +2,7 @@
    BCCI BHARUCH - Application Logic & UI Router
    ========================================================================== */
 
-import { Store } from './store.js?v=2.0.3';
+import { Store } from './store.js?v=2.0.4';
 
 class App {
   constructor() {
@@ -927,16 +927,50 @@ class App {
     this.bindAdminActions();
   }
 
+  handleApproveApplication(id) {
+    const updated = this.store.updateApplicationStatus(id, 'Approved');
+    if (!updated) return;
+
+    const emailLog = this.store.sendApprovalEmail(updated);
+    this.renderAdminPortal();
+    this.showToast(`Application ${id} approved! Confirmation email dispatched to ${updated.email}.`, 'success');
+
+    // Show Confirmation Email Dispatch Modal
+    const mailtoUrl = `mailto:${encodeURIComponent(updated.email)}?subject=${encodeURIComponent(emailLog.subject)}&body=${encodeURIComponent(emailLog.body)}`;
+    this.showModal({
+      title: `<i class="fas fa-envelope-open-text" style="color: #10B981;"></i> Membership Approved &amp; Confirmation Email Sent`,
+      content: `
+        <div style="font-size: 0.9rem; line-height: 1.6;">
+          <div style="background: #ECFDF5; border: 1px solid #A7F3D0; padding: 1rem; border-radius: 8px; margin-bottom: 1.25rem; color: #065F46;">
+            <div style="font-weight: 700; font-size: 1rem; margin-bottom: 0.25rem;"><i class="fas fa-check-circle"></i> Application ${updated.id} Approved</div>
+            <div>An official confirmation email has been generated and dispatched to <strong>${updated.email}</strong>.</div>
+          </div>
+
+          <div style="background: #F8FAFC; border: 1px solid #CBD5E1; border-radius: 8px; padding: 1.25rem; margin-bottom: 1.5rem; color: #1E293B;">
+            <div style="margin-bottom: 0.5rem; font-size: 0.85rem;"><strong>To:</strong> ${emailLog.recipientName} &lt;${emailLog.recipientEmail}&gt;</div>
+            <div style="margin-bottom: 0.75rem; font-size: 0.85rem; padding-bottom: 0.5rem; border-bottom: 1px solid #E2E8F0;">
+              <strong>Subject:</strong> ${emailLog.subject}
+            </div>
+            <div style="white-space: pre-wrap; font-family: monospace; font-size: 0.825rem; background: #FFFFFF; padding: 1rem; border-radius: 6px; border: 1px solid #E2E8F0; color: #334155; max-height: 200px; overflow-y: auto;">${emailLog.body}</div>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <a href="${mailtoUrl}" target="_blank" class="btn-primary" style="font-size: 0.85rem; padding: 0.5rem 1rem;">
+              <i class="fas fa-paper-plane"></i> Launch Local Mail Client (mailto)
+            </a>
+            <button class="btn-secondary" id="modalCloseBtn">Close</button>
+          </div>
+        </div>
+      `
+    });
+  }
+
   bindAdminActions() {
     // Approve Button Action
     document.querySelectorAll('[data-approve-id]').forEach(btn => {
       btn.addEventListener('click', () => {
         const id = btn.getAttribute('data-approve-id');
-        const updated = this.store.updateApplicationStatus(id, 'Approved');
-        if (updated) {
-          this.renderAdminPortal();
-          this.showToast(`Application ${id} approved! Member account activated.`, 'success');
-        }
+        this.handleApproveApplication(id);
       });
     });
 
@@ -1001,10 +1035,8 @@ class App {
           const approveBtn = document.getElementById('inspectApproveBtn');
           if (approveBtn) {
             approveBtn.addEventListener('click', () => {
-              this.store.updateApplicationStatus(app.id, 'Approved');
               this.closeModal();
-              this.renderAdminPortal();
-              this.showToast(`Application ${app.id} approved!`, 'success');
+              this.handleApproveApplication(app.id);
             });
           }
           const rejectBtn = document.getElementById('inspectRejectBtn');

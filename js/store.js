@@ -5,7 +5,8 @@
 const STORAGE_KEYS = {
   APPLICATIONS: 'bcci_membership_applications',
   ENQUIRIES: 'bcci_enquiries',
-  ADMIN_AUTH: 'bcci_admin_session'
+  ADMIN_AUTH: 'bcci_admin_session',
+  SENT_EMAILS: 'bcci_sent_approval_emails'
 };
 
 // Initial Seed Data for Pending & Approved Applications
@@ -188,6 +189,30 @@ export class Store {
     const validUsers = ['admin', 'admin@bccibharuch.in', 'bcci'];
     const validPasswords = ['admin', 'admin123', 'bcci2026', 'password'];
     return validUsers.includes(username.toLowerCase().trim()) && validPasswords.includes(password.trim());
+  }
+
+  // Approval Confirmation Email Dispatcher
+  getSentEmails() {
+    return JSON.parse(localStorage.getItem(STORAGE_KEYS.SENT_EMAILS) || '[]');
+  }
+
+  sendApprovalEmail(application) {
+    const sentEmails = this.getSentEmails();
+    const repName = application.repName || application.firstName || 'Member Representative';
+    const emailData = {
+      id: `MAIL-${Math.floor(1000 + Math.random() * 9000)}`,
+      appId: application.id,
+      company: application.company,
+      recipientName: repName,
+      recipientEmail: application.email || 'applicant@company.com',
+      membershipType: application.membershipType || 'Corporate',
+      subject: `Official Membership Approval - Bharuch Chamber of Commerce & Industry (${application.id})`,
+      sentAt: new Date().toISOString(),
+      body: `Dear ${repName},\n\nWe are pleased to inform you that your application for BCCI Membership (${application.id}) for "${application.company}" has been formally REVIEWED and APPROVED by the BCCI Secretariat Board.\n\nYour institutional membership is now ACTIVE. You are entitled to all member privileges, trade facilitation services, and policy representation under the Bharuch Chamber of Commerce & Industry.\n\nOfficial Membership Record:\n- Application ID: ${application.id}\n- Enterprise: ${application.company}\n- Approved On: ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}\n- Status: ACTIVATED & APPROVED\n\nWelcome to Asia's Largest Industrial Corridor Network.\n\nWarm Regards,\nBCCI Secretariat & Membership Board\nBharuch Chamber of Commerce & Industry\nadmin@bccibharuch.in | +91 7861906384`
+    };
+    sentEmails.unshift(emailData);
+    localStorage.setItem(STORAGE_KEYS.SENT_EMAILS, JSON.stringify(sentEmails));
+    return emailData;
   }
 
   // Static Data Providers
