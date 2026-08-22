@@ -2,7 +2,7 @@
    BCCI BHARUCH - Application Logic & UI Router
    ========================================================================== */
 
-import { Store } from './store.js?v=2.1.1';
+import { Store } from './store.js?v=2.1.2';
 
 class App {
   constructor() {
@@ -288,29 +288,61 @@ class App {
         return;
       }
 
-      if (file.size > 5 * 1024 * 1024) {
-        this.showToast('File size exceeds 5MB limit. Please select a smaller screenshot.', 'warning');
+      if (file.size > 10 * 1024 * 1024) {
+        this.showToast('File size exceeds 10MB limit. Please select a smaller screenshot.', 'warning');
         return;
       }
 
       this.currentPaymentProofFile = file;
 
+      // Canvas downscaling to compress smartphone photos down to fast ~150KB base64
       const reader = new FileReader();
       reader.onload = (e) => {
-        this.currentPaymentProofBase64 = e.target.result;
-        imgEl.src = e.target.result;
-        imgEl.setAttribute('data-lightbox', 'true');
-        fileNameEl.textContent = file.name;
-        preview.style.display = 'block';
-        placeholder.style.display = 'none';
+        const rawBase64 = e.target.result;
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 1200;
+          let w = img.width;
+          let h = img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) {
+              h = Math.round((h * maxDim) / w);
+              w = maxDim;
+            } else {
+              w = Math.round((w * maxDim) / h);
+              h = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.82);
+          
+          this.currentPaymentProofBase64 = compressedBase64;
+          imgEl.src = compressedBase64;
+          imgEl.setAttribute('data-lightbox', 'true');
+          fileNameEl.textContent = file.name;
+          preview.style.display = 'block';
+          placeholder.style.display = 'none';
 
-        if (dropzone) {
-          dropzone.classList.remove('is-invalid');
-          dropzone.classList.add('is-valid');
-          const container = dropzone.closest('.form-group') || dropzone.parentNode;
-          const errDiv = container.querySelector('.error-msg');
-          if (errDiv) errDiv.style.display = 'none';
-        }
+          if (dropzone) {
+            dropzone.classList.remove('is-invalid');
+            dropzone.classList.add('is-valid');
+            const container = dropzone.closest('.form-group') || dropzone.parentNode;
+            const errDiv = container.querySelector('.error-msg');
+            if (errDiv) errDiv.style.display = 'none';
+          }
+        };
+        img.onerror = () => {
+          this.currentPaymentProofBase64 = rawBase64;
+          imgEl.src = rawBase64;
+          fileNameEl.textContent = file.name;
+          preview.style.display = 'block';
+          placeholder.style.display = 'none';
+        };
+        img.src = rawBase64;
       };
       reader.readAsDataURL(file);
     };

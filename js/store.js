@@ -137,11 +137,21 @@ export class Store {
     const newApp = {
       id: `APP-${Math.floor(1000 + Math.random() * 9000)}`,
       ...appData,
-      status: 'Pending', // ALWAYS PENDING UNTIL ADMIN APPROVES
+      status: 'Pending',
       submittedAt: new Date().toISOString()
     };
     apps.unshift(newApp);
-    localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(apps));
+    try {
+      localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(apps));
+    } catch (err) {
+      console.warn('[LocalStorage Quota Warning] Pruning older records to preserve storage space', err);
+      try {
+        const pruned = apps.slice(0, 15).map((item, idx) => idx === 0 ? item : { ...item, paymentProof: item.paymentProof ? '[Stored Image]' : '' });
+        localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(pruned));
+      } catch (e) {
+        console.error('[LocalStorage Error]', e);
+      }
+    }
     return newApp;
   }
 
@@ -153,7 +163,11 @@ export class Store {
       if (newStatus === 'Approved') {
         apps[index].approvedAt = new Date().toISOString();
       }
-      localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(apps));
+      try {
+        localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(apps));
+      } catch (err) {
+        console.warn('[LocalStorage Update Error]', err);
+      }
       return apps[index];
     }
     return null;
@@ -172,7 +186,11 @@ export class Store {
       submittedAt: new Date().toISOString()
     };
     enquiries.unshift(newEnq);
-    localStorage.setItem(STORAGE_KEYS.ENQUIRIES, JSON.stringify(enquiries));
+    try {
+      localStorage.setItem(STORAGE_KEYS.ENQUIRIES, JSON.stringify(enquiries));
+    } catch (err) {
+      console.warn('[LocalStorage Enquiry Error]', err);
+    }
     return newEnq;
   }
 
