@@ -2,7 +2,7 @@
    BCCI BHARUCH - Application Logic & UI Router
    ========================================================================== */
 
-import { Store } from './store.js?v=2.1.0';
+import { Store } from './store.js?v=2.1.1';
 
 class App {
   constructor() {
@@ -355,9 +355,13 @@ class App {
       });
       dropzone.addEventListener('drop', (e) => {
         const dt = e.dataTransfer;
-        const files = dt.files;
+        const files = dt ? dt.files : null;
         if (files && files[0]) {
-          fileInput.files = files;
+          try {
+            fileInput.files = files;
+          } catch (err) {
+            console.warn('[File Upload Dropzone] fileInput.files read-only fallback', err);
+          }
           handleFile(files[0]);
         }
       });
@@ -436,8 +440,10 @@ class App {
   }
 
   validateField(input) {
+    if (!input) return true;
     const name = input.name;
-    const val = input.value.trim();
+    const rawVal = input.value || '';
+    const val = rawVal.trim();
     let isValid = true;
     let errorMsg = '';
 
@@ -473,31 +479,36 @@ class App {
     } else if (val) {
       switch (name) {
         case 'phone':
-          if (!/^[6-9]\d{9}$/.test(val)) {
+          const cleanPhone = val.replace(/\D/g, '');
+          if (cleanPhone.length < 10 || !/^[6-9]\d{9}$/.test(cleanPhone.slice(-10))) {
             isValid = false;
             errorMsg = 'Please enter a valid 10-digit mobile number (starting 6-9).';
           }
           break;
         case 'panNo':
-          if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(val)) {
+          const cleanPan = val.toUpperCase().trim();
+          if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(cleanPan)) {
             isValid = false;
             errorMsg = 'Invalid PAN format. Must be 10 characters (e.g. ABCDE1234F).';
           }
           break;
         case 'gstNo':
-          if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}[Zz][0-9A-Z]{1}$/.test(val)) {
+          const cleanGst = val.toUpperCase().trim();
+          if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}[Zz][0-9A-Z]{1}$/.test(cleanGst)) {
             isValid = false;
             errorMsg = 'Invalid GSTIN format. Must be 15 characters (e.g. 24AAAAA0000A1Z5).';
           }
           break;
         case 'pincode':
-          if (!/^[1-9][0-9]{5}$/.test(val)) {
+          const cleanPin = val.trim();
+          if (!/^[1-9][0-9]{5}$/.test(cleanPin)) {
             isValid = false;
             errorMsg = 'Please enter a valid 6-digit Pincode (e.g. 392001).';
           }
           break;
         case 'cin':
-          if (val.length > 0 && !/^[LUu][0-9]{5}[A-Za-z]{2}[0-9]{4}[A-Za-z]{3}[0-9]{6}$/.test(val)) {
+          const cleanCin = val.toUpperCase().trim();
+          if (cleanCin.length > 0 && !/^[LU][0-9]{5}[A-Z]{2}[0-9]{4}[A-Z]{3}[0-9]{6}$/.test(cleanCin)) {
             isValid = false;
             errorMsg = 'Invalid CIN format. Must be 21 characters (e.g. L24110GJ1998PLC034120).';
           }
