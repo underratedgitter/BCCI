@@ -684,6 +684,55 @@ Station Road, Bharuch - 392001`;
     }
   }
 
+  dispatchNativeEnquiryEmailForm(enq) {
+    const nativeForm = document.getElementById('nativeEnquiryDispatchForm');
+    if (!nativeForm) return;
+
+    const autoRespondMsg = `Dear ${enq.name || 'Valued User'},
+
+Thank you for contacting the Bharuch Chamber of Commerce & Industry (BCCI).
+
+We have received your general enquiry (Ref ID: ${enq.id}).
+
+Enquiry Summary:
+- Subject: ${enq.subject || 'General Enquiry'}
+- Category: ${enq.membershipType || 'General'}
+- Date Submitted: ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+
+Our team will respond to your registered email address (${enq.email}) within 24 hours.
+
+Warm Regards,
+BCCI Secretariat Board
+Bharuch Chamber of Commerce & Industry`;
+
+    const elSub = document.getElementById('enquiryDispatchSubject');
+    const elAppEmail = document.getElementById('enquiryDispatchApplicantEmail');
+    const elAutoResp = document.getElementById('enquiryDispatchAutoRespond');
+    const elId = document.getElementById('enquiryDispatchId');
+    const elName = document.getElementById('enquiryDispatchName');
+    const elComp = document.getElementById('enquiryDispatchCompany');
+    const elPhone = document.getElementById('enquiryDispatchPhone');
+    const elEnqSub = document.getElementById('enquiryDispatchSub');
+    const elMsg = document.getElementById('enquiryDispatchMsg');
+
+    if (elSub) elSub.value = `[BCCI ALERT] New General Enquiry: ${enq.subject || enq.id}`;
+    if (elAppEmail) elAppEmail.value = enq.email || '';
+    if (elAutoResp) elAutoResp.value = autoRespondMsg;
+    if (elId) elId.value = enq.id || '';
+    if (elName) elName.value = enq.name || '';
+    if (elComp) elComp.value = enq.company || 'N/A';
+    if (elPhone) elPhone.value = enq.phone || 'N/A';
+    if (elEnqSub) elEnqSub.value = enq.subject || '';
+    if (elMsg) elMsg.value = enq.message || '';
+
+    try {
+      nativeForm.submit();
+      console.log('[Native Enquiry Email Form Submitted to FormSubmit for Admin & Applicant]', enq.id);
+    } catch (err) {
+      console.error('[Native Enquiry Email Form Submit Error]', err);
+    }
+  }
+
   setupFormHandlers() {
     // Membership Form Submission
     const membershipForm = document.getElementById('membershipForm');
@@ -822,6 +871,9 @@ Station Road, Bharuch - 392001`;
         const data = Object.fromEntries(formData.entries());
 
         const newEnq = this.store.addEnquiry(data);
+
+        // Send native browser email dispatch to FormSubmit for Admin & Applicant auto-reply
+        this.dispatchNativeEnquiryEmailForm(newEnq);
 
         // Send instant email notification to admin
         this.sendEmailNotification(`New BCCI General Enquiry: ${data.subject || newEnq.id}`, {
