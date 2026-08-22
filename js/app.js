@@ -199,10 +199,23 @@ class App {
     const team = this.store.getLeadership();
     container.innerHTML = team.map(m => `
       <div class="team-card">
-        <div class="team-avatar">${m.initials}</div>
+        ${m.image ? `
+          <div class="team-avatar-img-wrap">
+            <img src="${m.image}" alt="${m.name}" class="team-avatar-img" />
+          </div>
+        ` : `
+          <div class="team-avatar">${m.initials}</div>
+        `}
         <h4 class="team-name">${m.name}</h4>
         <div class="team-title">${m.role}</div>
         <span class="team-badge">${m.category}</span>
+        ${m.linkedin ? `
+          <div style="margin-top: 1rem;">
+            <a href="${m.linkedin}" target="_blank" rel="noopener noreferrer" class="team-linkedin-btn" title="View ${m.name}'s LinkedIn Profile">
+              <i class="fab fa-linkedin"></i> LinkedIn
+            </a>
+          </div>
+        ` : ''}
       </div>
     `).join('');
   }
