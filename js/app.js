@@ -679,31 +679,31 @@ class App {
           if (errDiv) errDiv.style.display = 'none';
         });
 
-        // Show Success Confirmation Modal with Admin Email Dispatch Link
+        // Show Clean Success Confirmation Modal for Applicant
+        const applicantEmailDisplay = newApp.email ? `<strong>${newApp.email}</strong>` : 'your registered email address';
         this.showModal({
-          title: '<i class="fas fa-paper-plane" style="color: #10B981;"></i> Application Submitted &amp; Admin Notified',
+          title: '<i class="fas fa-check-circle" style="color: #10B981;"></i> Application Submitted',
           content: `
-            <div style="text-align: center; padding: 1rem 0;">
-              <i class="fas fa-check-circle" style="font-size: 3.5rem; color: #10B981; margin-bottom: 1.25rem;"></i>
-              <h3 style="margin-bottom: 0.8rem; color: var(--primary);">Application Submitted Successfully</h3>
-              <p style="color: #64748B; margin-bottom: 1.25rem; font-size: 0.95rem;">
-                Thank you for applying to join <strong>Bharuch Chamber of Commerce &amp; Industry</strong>.<br/>
-                Your Application ID is <strong style="color: var(--primary); font-family: monospace;">${newApp.id}</strong>.
+            <div style="text-align: center; padding: 0.5rem 0;">
+              <div style="width: 72px; height: 72px; background: rgba(16, 185, 129, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem;">
+                <i class="fas fa-check" style="font-size: 2.2rem; color: #10B981;"></i>
+              </div>
+              <h3 style="font-size: 1.35rem; font-weight: 700; color: #0F172A; margin-bottom: 0.6rem;">Application Submitted Successfully!</h3>
+              <p style="color: #475569; font-size: 0.95rem; margin-bottom: 1.25rem; line-height: 1.6;">
+                Thank you for applying to join <strong>Bharuch Chamber of Commerce &amp; Industry</strong>.
               </p>
 
-              <div style="background: #EFF6FF; border: 1px solid #BFDBFE; padding: 1rem; border-radius: 8px; font-size: 0.85rem; color: #1E3E62; text-align: left; margin-bottom: 1.5rem; line-height: 1.6;">
-                <div style="font-weight: 700; margin-bottom: 0.25rem;"><i class="fas fa-envelope"></i> Admin Notification Dispatched:</div>
-                An automatic email notification has been created for <strong>sp9023156004@gmail.com</strong> to alert the Secretariat Board for review &amp; approval.
+              <div style="background: #F8FAFC; border: 1px solid #E2E8F0; padding: 0.75rem 1.25rem; border-radius: 8px; font-size: 0.9rem; color: #334155; margin-bottom: 1.25rem; display: inline-block;">
+                Application Reference ID: <strong style="color: var(--primary); font-family: monospace; font-size: 1.05rem;">${newApp.id}</strong>
               </div>
 
-              <div style="display: flex; gap: 0.75rem; justify-content: center;">
-                <a href="${mailtoUrl}" target="_blank" class="btn-primary" style="justify-content: center; width: 100%;">
-                  <i class="fas fa-envelope-open-text"></i> Open Admin Notification Email
-                </a>
-                <button class="btn-secondary" id="modalCloseBtn" style="justify-content: center;">
-                  Close
-                </button>
-              </div>
+              <p style="color: #64748B; font-size: 0.88rem; margin-bottom: 1.5rem; line-height: 1.5;">
+                A confirmation receipt and application pending verification email has been sent to ${applicantEmailDisplay}.
+              </p>
+
+              <button class="btn-primary" id="modalCloseBtn" style="width: 100%; justify-content: center; padding: 0.75rem 1.5rem; font-weight: 600;">
+                Done
+              </button>
             </div>
           `
         });
@@ -767,11 +767,11 @@ class App {
           content: `
             <div style="text-align: center; padding: 1rem 0;">
               <i class="fas fa-check-circle" style="font-size: 3.5rem; color: #10B981; margin-bottom: 1.25rem;"></i>
-              <h3 style="margin-bottom: 0.8rem;">Thank You for Contacting BCCI</h3>
-              <p style="color: #94A3B8; margin-bottom: 1.5rem; font-size: 0.95rem;">
-                Your enquiry (Ref: <strong style="color: #FFD700;">${newEnq.id}</strong>) has been routed to <strong>sp9023156004@gmail.com</strong>. We will respond within 24 hours.
+              <h3 style="margin-bottom: 0.8rem; color: var(--primary);">Thank You for Contacting BCCI</h3>
+              <p style="color: #64748B; margin-bottom: 1.5rem; font-size: 0.95rem; line-height: 1.6;">
+                Your enquiry (Ref ID: <strong style="color: var(--primary); font-family: monospace;">${newEnq.id}</strong>) has been received successfully. A response will be sent to <strong>${data.email || 'your registered email'}</strong> within 24 hours.
               </p>
-              <button class="btn-primary" id="modalCloseBtn" style="width: 100%; justify-content: center;">Close</button>
+              <button class="btn-primary" id="modalCloseBtn" style="width: 100%; justify-content: center; font-weight: 600; padding: 0.75rem 1.5rem;">Done</button>
             </div>
           `
         });

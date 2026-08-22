@@ -231,6 +231,7 @@ export class Store {
   }
 
   sendApplicantReceivedEmail(application) {
+    const sentEmails = this.getSentEmails();
     const repName = application.repName || `${application.firstName || ''} ${application.lastName || ''}`.trim() || 'Valued Applicant';
     const emailData = {
       id: `ACK-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -242,6 +243,8 @@ export class Store {
       sentAt: new Date().toISOString(),
       body: `Dear ${repName},\n\nThank you for applying for Institutional Membership with the Bharuch Chamber of Commerce & Industry (BCCI).\n\nWe have successfully received your membership application for "${application.company}".\n\nApplication Record Details:\n- Application Reference ID: ${application.id}\n- Enterprise / Firm: ${application.company}\n- Representative: ${repName}\n- Date Submitted: ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}\n- Status: PENDING ADMIN APPROVAL & VERIFICATION\n\nNext Steps:\nAs per BCCI institutional regulations, your application credentials, legal documentation, and payment proof reference are currently undergoing verification by the BCCI Secretariat Administration.\n\nOnce reviewed and approved by the Secretariat Board, you will receive a formal Membership Confirmation & Welcome Email activating your institutional membership privileges.\n\nFor urgent enquiries, you may contact the BCCI Secretariat office at admin@bccibharuch.in or +91 7861906384.\n\nWarm Regards,\nBCCI Secretariat & Membership Board\nBharuch Chamber of Commerce & Industry\nStation Road, Bharuch - 392001`
     };
+    sentEmails.unshift(emailData);
+    localStorage.setItem(STORAGE_KEYS.SENT_EMAILS, JSON.stringify(sentEmails));
     return emailData;
   }
 
