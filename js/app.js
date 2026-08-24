@@ -2,7 +2,7 @@
    BCCI BHARUCH - Application Logic & UI Router
    ========================================================================== */
 
-import { Store } from './store.js?v=2.3.1';
+import { Store } from './store.js?v=2.4.0';
 
 class App {
   constructor() {
