@@ -2,7 +2,7 @@
    BCCI BHARUCH - Application Logic & UI Router
    ========================================================================== */
 
-import { Store } from './store.js?v=2.2.0';
+import { Store } from './store.js?v=2.3.0';
 
 class App {
   constructor() {
@@ -45,19 +45,86 @@ class App {
       if (session && session.email) {
         if (gate) gate.style.display = 'none';
         if (banner) banner.style.display = 'flex';
-        if (wrapper) wrapper.style.display = 'block';
-        if (emailDisplay) emailDisplay.textContent = `${session.name || 'Applicant'} (${session.email})`;
+        
+        // Check if this authenticated user has an existing membership application
+        const memberApp = this.store.getApplicationByEmail(session.email);
+
+        if (memberApp && memberApp.status === 'Approved') {
+          const validity = this.store.getMembershipValidity(memberApp);
+          if (wrapper) wrapper.style.display = 'none'; // Hide application form since already an approved member
+
+          let statusBadgeClass = 'background: #DEF7EC; color: #03543F; border: 1px solid #84E1BC;';
+          let statusLabel = `⭐ Active Member (Valid until ${validity.validUntilDate})`;
+          
+          if (validity.state === 'RENEWAL_DUE') {
+            statusBadgeClass = 'background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A;';
+            statusLabel = `⚠️ Renewal Due Soon (${validity.daysRemaining} days left)`;
+          } else if (validity.state === 'EXPIRED') {
+            statusBadgeClass = 'background: #FDE8E8; color: #9B1C1C; border: 1px solid #F8B4B4;';
+            statusLabel = `❌ Membership Expired (${validity.validUntilDate})`;
+          }
+
+          if (emailDisplay) {
+            emailDisplay.innerHTML = `
+              <div style="font-size: 1.05rem; font-weight: 700; color: #064E3B; margin-bottom: 0.2rem;">
+                ${memberApp.company} <span style="font-size: 0.8rem; background: #D1FAE5; color: #065F46; padding: 2px 8px; border-radius: 10px;">${memberApp.id}</span>
+              </div>
+              <div style="font-size: 0.85rem; color: #047857; margin-bottom: 0.4rem;">
+                Representative: <strong>${memberApp.repName}</strong> (${session.email})
+              </div>
+              <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+                <span style="font-size: 0.8rem; font-weight: 700; padding: 3px 10px; border-radius: 12px; ${statusBadgeClass}">
+                  ${statusLabel}
+                </span>
+                <button type="button" class="btn-primary btnViewDigitalCard" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; background: var(--primary);">
+                  <i class="fas fa-id-card"></i> Digital ID Card
+                </button>
+                <button type="button" class="btn-secondary btnRenewMembership" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; color: #D97706; border-color: #FCD34D; background: #FFFBEB;">
+                  <i class="fas fa-sync-alt"></i> Renew 1-Yr Membership
+                </button>
+              </div>
+            `;
+          }
+
+          // Update Top Navbar Member Identity Badge
+          this.updateHeaderMemberBadge(memberApp, validity);
+
+        } else if (memberApp && memberApp.status === 'Pending') {
+          if (wrapper) wrapper.style.display = 'none'; // Hide application form since pending review
+          if (emailDisplay) {
+            emailDisplay.innerHTML = `
+              <div style="font-size: 1rem; font-weight: 700; color: #1E3E62; margin-bottom: 0.2rem;">
+                ${memberApp.company} <span style="font-size: 0.8rem; background: #FEF3C7; color: #92400E; padding: 2px 8px; border-radius: 10px;">${memberApp.id}</span>
+              </div>
+              <div style="font-size: 0.85rem; color: #475569;">
+                <i class="fas fa-hourglass-half" style="color: #D97706;"></i> <strong>Application Status: PENDING ADMIN APPROVAL</strong>
+              </div>
+              <div style="font-size: 0.8rem; color: #64748B; margin-top: 0.2rem;">
+                Submitted on ${new Date(memberApp.submittedAt).toLocaleDateString()}. The Secretariat Board is reviewing your documentation.
+              </div>
+            `;
+          }
+          this.updateHeaderMemberBadge(memberApp, null);
+        } else {
+          // Unapplied Google Authenticated User -> Show Form
+          if (wrapper) wrapper.style.display = 'block';
+          if (emailDisplay) emailDisplay.textContent = `${session.name || 'Applicant'} (${session.email})`;
+          this.updateHeaderMemberBadge(null, null);
+
+          // Auto-fill official email and representative name fields in membership form
+          const emailInput = document.querySelector('#membershipForm input[name="email"]');
+          const repInput = document.querySelector('#membershipForm input[name="repName"]');
+          if (emailInput && !emailInput.value) emailInput.value = session.email;
+          if (repInput && !repInput.value && session.name) repInput.value = session.name;
+        }
+
         if (avatarInitial) avatarInitial.textContent = (session.name || session.email).charAt(0).toUpperCase();
 
-        // Auto-fill official email and representative name fields in membership form
-        const emailInput = document.querySelector('#membershipForm input[name="email"]');
-        const repInput = document.querySelector('#membershipForm input[name="repName"]');
-        if (emailInput && !emailInput.value) emailInput.value = session.email;
-        if (repInput && !repInput.value && session.name) repInput.value = session.name;
       } else {
         if (gate) gate.style.display = 'block';
         if (banner) banner.style.display = 'none';
         if (wrapper) wrapper.style.display = 'none';
+        this.updateHeaderMemberBadge(null, null);
       }
     };
 
@@ -79,7 +146,181 @@ class App {
       });
     }
 
+    // Dynamic Delegate Listeners for Digital Card & Renewal
+    document.addEventListener('click', (e) => {
+      const cardBtn = e.target.closest('.btnViewDigitalCard');
+      const renewBtn = e.target.closest('.btnRenewMembership');
+      const session = this.store.getApplicantSession();
+
+      if (cardBtn && session) {
+        const memberApp = this.store.getApplicationByEmail(session.email);
+        if (memberApp) this.showDigitalMemberCardModal(memberApp);
+      }
+
+      if (renewBtn && session) {
+        const memberApp = this.store.getApplicationByEmail(session.email);
+        if (memberApp) this.showRenewalModal(memberApp);
+      }
+    });
+
     updateApplicantAuthUI();
+  }
+
+  updateHeaderMemberBadge(memberApp, validity) {
+    const desktopAuthContainer = document.getElementById('navAuthContainer');
+    let badgeEl = document.getElementById('navHeaderMemberBadge');
+
+    if (!memberApp || memberApp.status !== 'Approved') {
+      if (badgeEl) badgeEl.remove();
+      return;
+    }
+
+    if (!badgeEl) {
+      badgeEl = document.createElement('div');
+      badgeEl.id = 'navHeaderMemberBadge';
+      if (desktopAuthContainer) {
+        desktopAuthContainer.parentNode.insertBefore(badgeEl, desktopAuthContainer);
+      }
+    }
+
+    let starColor = '#D97706';
+    let badgeBg = '#FEF3C7';
+    let badgeBorder = '#FDE68A';
+    let badgeText = '#92400E';
+
+    if (validity && validity.state === 'EXPIRED') {
+      starColor = '#DC2626';
+      badgeBg = '#FEE2E2';
+      badgeBorder = '#FCA5A5';
+      badgeText = '#991B1B';
+    }
+
+    badgeEl.style.cssText = `
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: ${badgeBg};
+      border: 1px solid ${badgeBorder};
+      color: ${badgeText};
+      padding: 0.35rem 0.75rem;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+    `;
+    badgeEl.innerHTML = `<i class="fas fa-star" style="color: ${starColor};"></i> Member: ${memberApp.company} (${memberApp.id})`;
+    badgeEl.title = `Official Member ID: ${memberApp.id} - Tap to view Digital Membership Pass`;
+
+    badgeEl.onclick = () => this.showDigitalMemberCardModal(memberApp);
+  }
+
+  showDigitalMemberCardModal(app) {
+    const validity = this.store.getMembershipValidity(app);
+    this.showModal({
+      title: `<i class="fas fa-id-card" style="color: var(--accent-gold-dark);"></i> Official BCCI Digital Membership Pass`,
+      content: `
+        <div style="padding: 0.5rem 0;">
+          <div style="background: linear-gradient(135deg, #0F2C59 0%, #1E3E62 100%); border-radius: 14px; padding: 1.5rem; color: #FFFFFF; box-shadow: 0 10px 25px rgba(15, 44, 89, 0.25); border: 2px solid #D4AF37; position: relative; overflow: hidden; margin-bottom: 1.5rem;">
+            
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.25rem;">
+              <div>
+                <div style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px; color: #F3E8FF; opacity: 0.8;">Institutional Member</div>
+                <div style="font-size: 1.15rem; font-weight: 800; color: #FFD700; line-height: 1.2; margin-top: 2px;">BHARUCH CHAMBER OF COMMERCE &amp; INDUSTRY</div>
+              </div>
+              <div style="background: rgba(255,215,0,0.15); border: 1px solid #FFD700; color: #FFD700; padding: 3px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700;">
+                ⭐ OFFICIAL
+              </div>
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+              <div style="font-size: 1.25rem; font-weight: 700; color: #FFFFFF;">${app.company}</div>
+              <div style="font-size: 0.85rem; color: #93C5FD;">Rep: ${app.repName} (${app.repDesignation || 'Delegate'})</div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; background: rgba(255,255,255,0.08); padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.8rem; border: 1px solid rgba(255,255,255,0.15);">
+              <div>
+                <div style="color: #94A3B8; font-size: 0.7rem; text-transform: uppercase;">Member ID</div>
+                <div style="font-weight: 700; font-family: monospace; color: #FFD700; font-size: 0.95rem;">${app.id}</div>
+              </div>
+              <div>
+                <div style="color: #94A3B8; font-size: 0.7rem; text-transform: uppercase;">Enterprise Scale</div>
+                <div style="font-weight: 600;">${app.enterpriseType || 'Corporate'}</div>
+              </div>
+              <div>
+                <div style="color: #94A3B8; font-size: 0.7rem; text-transform: uppercase;">Issued Date</div>
+                <div style="font-weight: 600;">${validity ? validity.approvedDate : 'N/A'}</div>
+              </div>
+              <div>
+                <div style="color: #94A3B8; font-size: 0.7rem; text-transform: uppercase;">Valid Until (1-Yr)</div>
+                <div style="font-weight: 700; color: ${validity && validity.state === 'EXPIRED' ? '#FCA5A5' : '#6EE7B7'};">${validity ? validity.validUntilDate : 'N/A'}</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 0.75rem; justify-content: center;">
+            <button type="button" class="btn-primary" onclick="window.print();" style="flex: 1; justify-content: center; font-size: 0.85rem;">
+              <i class="fas fa-print"></i> Print / Download Member Card
+            </button>
+            <button type="button" class="btn-secondary" id="modalCloseBtn" style="padding: 0.6rem 1.25rem;">Close</button>
+          </div>
+        </div>
+      `
+    });
+  }
+
+  showRenewalModal(app) {
+    const validity = this.store.getMembershipValidity(app);
+    this.showModal({
+      title: `<i class="fas fa-sync-alt" style="color: var(--primary);"></i> Annual Membership Renewal (1-Year Extension)`,
+      content: `
+        <div style="padding: 0.5rem 0;">
+          <div style="background: #EFF6FF; border: 1px solid #BFDBFE; padding: 1rem; border-radius: 8px; margin-bottom: 1.25rem; font-size: 0.9rem; color: #1E3E62;">
+            <div style="font-weight: 700; margin-bottom: 0.25rem;"><i class="fas fa-building"></i> Enterprise: ${app.company} (${app.id})</div>
+            <div>Current Validity: <strong>${validity ? validity.validUntilDate : 'N/A'}</strong></div>
+            <div style="margin-top: 0.4rem; color: var(--primary); font-weight: 600;">
+              Renewing will extend your BCCI membership validity by +1 Year (${validity ? validity.yearsTenure + 1 : 2} Years Total).
+            </div>
+          </div>
+
+          <div style="margin-bottom: 1.25rem; text-align: center; background: #F8FAFC; padding: 1rem; border-radius: 8px; border: 1px solid #E2E8F0;">
+            <img src="assets/banks.webp" alt="BCCI Payment QR" style="max-height: 180px; border-radius: 6px; border: 1px solid #CBD5E1; margin-bottom: 0.5rem;" />
+            <div style="font-size: 0.85rem; font-weight: 700; color: var(--primary);">Scan UPI QR Code for Annual Renewal Fee Payment</div>
+            <code style="font-size: 0.8rem; background: #DBEAFE; padding: 2px 8px; border-radius: 4px; color: #1E40AF;">7861906384.eazypay@icici</code>
+          </div>
+
+          <form id="renewalForm">
+            <div class="form-group" style="margin-bottom: 1.25rem;">
+              <label class="form-label">Payment UTR / Transaction Ref No. <span class="req">*</span></label>
+              <input type="text" id="renewalUtrInput" class="form-control" placeholder="e.g. UPI/589410238491" required />
+            </div>
+
+            <div style="display: flex; gap: 0.75rem; justify-content: center;">
+              <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; font-weight: 600;">
+                <i class="fas fa-check-circle"></i> Confirm 1-Year Membership Renewal
+              </button>
+            </div>
+          </form>
+        </div>
+      `
+    });
+
+    setTimeout(() => {
+      const renForm = document.getElementById('renewalForm');
+      if (renForm) {
+        renForm.addEventListener('submit', (e) => {
+          e.preventDefault();
+          const utr = document.getElementById('renewalUtrInput').value.trim();
+          if (!utr) return;
+
+          const renewedApp = this.store.renewMembership(app.id, utr);
+          this.closeModal();
+          this.showToast(`Membership ${app.id} successfully renewed for +1 Year!`, 'success');
+          
+          // Re-render UI
+          this.setupApplicantAuthHandlers();
+        });
+      }
+    }, 100);
   }
 
   triggerGoogleOAuthDialog(callback) {

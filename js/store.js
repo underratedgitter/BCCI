@@ -156,12 +156,64 @@ export class Store {
     return newApp;
   }
 
+  getApplicationByEmail(email) {
+    if (!email) return null;
+    const cleanEmail = email.toLowerCase().trim();
+    return this.getApplications().find(app => (app.email || '').toLowerCase().trim() === cleanEmail);
+  }
+
+  getMembershipValidity(app) {
+    if (!app || app.status !== 'Approved') return null;
+
+    const approvedDate = app.approvedAt ? new Date(app.approvedAt) : new Date(app.submittedAt || Date.now());
+    const validUntil = new Date(approvedDate);
+    const yearsToAdd = app.renewalYears || 1;
+    validUntil.setFullYear(validUntil.getFullYear() + yearsToAdd);
+
+    const now = new Date();
+    const diffMs = validUntil.getTime() - now.getTime();
+    const daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+    let state = 'ACTIVE';
+    if (daysRemaining <= 0) {
+      state = 'EXPIRED';
+    } else if (daysRemaining <= 30) {
+      state = 'RENEWAL_DUE';
+    }
+
+    return {
+      approvedDate: approvedDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
+      validUntilDate: validUntil.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
+      validUntilISO: validUntil.toISOString(),
+      daysRemaining: Math.max(0, daysRemaining),
+      yearsTenure: yearsToAdd,
+      state: state
+    };
+  }
+
+  renewMembership(appId, utrRef = '') {
+    const apps = this.getApplications();
+    const index = apps.findIndex(a => a.id === appId);
+    if (index !== -1) {
+      apps[index].renewalYears = (apps[index].renewalYears || 1) + 1;
+      apps[index].lastRenewedAt = new Date().toISOString();
+      if (utrRef) apps[index].paymentRef = utrRef;
+      try {
+        localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(apps));
+      } catch (err) {
+        console.warn('[LocalStorage Renewal Update Error]', err);
+      }
+      return apps[index];
+    }
+    return null;
+  }
+
   updateApplicationStatus(id, newStatus) {
     const apps = this.getApplications();
     const index = apps.findIndex(app => app.id === id);
     if (index !== -1) {
       apps[index].status = newStatus;
-      if (newStatus === 'Approved') {
+      if (newStatus === 'Approved' && !apps[index].approvedAt) {
         apps[index].approvedAt = new Date().toISOString();
       }
       try {
