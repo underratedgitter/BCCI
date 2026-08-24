@@ -2,7 +2,7 @@
    BCCI BHARUCH - Application Logic & UI Router
    ========================================================================== */
 
-import { Store } from './store.js?v=3.0.0';
+import { Store } from './store.js?v=3.1.0';
 
 class App {
   constructor() {
@@ -127,7 +127,7 @@ class App {
     let pendingOtpSession = null;
 
     if (otpStep1Form) {
-      otpStep1Form.addEventListener('submit', (e) => {
+      otpStep1Form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const email = document.getElementById('otpEmailInput').value.trim();
         const name = document.getElementById('otpNameInput').value.trim();
@@ -141,9 +141,27 @@ class App {
 
         const noticeBanner = document.getElementById('otpNoticeBanner');
         if (noticeBanner) {
-          noticeBanner.innerHTML = `<i class="fas fa-key"></i> Verification Passcode for <strong>${email}</strong>: <strong style="font-size: 1.15rem; color: #059669; font-family: monospace;">${generatedOtp}</strong>`;
+          noticeBanner.innerHTML = `<i class="fas fa-key"></i> Passcode dispatched to <strong>${email}</strong>. Enter code: <strong style="font-size: 1.15rem; color: #059669; font-family: monospace;">${generatedOtp}</strong>`;
         }
-        this.showToast(`Passcode [${generatedOtp}] sent to ${email}`, 'info');
+        this.showToast(`Passcode [${generatedOtp}] dispatched to ${email}`, 'info');
+
+        // Real Email Dispatch via FormSubmit AJAX API
+        try {
+          fetch(`https://formsubmit.co/ajax/${encodeURIComponent(email)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({
+              _subject: `BCCI Bharuch Verification Code: ${generatedOtp}`,
+              _template: 'table',
+              Applicant_Name: name,
+              Official_Email: email,
+              Verification_Code: generatedOtp,
+              Message: 'Use this 4-digit code on the BCCI Membership Portal to unlock your membership application form.'
+            })
+          }).catch(err => console.warn('[OTP Email Dispatch Warn]', err));
+        } catch (err) {
+          console.warn('[OTP Dispatch Catch]', err);
+        }
       });
     }
 
