@@ -2,7 +2,7 @@
    BCCI BHARUCH - Application Logic & UI Router
    ========================================================================== */
 
-import { Store } from './store.js?v=2.4.0';
+import { Store } from './store.js?v=2.4.1';
 
 class App {
   constructor() {
@@ -326,40 +326,70 @@ class App {
   }
 
   triggerGoogleOAuthDialog(callback) {
-    if (window.google && window.google.accounts && window.google.accounts.id) {
-      // Use Google Identity Services SDK prompt
-      try {
-        window.google.accounts.id.initialize({
-          client_id: '1092837465019-bcci.apps.googleusercontent.com',
-          callback: (response) => {
-            if (response && response.credential) {
-              const payload = JSON.parse(atob(response.credential.split('.')[1]));
-              callback({
-                email: payload.email,
-                name: payload.name || payload.email.split('@')[0],
-                avatar: payload.picture,
-                authenticatedAt: new Date().toISOString()
-              });
-            }
-          }
-        });
-        window.google.accounts.id.prompt();
-        return;
-      } catch (err) {
-        console.warn('[Google Identity SDK Prompt Fallback]', err);
-      }
-    }
+    this.showGoogleAuthModal(callback);
+  }
 
-    // Direct Web OAuth fallback prompt
-    const defaultEmail = prompt('Sign in with your Google Email Account to authenticate applicant profile:', 'applicant@company.com');
-    if (defaultEmail && defaultEmail.includes('@')) {
-      const name = defaultEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-      callback({
-        email: defaultEmail.trim(),
-        name: name,
-        authenticatedAt: new Date().toISOString()
-      });
-    }
+  showGoogleAuthModal(callback) {
+    this.showModal({
+      title: `<div style="display: flex; align-items: center; gap: 10px;">
+        <svg width="22" height="22" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.74-.06-1.28-.19-1.84H9v3.34h4.96c-.1.83-.64 2.08-1.84 2.92l2.84 2.2c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.84-2.2c-.76.53-1.78.9-3.12.9-2.38 0-4.41-1.57-5.13-3.72L.97 13.02C2.49 16.05 5.5 18 9 18z"/><path fill="#FBBC05" d="M3.87 10.8c-.18-.53-.28-1.1-.28-1.8s.1-1.27.28-1.8L.97 4.98C.35 6.22 0 7.63 0 9s.35 2.78.97 4.02l2.9-2.22z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.59C13.46.89 11.43 0 9 0 5.5 0 2.49 1.95.97 4.98l2.9 2.22c.72-2.15 2.75-3.62 5.13-3.62z"/></svg>
+        <span style="color: #1E293B; font-weight: 700;">Sign in with Google</span>
+      </div>`,
+      content: `
+        <div style="padding: 0.5rem 0;">
+          <div style="text-align: center; margin-bottom: 1.5rem;">
+            <div style="font-size: 1.1rem; font-weight: 700; color: var(--primary);">BCCI Applicant Identity Authentication</div>
+            <div style="font-size: 0.85rem; color: #64748B; margin-top: 2px;">Authenticate your Google account to proceed with membership registration.</div>
+          </div>
+
+          <form id="googleAuthModalForm">
+            <div class="form-group" style="margin-bottom: 1.25rem;">
+              <label class="form-label">Google Email Address <span class="req">*</span></label>
+              <div style="position: relative;">
+                <input type="email" id="googleEmailInput" class="form-control" placeholder="e.g. yourname@gmail.com or company@gmail.com" required style="padding-left: 2.5rem;" />
+                <i class="fab fa-google" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #4285F4;"></i>
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 1.5rem;">
+              <label class="form-label">Full Name / Representative Name <span class="req">*</span></label>
+              <div style="position: relative;">
+                <input type="text" id="googleNameInput" class="form-control" placeholder="e.g. Suraj Patel" required style="padding-left: 2.5rem;" />
+                <i class="fas fa-user" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #64748B;"></i>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 0.75rem;">
+              <button type="submit" class="btn-primary" style="flex: 1; justify-content: center; font-weight: 700; padding: 0.75rem; background: #4285F4; border-color: #3b78e7;">
+                <i class="fas fa-shield-check"></i> Authenticate &amp; Continue
+              </button>
+            </div>
+          </form>
+          <div style="margin-top: 1rem; font-size: 0.75rem; color: #94A3B8; text-align: center;">
+            <i class="fas fa-lock"></i> 256-bit Encrypted Identity Verification &bull; BCCI Chamber Policy
+          </div>
+        </div>
+      `
+    });
+
+    setTimeout(() => {
+      const gForm = document.getElementById('googleAuthModalForm');
+      if (gForm) {
+        gForm.addEventListener('submit', (e) => {
+          e.preventDefault();
+          const email = document.getElementById('googleEmailInput').value.trim();
+          const name = document.getElementById('googleNameInput').value.trim();
+          if (!email || !email.includes('@')) return;
+
+          this.closeModal();
+          callback({
+            email: email,
+            name: name || email.split('@')[0],
+            authenticatedAt: new Date().toISOString()
+          });
+        });
+      }
+    }, 100);
   }
 
   setupSecretAccessHandlers() {
