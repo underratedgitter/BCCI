@@ -6,6 +6,7 @@ const STORAGE_KEYS = {
   APPLICATIONS: 'bcci_membership_applications',
   ENQUIRIES: 'bcci_enquiries',
   ADMIN_AUTH: 'bcci_admin_session',
+  APPLICANT_SESSION: 'bcci_applicant_session',
   SENT_EMAILS: 'bcci_sent_approval_emails'
 };
 
@@ -201,6 +202,20 @@ export class Store {
 
   setAdminAuth(status) {
     localStorage.setItem(STORAGE_KEYS.ADMIN_AUTH, status ? 'true' : 'false');
+  }
+
+  // Applicant OAuth Session Helpers
+  getApplicantSession() {
+    const data = localStorage.getItem(STORAGE_KEYS.APPLICANT_SESSION);
+    return data ? JSON.parse(data) : null;
+  }
+
+  setApplicantSession(sessionData) {
+    localStorage.setItem(STORAGE_KEYS.APPLICANT_SESSION, JSON.stringify(sessionData));
+  }
+
+  clearApplicantSession() {
+    localStorage.removeItem(STORAGE_KEYS.APPLICANT_SESSION);
   }
 
   validateAdminCredentials(username, password) {

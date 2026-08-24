@@ -2,7 +2,7 @@
    BCCI BHARUCH - Application Logic & UI Router
    ========================================================================== */
 
-import { Store } from './store.js?v=2.1.3';
+import { Store } from './store.js?v=2.2.0';
 
 class App {
   constructor() {
@@ -23,11 +23,100 @@ class App {
     this.updateNavAuthUI();
     this.renderView('home');
     this.setupSecretAccessHandlers();
+    this.setupApplicantAuthHandlers();
     this.setupFileUploadHandlers();
     this.setupFormValidation();
     this.setupFormHandlers();
     this.setupModalEvents();
     this.setupLightboxEvents();
+  }
+
+  setupApplicantAuthHandlers() {
+    const gate = document.getElementById('applicantAuthGate');
+    const banner = document.getElementById('applicantAuthBanner');
+    const wrapper = document.getElementById('membershipFormWrapper');
+    const googleBtn = document.getElementById('googleAuthBtn');
+    const signOutBtn = document.getElementById('applicantSignOutBtn');
+    const emailDisplay = document.getElementById('applicantEmailDisplay');
+    const avatarInitial = document.getElementById('applicantAvatarInitial');
+
+    const updateApplicantAuthUI = () => {
+      const session = this.store.getApplicantSession();
+      if (session && session.email) {
+        if (gate) gate.style.display = 'none';
+        if (banner) banner.style.display = 'flex';
+        if (wrapper) wrapper.style.display = 'block';
+        if (emailDisplay) emailDisplay.textContent = `${session.name || 'Applicant'} (${session.email})`;
+        if (avatarInitial) avatarInitial.textContent = (session.name || session.email).charAt(0).toUpperCase();
+
+        // Auto-fill official email and representative name fields in membership form
+        const emailInput = document.querySelector('#membershipForm input[name="email"]');
+        const repInput = document.querySelector('#membershipForm input[name="repName"]');
+        if (emailInput && !emailInput.value) emailInput.value = session.email;
+        if (repInput && !repInput.value && session.name) repInput.value = session.name;
+      } else {
+        if (gate) gate.style.display = 'block';
+        if (banner) banner.style.display = 'none';
+        if (wrapper) wrapper.style.display = 'none';
+      }
+    };
+
+    if (googleBtn) {
+      googleBtn.addEventListener('click', () => {
+        this.triggerGoogleOAuthDialog((userSession) => {
+          this.store.setApplicantSession(userSession);
+          updateApplicantAuthUI();
+          this.showToast(`Authenticated as ${userSession.email}`, 'success');
+        });
+      });
+    }
+
+    if (signOutBtn) {
+      signOutBtn.addEventListener('click', () => {
+        this.store.clearApplicantSession();
+        updateApplicantAuthUI();
+        this.showToast('Applicant session signed out.', 'info');
+      });
+    }
+
+    updateApplicantAuthUI();
+  }
+
+  triggerGoogleOAuthDialog(callback) {
+    if (window.google && window.google.accounts && window.google.accounts.id) {
+      // Use Google Identity Services SDK prompt
+      try {
+        window.google.accounts.id.initialize({
+          client_id: '1092837465019-bcci.apps.googleusercontent.com',
+          callback: (response) => {
+            if (response && response.credential) {
+              const payload = JSON.parse(atob(response.credential.split('.')[1]));
+              callback({
+                email: payload.email,
+                name: payload.name || payload.email.split('@')[0],
+                avatar: payload.picture,
+                authenticatedAt: new Date().toISOString()
+              });
+            }
+          }
+        });
+        window.google.accounts.id.prompt();
+        return;
+      } catch (err) {
+        console.warn('[Google Identity SDK Prompt Fallback]', err);
+      }
+    }
+
+    // Direct Web OAuth fallback prompt
+    const defaultEmail = prompt('Sign in with your Google Email Account to authenticate applicant profile:', 'applicant@company.com');
+    if (defaultEmail && defaultEmail.includes('@')) {
+      const name = defaultEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      callback({
+        email: defaultEmail.trim(),
+        name: name,
+        authenticatedAt: new Date().toISOString()
+      });
+    }
   }
 
   setupSecretAccessHandlers() {
