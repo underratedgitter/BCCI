@@ -2,7 +2,7 @@
    BCCI BHARUCH - Application Logic & UI Router
    ========================================================================== */
 
-import { Store } from './store.js?v=2.3.0';
+import { Store } from './store.js?v=2.3.1';
 
 class App {
   constructor() {
@@ -53,34 +53,35 @@ class App {
           const validity = this.store.getMembershipValidity(memberApp);
           if (wrapper) wrapper.style.display = 'none'; // Hide application form since already an approved member
 
-          let statusBadgeClass = 'background: #DEF7EC; color: #03543F; border: 1px solid #84E1BC;';
-          let statusLabel = `⭐ Active Member (Valid until ${validity.validUntilDate})`;
+          let statusBadgeClass = 'background: rgba(16, 185, 129, 0.15); color: #34D399; border: 1px solid #10B981;';
+          let statusLabel = `⭐ ACTIVE MEMBER (Valid until ${validity.validUntilDate})`;
           
           if (validity.state === 'RENEWAL_DUE') {
-            statusBadgeClass = 'background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A;';
-            statusLabel = `⚠️ Renewal Due Soon (${validity.daysRemaining} days left)`;
+            statusBadgeClass = 'background: rgba(245, 158, 11, 0.2); color: #FBBF24; border: 1px solid #F59E0B;';
+            statusLabel = `⚠️ RENEWAL DUE SOON (${validity.daysRemaining} days left)`;
           } else if (validity.state === 'EXPIRED') {
-            statusBadgeClass = 'background: #FDE8E8; color: #9B1C1C; border: 1px solid #F8B4B4;';
-            statusLabel = `❌ Membership Expired (${validity.validUntilDate})`;
+            statusBadgeClass = 'background: rgba(239, 68, 68, 0.2); color: #FCA5A5; border: 1px solid #EF4444;';
+            statusLabel = `❌ MEMBERSHIP EXPIRED (${validity.validUntilDate})`;
           }
 
           if (emailDisplay) {
             emailDisplay.innerHTML = `
-              <div style="font-size: 1.05rem; font-weight: 700; color: #064E3B; margin-bottom: 0.2rem;">
-                ${memberApp.company} <span style="font-size: 0.8rem; background: #D1FAE5; color: #065F46; padding: 2px 8px; border-radius: 10px;">${memberApp.id}</span>
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <span style="font-size: 1.15rem; font-weight: 800; color: #FFFFFF;">${memberApp.company}</span>
+                <span style="font-size: 0.75rem; background: rgba(255,215,0,0.2); color: #FFD700; border: 1px solid #FFD700; padding: 2px 8px; border-radius: 12px; font-family: monospace; font-weight: 700;">${memberApp.id}</span>
               </div>
-              <div style="font-size: 0.85rem; color: #047857; margin-bottom: 0.4rem;">
-                Representative: <strong>${memberApp.repName}</strong> (${session.email})
+              <div style="font-size: 0.85rem; color: #CBD5E1; margin-top: 3px;">
+                Delegate: <strong style="color: #FFFFFF;">${memberApp.repName}</strong> (${session.email})
               </div>
-              <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
-                <span style="font-size: 0.8rem; font-weight: 700; padding: 3px 10px; border-radius: 12px; ${statusBadgeClass}">
+              <div style="display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; margin-top: 0.6rem;">
+                <span style="font-size: 0.8rem; font-weight: 700; padding: 4px 12px; border-radius: 20px; ${statusBadgeClass}">
                   ${statusLabel}
                 </span>
-                <button type="button" class="btn-primary btnViewDigitalCard" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; background: var(--primary);">
-                  <i class="fas fa-id-card"></i> Digital ID Card
+                <button type="button" class="btn-primary btnViewDigitalCard" style="padding: 0.35rem 0.85rem; font-size: 0.78rem; background: linear-gradient(135deg, #D4AF37 0%, #AA7C11 100%); color: #0F2C59; font-weight: 800; border: none; box-shadow: 0 2px 6px rgba(212, 175, 55, 0.4);">
+                  <i class="fas fa-id-card"></i> Digital Membership Pass
                 </button>
-                <button type="button" class="btn-secondary btnRenewMembership" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; color: #D97706; border-color: #FCD34D; background: #FFFBEB;">
-                  <i class="fas fa-sync-alt"></i> Renew 1-Yr Membership
+                <button type="button" class="btn-secondary btnRenewMembership" style="padding: 0.35rem 0.85rem; font-size: 0.78rem; color: #FFD700; border-color: rgba(255,215,0,0.4); background: rgba(255,215,0,0.1); font-weight: 700;">
+                  <i class="fas fa-sync-alt"></i> Annual Renewal
                 </button>
               </div>
             `;
@@ -93,13 +94,14 @@ class App {
           if (wrapper) wrapper.style.display = 'none'; // Hide application form since pending review
           if (emailDisplay) {
             emailDisplay.innerHTML = `
-              <div style="font-size: 1rem; font-weight: 700; color: #1E3E62; margin-bottom: 0.2rem;">
-                ${memberApp.company} <span style="font-size: 0.8rem; background: #FEF3C7; color: #92400E; padding: 2px 8px; border-radius: 10px;">${memberApp.id}</span>
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <span style="font-size: 1.05rem; font-weight: 800; color: #FFFFFF;">${memberApp.company}</span>
+                <span style="font-size: 0.75rem; background: rgba(251,191,36,0.2); color: #FBBF24; border: 1px solid #F59E0B; padding: 2px 8px; border-radius: 12px; font-family: monospace; font-weight: 700;">${memberApp.id}</span>
               </div>
-              <div style="font-size: 0.85rem; color: #475569;">
-                <i class="fas fa-hourglass-half" style="color: #D97706;"></i> <strong>Application Status: PENDING ADMIN APPROVAL</strong>
+              <div style="font-size: 0.85rem; color: #FCD34D; margin-top: 3px;">
+                <i class="fas fa-hourglass-half"></i> <strong>Application Status: PENDING SECRETARIAT REVIEW</strong>
               </div>
-              <div style="font-size: 0.8rem; color: #64748B; margin-top: 0.2rem;">
+              <div style="font-size: 0.8rem; color: #94A3B8; margin-top: 0.2rem;">
                 Submitted on ${new Date(memberApp.submittedAt).toLocaleDateString()}. The Secretariat Board is reviewing your documentation.
               </div>
             `;
@@ -183,32 +185,32 @@ class App {
       }
     }
 
-    let starColor = '#D97706';
-    let badgeBg = '#FEF3C7';
-    let badgeBorder = '#FDE68A';
-    let badgeText = '#92400E';
+    let starColor = '#FFD700';
+    let badgeBg = 'linear-gradient(135deg, #0F2C59 0%, #1E3E62 100%)';
+    let badgeBorder = '#D4AF37';
+    let badgeText = '#FFFFFF';
 
     if (validity && validity.state === 'EXPIRED') {
-      starColor = '#DC2626';
-      badgeBg = '#FEE2E2';
+      starColor = '#EF4444';
+      badgeBg = '#7F1D1D';
       badgeBorder = '#FCA5A5';
-      badgeText = '#991B1B';
     }
 
     badgeEl.style.cssText = `
       display: inline-flex;
       align-items: center;
-      gap: 0.4rem;
+      gap: 0.45rem;
       background: ${badgeBg};
       border: 1px solid ${badgeBorder};
       color: ${badgeText};
-      padding: 0.35rem 0.75rem;
+      padding: 0.4rem 0.85rem;
       border-radius: 20px;
-      font-size: 0.8rem;
+      font-size: 0.82rem;
       font-weight: 700;
       cursor: pointer;
+      box-shadow: 0 4px 12px rgba(15, 44, 89, 0.25);
     `;
-    badgeEl.innerHTML = `<i class="fas fa-star" style="color: ${starColor};"></i> Member: ${memberApp.company} (${memberApp.id})`;
+    badgeEl.innerHTML = `<i class="fas fa-award" style="color: ${starColor}; font-size: 0.95rem;"></i> OFFICIAL MEMBER: ${memberApp.company} <span style="color: #FFD700; font-family: monospace; font-size: 0.75rem; background: rgba(255,215,0,0.15); padding: 1px 6px; border-radius: 8px;">${memberApp.id}</span>`;
     badgeEl.title = `Official Member ID: ${memberApp.id} - Tap to view Digital Membership Pass`;
 
     badgeEl.onclick = () => this.showDigitalMemberCardModal(memberApp);
