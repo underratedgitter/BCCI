@@ -2,7 +2,7 @@
    BCCI BHARUCH - Application Logic & UI Router
    ========================================================================== */
 
-import { Store } from './store.js?v=2.6.1';
+import { Store } from './store.js?v=2.6.2';
 
 class App {
   constructor() {
@@ -32,42 +32,98 @@ class App {
   }
 
   setupApplicantAuthHandlers() {
-    const gate = document.getElementById('applicantAuthGate');
-    const banner = document.getElementById('applicantAuthBanner');
-    const wrapper = document.getElementById('membershipFormWrapper');
     const googleBtn = document.getElementById('googleAuthBtn');
     const signOutBtn = document.getElementById('applicantSignOutBtn');
-    const emailDisplay = document.getElementById('applicantEmailDisplay');
-    const avatarInitial = document.getElementById('applicantAvatarInitial');
+
+    // Global Safe JWT Decoder
+    const parseJwt = (token) => {
+      try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map((c) => {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        return JSON.parse(jsonPayload);
+      } catch (e) {
+        console.error('[JWT Parse Error]', e);
+        return null;
+      }
+    };
 
     // Global Google Identity Services Callback
     window.handleGoogleCredentialResponse = (response) => {
       if (response && response.credential) {
         try {
-          const payload = JSON.parse(atob(response.credential.split('.')[1]));
-          const sessionData = {
-            email: payload.email,
-            name: payload.name || payload.email.split('@')[0],
-            avatar: payload.picture,
-            authenticatedAt: new Date().toISOString()
-          };
-          this.store.setApplicantSession(sessionData);
-          updateApplicantAuthUI();
-          this.showToast(`Authenticated via Google as ${payload.email}`, 'success');
+          const payload = parseJwt(response.credential);
+          if (payload && payload.email) {
+            const sessionData = {
+              email: payload.email,
+              name: payload.name || payload.email.split('@')[0],
+              avatar: payload.picture || '',
+              authenticatedAt: new Date().toISOString()
+            };
+            this.store.setApplicantSession(sessionData);
+            this.updateApplicantAuthUI();
+            this.showToast(`Authenticated via Google as ${payload.email}`, 'success');
+          }
         } catch (err) {
-          console.warn('[Google Credential Parse Error]', err);
+          console.warn('[Google Credential Response Error]', err);
         }
       }
     };
 
-    const updateApplicantAuthUI = () => {
+    if (googleBtn) {
+      googleBtn.addEventListener('click', () => {
+        this.triggerGoogleOAuthDialog((userSession) => {
+          this.store.setApplicantSession(userSession);
+          this.updateApplicantAuthUI();
+          this.showToast(`Authenticated as ${userSession.email}`, 'success');
+        });
+      });
+    }
+
+    if (signOutBtn) {
+      signOutBtn.addEventListener('click', () => {
+        this.store.clearApplicantSession();
+        this.updateApplicantAuthUI();
+        this.showToast('Applicant session signed out.', 'info');
+      });
+    }
+
+    // Dynamic Delegate Listeners for Digital Card & Renewal
+    document.addEventListener('click', (e) => {
+      const cardBtn = e.target.closest('.btnViewDigitalCard');
+      const renewBtn = e.target.closest('.btnRenewMembership');
       const session = this.store.getApplicantSession();
-      if (session && session.email) {
-        if (gate) gate.style.display = 'none';
-        if (banner) banner.style.display = 'flex';
-        
-        // Check if this authenticated user has an existing membership application
+
+      if (cardBtn && session) {
         const memberApp = this.store.getApplicationByEmail(session.email);
+        if (memberApp) this.showDigitalMemberCardModal(memberApp);
+      }
+
+      if (renewBtn && session) {
+        const memberApp = this.store.getApplicationByEmail(session.email);
+        if (memberApp) this.showRenewalModal(memberApp);
+      }
+    });
+
+    this.updateApplicantAuthUI();
+  }
+
+  updateApplicantAuthUI() {
+    const gate = document.getElementById('applicantAuthGate');
+    const banner = document.getElementById('applicantAuthBanner');
+    const wrapper = document.getElementById('membershipFormWrapper');
+    const emailDisplay = document.getElementById('applicantEmailDisplay');
+    const avatarInitial = document.getElementById('applicantAvatarInitial');
+
+    const session = this.store.getApplicantSession();
+    if (session && session.email) {
+      if (gate) gate.style.display = 'none';
+      if (banner) banner.style.display = 'flex';
+      
+      // Check if this authenticated user has an existing membership application
+      const memberApp = this.store.getApplicationByEmail(session.email);
 
         if (memberApp && memberApp.status === 'Approved') {
           const validity = this.store.getMembershipValidity(memberApp);
@@ -142,50 +198,12 @@ class App {
 
         if (avatarInitial) avatarInitial.textContent = (session.name || session.email).charAt(0).toUpperCase();
 
-      } else {
-        if (gate) gate.style.display = 'block';
-        if (banner) banner.style.display = 'none';
-        if (wrapper) wrapper.style.display = 'none';
-        this.updateHeaderMemberBadge(null, null);
-      }
-    };
-
-    if (googleBtn) {
-      googleBtn.addEventListener('click', () => {
-        this.triggerGoogleOAuthDialog((userSession) => {
-          this.store.setApplicantSession(userSession);
-          updateApplicantAuthUI();
-          this.showToast(`Authenticated as ${userSession.email}`, 'success');
-        });
-      });
+    } else {
+      if (gate) gate.style.display = 'block';
+      if (banner) banner.style.display = 'none';
+      if (wrapper) wrapper.style.display = 'none';
+      this.updateHeaderMemberBadge(null, null);
     }
-
-    if (signOutBtn) {
-      signOutBtn.addEventListener('click', () => {
-        this.store.clearApplicantSession();
-        updateApplicantAuthUI();
-        this.showToast('Applicant session signed out.', 'info');
-      });
-    }
-
-    // Dynamic Delegate Listeners for Digital Card & Renewal
-    document.addEventListener('click', (e) => {
-      const cardBtn = e.target.closest('.btnViewDigitalCard');
-      const renewBtn = e.target.closest('.btnRenewMembership');
-      const session = this.store.getApplicantSession();
-
-      if (cardBtn && session) {
-        const memberApp = this.store.getApplicationByEmail(session.email);
-        if (memberApp) this.showDigitalMemberCardModal(memberApp);
-      }
-
-      if (renewBtn && session) {
-        const memberApp = this.store.getApplicationByEmail(session.email);
-        if (memberApp) this.showRenewalModal(memberApp);
-      }
-    });
-
-    updateApplicantAuthUI();
   }
 
   updateHeaderMemberBadge(memberApp, validity) {
@@ -616,6 +634,9 @@ class App {
     }
     if (viewId === 'services') {
       this.renderServicesAndFaqs();
+    }
+    if (viewId === 'membership') {
+      this.updateApplicantAuthUI();
     }
     if (viewId === 'admin') {
       this.renderAdminPortal();
