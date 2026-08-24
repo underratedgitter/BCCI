@@ -2,7 +2,7 @@
    BCCI BHARUCH - Application Logic & UI Router
    ========================================================================== */
 
-import { Store } from './store.js?v=2.1.2';
+import { Store } from './store.js?v=2.1.3';
 
 class App {
   constructor() {
@@ -22,11 +22,38 @@ class App {
     this.bindNavigation();
     this.updateNavAuthUI();
     this.renderView('home');
+    this.setupSecretAccessHandlers();
     this.setupFileUploadHandlers();
     this.setupFormValidation();
     this.setupFormHandlers();
     this.setupModalEvents();
     this.setupLightboxEvents();
+  }
+
+  setupSecretAccessHandlers() {
+    // 1. URL Hash routing handler (#admin, #signin, #secret-admin)
+    const handleHashChange = () => {
+      const hash = (window.location.hash || '').toLowerCase();
+      if (hash === '#admin' || hash === '#secret-admin') {
+        this.renderView(this.adminAuthed ? 'admin' : 'signin');
+      } else if (hash === '#signin' || hash === '#login') {
+        this.renderView('signin');
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    if (window.location.hash) {
+      handleHashChange();
+    }
+
+    // 2. Secret Keyboard Shortcut (Ctrl + Shift + A or Cmd + Shift + A)
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+        e.preventDefault();
+        this.renderView(this.adminAuthed ? 'admin' : 'signin');
+        this.showToast('Secretariat Access Shortcut Triggered', 'info');
+      }
+    });
   }
 
   updateNavAuthUI() {
@@ -40,11 +67,7 @@ class App {
       <button class="btn-signout-nav btnNavSignOut" title="Sign Out Admin Session" style="width: 100%; justify-content: center; margin-top: 0.5rem;">
         <i class="fas fa-sign-out-alt"></i> Sign Out
       </button>
-    ` : `
-      <button class="btn-signin-nav" data-view-nav="signin" style="width: 100%; justify-content: center;">
-        <i class="fas fa-sign-in-alt"></i> Admin Sign In
-      </button>
-    `;
+    ` : '';
 
     if (desktopContainer) {
       desktopContainer.innerHTML = this.adminAuthed ? `
@@ -54,11 +77,7 @@ class App {
         <button class="btn-signout-nav btnNavSignOut" title="Sign Out Admin Session">
           <i class="fas fa-sign-out-alt"></i> Sign Out
         </button>
-      ` : `
-        <button class="btn-signin-nav" data-view-nav="signin">
-          <i class="fas fa-sign-in-alt"></i> Admin Sign In
-        </button>
-      `;
+      ` : '';
     }
 
     if (drawerContainer) {
