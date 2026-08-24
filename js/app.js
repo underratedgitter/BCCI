@@ -2,7 +2,7 @@
    BCCI BHARUCH - Application Logic & UI Router
    ========================================================================== */
 
-import { Store } from './store.js?v=2.4.1';
+import { Store } from './store.js?v=2.5.0';
 
 class App {
   constructor() {
@@ -39,6 +39,26 @@ class App {
     const signOutBtn = document.getElementById('applicantSignOutBtn');
     const emailDisplay = document.getElementById('applicantEmailDisplay');
     const avatarInitial = document.getElementById('applicantAvatarInitial');
+
+    // Global Google Identity Services Callback
+    window.handleGoogleCredentialResponse = (response) => {
+      if (response && response.credential) {
+        try {
+          const payload = JSON.parse(atob(response.credential.split('.')[1]));
+          const sessionData = {
+            email: payload.email,
+            name: payload.name || payload.email.split('@')[0],
+            avatar: payload.picture,
+            authenticatedAt: new Date().toISOString()
+          };
+          this.store.setApplicantSession(sessionData);
+          updateApplicantAuthUI();
+          this.showToast(`Authenticated via Google as ${payload.email}`, 'success');
+        } catch (err) {
+          console.warn('[Google Credential Parse Error]', err);
+        }
+      }
+    };
 
     const updateApplicantAuthUI = () => {
       const session = this.store.getApplicantSession();
