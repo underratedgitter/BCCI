@@ -722,11 +722,14 @@
           </button>
         </div>
 
-        <div class="form-container" id="membershipFormWrapper" style="display: none;">
-          <form id="membershipForm">
-            <h3 style="color: var(--primary); margin-bottom: 1.5rem; font-size: 1.2rem;">
-              <i class="fas fa-building"></i> Company &amp; Entity Profile
-            </h3>
+        <div id="membershipFormWrapper" style="display: none; max-width: 1200px; margin: 0 auto;">
+          <div class="membership-layout-grid" style="display: grid; grid-template-columns: 1fr 340px; gap: 2rem; align-items: start;">
+            <!-- Left Column: Membership Form -->
+            <div class="form-container" style="max-width: 100%; margin: 0;">
+              <form id="membershipForm">
+                <h3 style="color: var(--primary); margin-bottom: 1.5rem; font-size: 1.2rem;">
+                  <i class="fas fa-building"></i> Company &amp; Entity Profile
+                </h3>
             <div class="form-grid">
               <div class="form-group full-width">
                 <label class="form-label">Registered Enterprise / Firm Name <span class="req">*</span></label>
@@ -957,6 +960,75 @@
             </button>
           </form>
         </div>
+
+        <!-- Right Column: BCCI News & Official Blogs Sidebar Card -->
+        <aside style="display: flex; flex-direction: column; gap: 1.5rem; position: sticky; top: 100px;">
+          <!-- News Card -->
+          <div style="background: #FFFFFF; border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 1.5rem; box-shadow: var(--shadow-sm);">
+            <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #EFF6FF; padding-bottom: 0.75rem; margin-bottom: 1.25rem;">
+              <h4 style="font-size: 1.05rem; font-weight: 800; color: var(--primary); display: flex; align-items: center; gap: 8px; margin: 0;">
+                <i class="fas fa-newspaper" style="color: var(--secondary);"></i> News &amp; Updates
+              </h4>
+              <span style="font-size: 0.7rem; background: #EFF6FF; color: var(--primary); font-weight: 700; padding: 2px 8px; border-radius: 10px;">Official</span>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 1rem;">
+              <article style="border-bottom: 1px solid #F1F5F9; padding-bottom: 0.85rem;">
+                <div style="font-size: 0.75rem; color: var(--secondary); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">
+                  <i class="fas fa-calendar-alt"></i> August 2026 &bull; Industry News
+                </div>
+                <h5 style="font-size: 0.9rem; font-weight: 700; color: #1E293B; margin-bottom: 4px; line-height: 1.4;">
+                  BCCI Industrial Expo 2026 Registration Open
+                </h5>
+                <p style="font-size: 0.8rem; color: #64748B; margin: 0; line-height: 1.5;">
+                  Bharuch Chamber announces stall allocations and MSME subsidies for upcoming regional trade summit.
+                </p>
+              </article>
+
+              <article style="border-bottom: 1px solid #F1F5F9; padding-bottom: 0.85rem;">
+                <div style="font-size: 0.75rem; color: var(--secondary); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">
+                  <i class="fas fa-calendar-alt"></i> July 2026 &bull; Chamber Blog
+                </div>
+                <h5 style="font-size: 0.9rem; font-weight: 700; color: #1E293B; margin-bottom: 4px; line-height: 1.4;">
+                  New GIDC Water &amp; Power Tariff Policy Released
+                </h5>
+                <p style="font-size: 0.8rem; color: #64748B; margin: 0; line-height: 1.5;">
+                  Key highlights from the BCCI delegation meeting with GIDC Chairman &amp; State Industry Ministry.
+                </p>
+              </article>
+
+              <article>
+                <div style="font-size: 0.75rem; color: var(--secondary); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">
+                  <i class="fas fa-calendar-alt"></i> July 2026 &bull; Advisory
+                </div>
+                <h5 style="font-size: 0.9rem; font-weight: 700; color: #1E293B; margin-bottom: 4px; line-height: 1.4;">
+                  GST Compliance Workshop for Manufacturers
+                </h5>
+                <p style="font-size: 0.8rem; color: #64748B; margin: 0; line-height: 1.5;">
+                  Interactive session with Central Excise officials organized at BCCI Chamber Auditorium.
+                </p>
+              </article>
+            </div>
+          </div>
+
+          <!-- Chamber Benefits Card -->
+          <div style="background: linear-gradient(135deg, #0F2C59 0%, #1E3E62 100%); border: 1px solid #D4AF37; border-radius: var(--radius-lg); padding: 1.25rem 1.5rem; color: #FFFFFF; box-shadow: 0 10px 25px rgba(15,44,89,0.12);">
+            <div style="font-size: 0.8rem; color: #FFD700; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 0.5rem;">
+              <i class="fas fa-award"></i> Member Privileges
+            </div>
+            <h5 style="font-size: 1rem; font-weight: 800; color: #FFFFFF; margin-bottom: 0.75rem;">
+              Why Join BCCI Bharuch?
+            </h5>
+            <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.82rem; color: #E2E8F0;">
+              <li style="display: flex; align-items: center; gap: 8px;"><i class="fas fa-check-circle" style="color: #FFD700;"></i> Official Certificate of Origin Issuer</li>
+              <li style="display: flex; align-items: center; gap: 8px;"><i class="fas fa-check-circle" style="color: #FFD700;"></i> Direct Government Representation</li>
+              <li style="display: flex; align-items: center; gap: 8px;"><i class="fas fa-check-circle" style="color: #FFD700;"></i> Global Trade Delegations &amp; Expos</li>
+              <li style="display: flex; align-items: center; gap: 8px;"><i class="fas fa-check-circle" style="color: #FFD700;"></i> Verified Digital Pass &amp; Directory Listing</li>
+            </ul>
+          </div>
+        </aside>
+      </div>
+    </div>
       </div>
     </section>
   </main>
@@ -1245,7 +1317,7 @@
   </form>
 
   <!-- App Main ES Module -->
-  <script type="module" src="js/app.js?v=3.1.0"></script>
+  <script type="module" src="js/app.js?v=3.2.0"></script>
 </body>
 
 </html>

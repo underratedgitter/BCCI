@@ -2042,3 +2042,9 @@ button:active, .btn-primary:active, .btn-secondary:active, .btn-nav-cta:active {
   }
 }
 
+@media (max-width: 992px) {
+  .membership-layout-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
