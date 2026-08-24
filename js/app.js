@@ -2,7 +2,7 @@
    BCCI BHARUCH - Application Logic & UI Router
    ========================================================================== */
 
-import { Store } from './store.js?v=2.5.1';
+import { Store } from './store.js?v=2.6.0';
 
 class App {
   constructor() {
@@ -346,6 +346,31 @@ class App {
   }
 
   triggerGoogleOAuthDialog(callback) {
+    if (window.google && window.google.accounts && window.google.accounts.id) {
+      try {
+        window.google.accounts.id.initialize({
+          client_id: '984292781459-1lstfue0bjhde1fachhk2264gcbb9ot7.apps.googleusercontent.com',
+          callback: (response) => {
+            if (response && response.credential) {
+              const payload = JSON.parse(atob(response.credential.split('.')[1]));
+              const sessionData = {
+                email: payload.email,
+                name: payload.name || payload.email.split('@')[0],
+                avatar: payload.picture,
+                authenticatedAt: new Date().toISOString()
+              };
+              this.store.setApplicantSession(sessionData);
+              callback(sessionData);
+              this.showToast(`Authenticated via Google as ${payload.email}`, 'success');
+            }
+          }
+        });
+        window.google.accounts.id.prompt();
+        return;
+      } catch (err) {
+        console.warn('[Google SDK Prompt]', err);
+      }
+    }
     this.showGoogleAuthModal(callback);
   }
 
