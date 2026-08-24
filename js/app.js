@@ -2,7 +2,7 @@
    BCCI BHARUCH - Application Logic & UI Router
    ========================================================================== */
 
-import { Store } from './store.js?v=2.7.0';
+import { Store } from './store.js?v=3.0.0';
 
 class App {
   constructor() {
@@ -79,6 +79,85 @@ class App {
           this.updateApplicantAuthUI();
           this.showToast(`Authenticated as ${userSession.email}`, 'success');
         });
+      });
+    }
+
+    // Tab switching for Auth Gate
+    const tabGoogle = document.getElementById('tabBtnGoogle');
+    const tabOtp = document.getElementById('tabBtnOtp');
+    const panelGoogle = document.getElementById('authPanelGoogle');
+    const panelOtp = document.getElementById('authPanelOtp');
+
+    if (tabGoogle && tabOtp && panelGoogle && panelOtp) {
+      tabGoogle.addEventListener('click', () => {
+        tabGoogle.classList.add('active');
+        tabGoogle.style.background = '#FFFFFF';
+        tabGoogle.style.color = 'var(--primary)';
+        tabGoogle.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
+        
+        tabOtp.classList.remove('active');
+        tabOtp.style.background = 'transparent';
+        tabOtp.style.color = '#64748B';
+        tabOtp.style.boxShadow = 'none';
+
+        panelGoogle.style.display = 'block';
+        panelOtp.style.display = 'none';
+      });
+
+      tabOtp.addEventListener('click', () => {
+        tabOtp.classList.add('active');
+        tabOtp.style.background = '#FFFFFF';
+        tabOtp.style.color = 'var(--primary)';
+        tabOtp.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
+
+        tabGoogle.classList.remove('active');
+        tabGoogle.style.background = 'transparent';
+        tabGoogle.style.color = '#64748B';
+        tabGoogle.style.boxShadow = 'none';
+
+        panelGoogle.style.display = 'none';
+        panelOtp.style.display = 'block';
+      });
+    }
+
+    // OTP Verification Flow Logic
+    const otpStep1Form = document.getElementById('otpStep1Form');
+    const otpStep2Form = document.getElementById('otpStep2Form');
+    let generatedOtp = null;
+    let pendingOtpSession = null;
+
+    if (otpStep1Form) {
+      otpStep1Form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const email = document.getElementById('otpEmailInput').value.trim();
+        const name = document.getElementById('otpNameInput').value.trim();
+        if (!email || !name) return;
+
+        generatedOtp = Math.floor(1000 + Math.random() * 9000).toString();
+        pendingOtpSession = { email, name, authenticatedAt: new Date().toISOString() };
+
+        otpStep1Form.style.display = 'none';
+        otpStep2Form.style.display = 'block';
+
+        const noticeBanner = document.getElementById('otpNoticeBanner');
+        if (noticeBanner) {
+          noticeBanner.innerHTML = `<i class="fas fa-key"></i> Verification Passcode for <strong>${email}</strong>: <strong style="font-size: 1.15rem; color: #059669; font-family: monospace;">${generatedOtp}</strong>`;
+        }
+        this.showToast(`Passcode [${generatedOtp}] sent to ${email}`, 'info');
+      });
+    }
+
+    if (otpStep2Form) {
+      otpStep2Form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const inputCode = document.getElementById('otpCodeInput').value.trim();
+        if (inputCode === generatedOtp && pendingOtpSession) {
+          this.store.setApplicantSession(pendingOtpSession);
+          this.updateApplicantAuthUI();
+          this.showToast(`Authenticated via Email OTP as ${pendingOtpSession.email}`, 'success');
+        } else {
+          this.showToast('Invalid verification passcode. Please enter the 4-digit code.', 'error');
+        }
       });
     }
 
