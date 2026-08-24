@@ -2056,3 +2056,51 @@ button:active, .btn-primary:active, .btn-secondary:active, .btn-nav-cta:active {
   }
 }
 
+/* ==========================================================================
+   DYNAMIC LIVELY UI ANIMATIONS & GATE LOGO EFFECTS
+   ========================================================================== */
+.bcci-gate-logo-container {
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.4s ease !important;
+}
+
+.bcci-gate-logo-container:hover {
+  transform: scale(1.08) rotate(3deg);
+  box-shadow: 0 12px 28px rgba(212, 175, 55, 0.45) !important;
+}
+
+#applicantAuthGate::before {
+  content: '';
+  position: absolute;
+  top: -50px;
+  right: -50px;
+  width: 160px;
+  height: 160px;
+  background: radial-gradient(circle, rgba(212, 175, 55, 0.15) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+#applicantAuthGate::after {
+  content: '';
+  position: absolute;
+  bottom: -50px;
+  left: -50px;
+  width: 160px;
+  height: 160px;
+  background: radial-gradient(circle, rgba(15, 44, 89, 0.08) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+aside article {
+  transition: transform 0.25s ease;
+}
+
+aside article:hover {
+  transform: translateX(4px);
+}
+
+.auth-tab-btn {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
