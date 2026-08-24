@@ -1172,6 +1172,14 @@ a:hover {
 /* ==========================================================================
    FORMS & ADMIN PORTAL
    ========================================================================== */
+#membershipFormWrapper {
+  max-width: 1200px !important;
+  margin: 0 auto !important;
+  grid-template-columns: 1fr 340px;
+  gap: 2rem;
+  align-items: start;
+}
+
 .form-container {
   background: #FFFFFF;
   border: 1px solid var(--border-color);

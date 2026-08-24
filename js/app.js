@@ -2,7 +2,7 @@
    BCCI BHARUCH - Application Logic & UI Router
    ========================================================================== */
 
-import { Store } from './store.js?v=3.2.0';
+import { Store } from './store.js?v=3.3.0';
 
 class App {
   constructor() {
@@ -282,7 +282,7 @@ class App {
           this.updateHeaderMemberBadge(memberApp, null);
         } else {
           // Unapplied Google Authenticated User -> Show Form
-          if (wrapper) wrapper.style.display = 'block';
+          if (wrapper) wrapper.style.display = 'grid';
           if (emailDisplay) emailDisplay.textContent = `${session.name || 'Applicant'} (${session.email})`;
           this.updateHeaderMemberBadge(null, null);
 
