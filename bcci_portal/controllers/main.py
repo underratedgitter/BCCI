@@ -4,7 +4,7 @@ import time
 import logging
 
 from odoo import http
-from odoo.http import request, Response
+from odoo.http import request
 
 _logger = logging.getLogger(__name__)
 
@@ -37,8 +37,11 @@ class BCCIPortalController(http.Controller):
             with open(html_path, 'r', encoding='utf-8') as f:
                 html_content = f.read()
         except FileNotFoundError:
-            return Response('BCCI Portal: portal.html not found in static/', status=500)
-        return Response(html_content, content_type='text/html;charset=utf-8', status=200)
+            return request.make_response('BCCI Portal: portal.html not found in static/', status=500)
+        return request.make_response(
+            html_content,
+            headers=[('Content-Type', 'text/html; charset=utf-8')]
+        )
 
     # ── Email OTP ────────────────────────────────────────────────────────────
 
