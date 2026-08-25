@@ -33,9 +33,6 @@
         <!-- BCCI Custom Stylesheet -->
         <link rel="stylesheet" t-att-href="'/bcci_portal/static/css/styles.css?v=11.0.0'"/>
 
-        <!-- Firebase SDKs -->
-        <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"/>
-        <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"/>
       </t>
 
       <!-- Prevent Odoo from injecting its own navbar/footer -->
@@ -56,11 +53,9 @@
           <!-- This div is replaced by the portal app.js after load -->
         </div>
 
-        <!-- Firebase Invisible Recaptcha Container (must be in body, never hidden) -->
-        <div id="recaptcha-container" style="display:none;"/>
 
         <!-- BCCI App Entry Point -->
-        <script type="module" t-att-src="'/bcci_portal/static/js/app.js?v=15.0.0'"/>
+        <script type="module" t-att-src="'/bcci_portal/static/js/app.js?v=16.0.0'"/>
       </body>
     </t>
   </template>

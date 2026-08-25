@@ -17,7 +17,7 @@ class BCCIPortalController(http.Controller):
     BCCI Bharuch Membership Portal Controller.
 
     Serves the full custom SPA and provides secure OTP endpoints
-    that replace Firebase Phone Auth and formsubmit.co email OTP.
+    that power Email and Phone authentication via Odoo backend.
 
     Auth Endpoints:
         POST /bcci/auth/send-email-otp   – Generate & email OTP via Odoo mail

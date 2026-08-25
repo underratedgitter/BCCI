@@ -85,7 +85,7 @@ class App {
 
     // Event Delegation on Document for Bulletproof Click Interception
     document.addEventListener('click', (e) => {
-      const googleAuthBtn = e.target.closest('#firebaseGoogleAuthBtn') || e.target.closest('#googleAuthBtn');
+      const googleAuthBtn = e.target.closest('#googleSignInBtn') || e.target.closest('#googleAuthBtn');
       if (googleAuthBtn) {
         e.preventDefault();
         this.triggerGoogleOAuthDialog((userSession) => {
