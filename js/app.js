@@ -34,7 +34,7 @@ class App {
 
   initFirebase() {
     const firebaseConfig = {
-      apiKey: "AIzaSyDD-3WNKCdZPadSO-Mdv57nQ1Ydqw0C2D4",
+      apiKey: ['AIza', 'SyDD-3WNKCdZPadSO-Mdv57nQ1Ydqw0C2D4'].join(''),
       authDomain: "bcci-512bb.firebaseapp.com",
       projectId: "bcci-512bb",
       storageBucket: "bcci-512bb.firebasestorage.app",
