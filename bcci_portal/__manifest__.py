@@ -8,6 +8,9 @@
     'license': 'LGPL-3',
     'depends': ['base', 'web', 'mail', 'sms'],
     'data': [
+        'security/ir.model.access.csv',
+        'views/membership_application_views.xml',
+        'views/enquiry_views.xml',
         'views/portal_template.xml',
     ],
     'installable': True,

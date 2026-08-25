@@ -15,11 +15,6 @@ class App {
   }
 
   init() {
-    if (!localStorage.getItem('bcci_resend_api_key')) {
-      const activeKey = ['re_', '3aymJv8x_', '64nneTrayP8UapBk627jjnDe'].join('');
-      localStorage.setItem('bcci_resend_api_key', activeKey);
-    }
-    this.initFirebase();
     this.bindNavigation();
     this.updateNavAuthUI();
     this.renderView('home');
@@ -32,24 +27,20 @@ class App {
     this.setupLightboxEvents();
   }
 
-  initFirebase() {
-    const firebaseConfig = {
-      apiKey: ['AIza', 'SyDD-3WNKCdZPadSO-Mdv57nQ1Ydqw0C2D4'].join(''),
-      authDomain: "bcci-512bb.firebaseapp.com",
-      projectId: "bcci-512bb",
-      storageBucket: "bcci-512bb.firebasestorage.app",
-      messagingSenderId: "591205807563",
-      appId: "1:591205807563:web:b5aa377d5c075ef735f24e",
-      measurementId: "G-ZYYNFP9HQW"
-    };
-
-    if (window.firebase && (!window.firebase.apps || !window.firebase.apps.length)) {
-      try {
-        window.firebase.initializeApp(firebaseConfig);
-        console.log('[Firebase Initialized]', firebaseConfig.projectId);
-      } catch (err) {
-        console.warn('[Firebase Init Warning]', err);
-      }
+  /* ── Odoo OTP API Helper ──────────────────────────────────────────── */
+  async callOdooOtp(endpoint, payload) {
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',   // Required for Odoo session cookies
+        body: JSON.stringify({ jsonrpc: '2.0', method: 'call', params: payload })
+      });
+      const data = await res.json();
+      return data.result || { success: false, error: 'No response from server.' };
+    } catch (err) {
+      console.error('[Odoo OTP API Error]', err);
+      return { success: false, error: 'Network error. Please check your connection.' };
     }
   }
 
@@ -162,10 +153,9 @@ class App {
       }
     });
 
-    // OTP Verification Flow Logic (Email)
+    // ── Email OTP via Odoo Backend ─────────────────────────────────────
     const otpStep1Form = document.getElementById('otpStep1Form');
     const otpStep2Form = document.getElementById('otpStep2Form');
-    let generatedOtp = null;
     let pendingOtpSession = null;
 
     if (otpStep1Form) {
@@ -175,57 +165,52 @@ class App {
         const name = document.getElementById('otpNameInput').value.trim();
         if (!email || !name) return;
 
-        generatedOtp = Math.floor(1000 + Math.random() * 9000).toString();
-        pendingOtpSession = { email, name, authenticatedAt: new Date().toISOString() };
+        const btn = otpStep1Form.querySelector('button[type="submit"]');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...'; }
 
-        otpStep1Form.style.display = 'none';
-        otpStep2Form.style.display = 'block';
+        const result = await this.callOdooOtp('/bcci/auth/send-email-otp', { email, name });
 
-        const noticeBanner = document.getElementById('otpNoticeBanner');
-        if (noticeBanner) {
-          noticeBanner.innerHTML = `<i class="fas fa-key"></i> Passcode dispatched to <strong>${email}</strong>. Enter code: <strong style="font-size: 1.15rem; color: #059669; font-family: monospace;">${generatedOtp}</strong>`;
-        }
-        this.showToast(`Passcode [${generatedOtp}] dispatched to ${email}`, 'info');
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Verification Passcode'; }
 
-        try {
-          fetch(`https://formsubmit.co/ajax/${encodeURIComponent(email)}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({
-              _subject: `BCCI Bharuch Verification Code: ${generatedOtp}`,
-              _template: 'table',
-              Applicant_Name: name,
-              Official_Email: email,
-              Verification_Code: generatedOtp,
-              Message: 'Use this 4-digit code on the BCCI Membership Portal to unlock your membership application form.'
-            })
-          }).catch(err => console.warn('[OTP Email Dispatch Warn]', err));
-        } catch (err) {
-          console.warn('[OTP Dispatch Catch]', err);
+        if (result.success) {
+          pendingOtpSession = { email, name, authenticatedAt: new Date().toISOString() };
+          otpStep1Form.style.display = 'none';
+          otpStep2Form.style.display = 'block';
+          const noticeBanner = document.getElementById('otpNoticeBanner');
+          if (noticeBanner) {
+            noticeBanner.innerHTML = `<i class="fas fa-envelope-check"></i> Verification code sent to <strong>${email}</strong>. Enter the 6-digit code below.`;
+          }
+          this.showToast(`Verification code sent to ${email}`, 'success');
+        } else {
+          this.showToast(result.error || 'Failed to send OTP. Please try again.', 'error');
         }
       });
     }
 
     if (otpStep2Form) {
-      otpStep2Form.addEventListener('submit', (e) => {
+      otpStep2Form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const inputCode = document.getElementById('otpCodeInput').value.trim();
-        if (inputCode === generatedOtp && pendingOtpSession) {
-          this.store.setApplicantSession(pendingOtpSession);
+        const btn = otpStep2Form.querySelector('button[type="submit"]');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...'; }
+
+        const result = await this.callOdooOtp('/bcci/auth/verify-otp', { type: 'email', code: inputCode });
+
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check-circle"></i> Verify Code & Access Form'; }
+
+        if (result.success && result.session_data) {
+          this.store.setApplicantSession(result.session_data);
           this.updateApplicantAuthUI();
-          this.showToast(`Authenticated via Email OTP as ${pendingOtpSession.email}`, 'success');
+          this.showToast(`Authenticated via Email OTP as ${result.session_data.email}`, 'success');
         } else {
-          this.showToast('Invalid verification passcode. Please enter the 4-digit code.', 'error');
+          this.showToast(result.error || 'Invalid code. Please try again.', 'error');
         }
       });
     }
 
-    // OTP Verification Flow Logic (Mobile Phone Number via Firebase Real SMS & Fail-Safe)
+    // ── Phone OTP via Odoo Backend ─────────────────────────────────────
     const phoneStep1Form = document.getElementById('phoneStep1Form');
     const phoneStep2Form = document.getElementById('phoneStep2Form');
-    let pendingPhoneSession = null;
-    let confirmationResult = null;
-    let fallbackOtpCode = null;
 
     if (phoneStep1Form) {
       phoneStep1Form.addEventListener('submit', async (e) => {
@@ -234,68 +219,23 @@ class App {
         const name = document.getElementById('phoneNameInput').value.trim();
         if (!phone || !name) return;
 
-        const formattedPhone = `+91${phone}`;
-        fallbackOtpCode = Math.floor(1000 + Math.random() * 9000).toString();
-        pendingPhoneSession = { phone, email: `${phone}@mobile.bcci`, name, authenticatedAt: new Date().toISOString() };
+        const btn = phoneStep1Form.querySelector('button[type="submit"]');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending SMS...'; }
 
-        phoneStep1Form.style.display = 'none';
-        phoneStep2Form.style.display = 'block';
+        const result = await this.callOdooOtp('/bcci/auth/send-phone-otp', { phone, name });
 
-        const noticeBanner = document.getElementById('phoneNoticeBanner');
-        if (noticeBanner) {
-          noticeBanner.innerHTML = `<i class="fas fa-sms"></i> SMS verification code dispatched to <strong>+91 ${phone}</strong>. Check your mobile phone messages and enter the code below.`;
-        }
-        this.showToast(`SMS OTP dispatched to +91 ${phone}. Check your mobile messages.`, 'info');
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-mobile-alt"></i> Send Mobile Passcode'; }
 
-        // Send background email notification fallback to admin email as backup dispatch
-        try {
-          fetch('https://formsubmit.co/ajax/sp9023156004@gmail.com', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({
-              _subject: `BCCI Phone Verification OTP for +91 ${phone}: ${fallbackOtpCode}`,
-              _template: 'table',
-              Applicant_Phone: phone,
-              Applicant_Name: name,
-              OTP_Code: fallbackOtpCode
-            })
-          }).catch(err => console.warn('[Backup SMS Dispatch Warn]', err));
-        } catch (err) {}
-
-        // Initialize Firebase RecaptchaVerifier and Send SMS
-        if (window.firebase && window.firebase.auth) {
-          try {
-            // Reset recaptchaVerifier if it was already used (required after each send)
-            if (window.recaptchaVerifier) {
-              try { window.recaptchaVerifier.clear(); } catch(e) {}
-              window.recaptchaVerifier = null;
-            }
-            window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
-              'size': 'invisible',
-              'callback': (response) => {
-                console.log('[Firebase Recaptcha Verified]', response);
-              },
-              'expired-callback': () => {
-                window.recaptchaVerifier = null;
-              }
-            });
-            window.recaptchaVerifier.render().then(() => {
-              firebase.auth().signInWithPhoneNumber(formattedPhone, window.recaptchaVerifier)
-                .then((result) => {
-                  confirmationResult = result;
-                  this.showToast(`SMS code sent to +91 ${phone}. Check your phone.`, 'success');
-                })
-                .catch((err) => {
-                  console.warn('[Firebase Phone Auth Error]', err);
-                  this.showToast('SMS delivery failed. Please check your phone number and try again.', 'error');
-                  if (noticeBanner) {
-                    noticeBanner.innerHTML = `<i class="fas fa-exclamation-triangle" style="color:#EF4444"></i> SMS failed. Check your number and retry.`;
-                  }
-                });
-            });
-          } catch (err) {
-            console.warn('[Firebase Setup Note]', err);
+        if (result.success) {
+          phoneStep1Form.style.display = 'none';
+          phoneStep2Form.style.display = 'block';
+          const noticeBanner = document.getElementById('phoneNoticeBanner');
+          if (noticeBanner) {
+            noticeBanner.innerHTML = `<i class="fas fa-sms"></i> SMS verification code sent to <strong>+91 ${phone}</strong>. Enter the 6-digit code below.`;
           }
+          this.showToast(`SMS code sent to +91 ${phone}`, 'success');
+        } else {
+          this.showToast(result.error || 'Failed to send SMS. Please try again.', 'error');
         }
       });
     }
@@ -304,28 +244,19 @@ class App {
       phoneStep2Form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const inputCode = document.getElementById('phoneCodeInput').value.trim();
-        let verified = false;
+        const btn = phoneStep2Form.querySelector('button[type="submit"]');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...'; }
 
-        if (confirmationResult) {
-          try {
-            const userCredential = await confirmationResult.confirm(inputCode);
-            if (userCredential && userCredential.user) verified = true;
-          } catch (err) {
-            console.warn('[Firebase Confirmation Error]', err);
-          }
-        }
+        const result = await this.callOdooOtp('/bcci/auth/verify-otp', { type: 'phone', code: inputCode });
 
-        // Accept confirmationResult verification OR fallback code verification
-        if (!verified && (inputCode === fallbackOtpCode || inputCode.length >= 4)) {
-          verified = true;
-        }
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check-circle"></i> Verify Code & Log In'; }
 
-        if (verified && pendingPhoneSession) {
-          this.store.setApplicantSession(pendingPhoneSession);
+        if (result.success && result.session_data) {
+          this.store.setApplicantSession(result.session_data);
           this.updateApplicantAuthUI();
-          this.showToast(`Authenticated via Mobile Phone (+91 ${pendingPhoneSession.phone})`, 'success');
+          this.showToast(`Authenticated via Mobile Phone (+91 ${result.session_data.phone})`, 'success');
         } else {
-          this.showToast('Invalid verification code. Please enter your mobile code.', 'error');
+          this.showToast(result.error || 'Invalid code. Please try again.', 'error');
         }
       });
     }

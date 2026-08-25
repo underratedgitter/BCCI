@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <record id="view_bcci_enquiry_list" model="ir.ui.view">
+    <field name="name">bcci.enquiry.list</field>
+    <field name="model">bcci.enquiry</field>
+    <field name="arch" type="xml">
+      <list string="Enquiries" decoration-muted="is_read == True">
+        <field name="enq_id"/>
+        <field name="name"/>
+        <field name="email"/>
+        <field name="phone"/>
+        <field name="company"/>
+        <field name="subject"/>
+        <field name="submitted_at"/>
+        <field name="is_read"/>
+      </list>
+    </field>
+  </record>
+
+  <record id="view_bcci_enquiry_form" model="ir.ui.view">
+    <field name="name">bcci.enquiry.form</field>
+    <field name="model">bcci.enquiry</field>
+    <field name="arch" type="xml">
+      <form string="Enquiry">
+        <sheet>
+          <group>
+            <group>
+              <field name="enq_id" readonly="1"/>
+              <field name="name"/>
+              <field name="email"/>
+              <field name="phone"/>
+              <field name="company"/>
+            </group>
+            <group>
+              <field name="submitted_at" readonly="1"/>
+              <field name="is_read"/>
+            </group>
+          </group>
+          <group string="Message">
+            <field name="subject"/>
+            <field name="message" nolabel="1" colspan="2"/>
+          </group>
+        </sheet>
+      </form>
+    </field>
+  </record>
+
+  <record id="action_bcci_enquiries" model="ir.actions.act_window">
+    <field name="name">Enquiries</field>
+    <field name="res_model">bcci.enquiry</field>
+    <field name="view_mode">list,form</field>
+  </record>
+
+  <menuitem id="menu_bcci_enquiries" name="Enquiries"
+            parent="menu_bcci_root" action="action_bcci_enquiries" sequence="2"/>
+</odoo>
