@@ -54,8 +54,6 @@ class App {
   }
 
   setupApplicantAuthHandlers() {
-    const googleBtn = document.getElementById('googleAuthBtn');
-    const signOutBtn = document.getElementById('applicantSignOutBtn');
 
     // Global Safe JWT Decoder
     const parseJwt = (token) => {
@@ -99,7 +97,11 @@ class App {
       const googleAuthBtn = e.target.closest('#firebaseGoogleAuthBtn') || e.target.closest('#googleAuthBtn');
       if (googleAuthBtn) {
         e.preventDefault();
-        this.executeGoogleAuth();
+        this.triggerGoogleOAuthDialog((userSession) => {
+          this.store.setApplicantSession(userSession);
+          this.updateApplicantAuthUI();
+          this.showToast(`Authenticated as ${userSession.email}`, 'success');
+        });
         return;
       }
 
@@ -263,22 +265,34 @@ class App {
         // Initialize Firebase RecaptchaVerifier and Send SMS
         if (window.firebase && window.firebase.auth) {
           try {
-            if (!window.recaptchaVerifier) {
-              window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
-                'size': 'invisible',
-                'callback': (response) => {
-                  console.log('[Firebase Recaptcha Verified]', response);
-                }
-              });
+            // Reset recaptchaVerifier if it was already used (required after each send)
+            if (window.recaptchaVerifier) {
+              try { window.recaptchaVerifier.clear(); } catch(e) {}
+              window.recaptchaVerifier = null;
             }
-            firebase.auth().signInWithPhoneNumber(formattedPhone, window.recaptchaVerifier)
-              .then((result) => {
-                confirmationResult = result;
-                this.showToast(`Firebase Mobile OTP sent to ${formattedPhone}`, 'success');
-              })
-              .catch((err) => {
-                console.warn('[Firebase Auth Phone OTP Note]', err);
-              });
+            window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
+              'size': 'invisible',
+              'callback': (response) => {
+                console.log('[Firebase Recaptcha Verified]', response);
+              },
+              'expired-callback': () => {
+                window.recaptchaVerifier = null;
+              }
+            });
+            window.recaptchaVerifier.render().then(() => {
+              firebase.auth().signInWithPhoneNumber(formattedPhone, window.recaptchaVerifier)
+                .then((result) => {
+                  confirmationResult = result;
+                  this.showToast(`SMS code sent to +91 ${phone}. Check your phone.`, 'success');
+                })
+                .catch((err) => {
+                  console.warn('[Firebase Phone Auth Error]', err);
+                  this.showToast('SMS delivery failed. Please check your phone number and try again.', 'error');
+                  if (noticeBanner) {
+                    noticeBanner.innerHTML = `<i class="fas fa-exclamation-triangle" style="color:#EF4444"></i> SMS failed. Check your number and retry.`;
+                  }
+                });
+            });
           } catch (err) {
             console.warn('[Firebase Setup Note]', err);
           }

@@ -762,9 +762,6 @@
                 <input type="text" id="phoneNameInput" class="form-control" placeholder="e.g. Rajesh Shah" required />
               </div>
 
-              <!-- Firebase Invisible Recaptcha Container -->
-              <div id="recaptcha-container"></div>
-
               <button type="submit" class="btn-primary"
                 style="width: 100%; justify-content: center; font-weight: 700; padding: 0.75rem; background: var(--primary);">
                 <i class="fas fa-mobile-alt"></i> Send Mobile Passcode
@@ -1444,9 +1441,11 @@
   <!-- Firebase App & Auth SDK for Free Mobile Phone OTP Verification -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <!-- Firebase Invisible Recaptcha Container (must be in body, never hidden) -->
+  <div id="recaptcha-container" style="display:none;"></div>
 
-  <!-- App Main ES Module (v14.0 Force Cache Refresh) -->
-  <script type="module" src="js/app.js?v=14.0.0"></script>
+  <!-- App Main ES Module (v15.0 Root Cause Fix) -->
+  <script type="module" src="js/app.js?v=15.0.0"></script>
 </body>
 
 </html>
