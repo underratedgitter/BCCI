@@ -681,6 +681,10 @@
           <!-- Section 1: Google Sign-In Panel -->
           <div id="authPanelGoogle" style="display: block;">
             <div style="display: flex; flex-direction: column; gap: 0.75rem; align-items: center; justify-content: center; margin-bottom: 1rem;">
+              <button type="button" id="firebaseGoogleAuthBtn" class="btn-secondary" style="width: 100%; max-width: 320px; justify-content: center; padding: 0.8rem 1.2rem; border: 1px solid #CBD5E1; background: #FFFFFF; color: #0F172A; font-weight: 700; font-size: 0.95rem; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); cursor: pointer; display: inline-flex; align-items: center; gap: 10px;">
+                <i class="fab fa-google" style="color: #4285F4; font-size: 1.15rem;"></i> Continue with Google
+              </button>
+
               <div id="g_id_onload"
                    data-client_id="984292781459-1lstfue0bjhde1fachhk2264gcbb9ot7.apps.googleusercontent.com"
                    data-context="signin"
@@ -755,14 +759,14 @@
 
             <form id="phoneStep2Form" style="display: none; margin-top: 1rem;">
               <div style="background: #E0F2FE; border: 1px solid #BAE6FD; color: #075985; padding: 0.85rem; border-radius: 8px; margin-bottom: 1.25rem; font-size: 0.85rem;" id="phoneNoticeBanner">
-                <i class="fas fa-info-circle"></i> Verification passcode sent to your mobile number. Enter the 4-digit code below to log in.
+                <i class="fas fa-sms"></i> An SMS verification code has been dispatched to your mobile phone number. Enter the code below to log in.
               </div>
               <div class="form-group" style="margin-bottom: 1.25rem;">
-                <label class="form-label">Enter 4-Digit Passcode <span class="req">*</span></label>
-                <input type="text" id="phoneCodeInput" class="form-control" placeholder="e.g. 8492" maxlength="4" style="letter-spacing: 4px; font-size: 1.2rem; font-weight: 700; text-align: center;" required />
+                <label class="form-label">Enter SMS Verification Code <span class="req">*</span></label>
+                <input type="text" id="phoneCodeInput" class="form-control" placeholder="e.g. 123456" maxlength="6" style="letter-spacing: 4px; font-size: 1.2rem; font-weight: 700; text-align: center;" required />
               </div>
               <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; font-weight: 700; padding: 0.75rem; background: #10B981; border-color: #059669;">
-                <i class="fas fa-check-circle"></i> Verify Mobile Code &amp; Log In
+                <i class="fas fa-check-circle"></i> Verify Code &amp; Log In
               </button>
             </form>
           </div>

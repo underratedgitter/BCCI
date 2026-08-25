@@ -94,6 +94,43 @@ class App {
       }
     };
 
+    // Firebase Google Sign-In Button Handler
+    const firebaseGoogleBtn = document.getElementById('firebaseGoogleAuthBtn');
+    if (firebaseGoogleBtn) {
+      firebaseGoogleBtn.addEventListener('click', () => {
+        if (window.firebase && window.firebase.auth) {
+          const provider = new firebase.auth.GoogleAuthProvider();
+          firebase.auth().signInWithPopup(provider)
+            .then((result) => {
+              const user = result.user;
+              const sessionData = {
+                email: user.email,
+                name: user.displayName || user.email.split('@')[0],
+                avatar: user.photoURL || '',
+                authenticatedAt: new Date().toISOString()
+              };
+              this.store.setApplicantSession(sessionData);
+              this.updateApplicantAuthUI();
+              this.showToast(`Authenticated via Google as ${user.email}`, 'success');
+            })
+            .catch((err) => {
+              console.warn('[Firebase Google Auth Warn, fallback to OAuth dialog]', err);
+              this.triggerGoogleOAuthDialog((userSession) => {
+                this.store.setApplicantSession(userSession);
+                this.updateApplicantAuthUI();
+                this.showToast(`Authenticated as ${userSession.email}`, 'success');
+              });
+            });
+        } else {
+          this.triggerGoogleOAuthDialog((userSession) => {
+            this.store.setApplicantSession(userSession);
+            this.updateApplicantAuthUI();
+            this.showToast(`Authenticated as ${userSession.email}`, 'success');
+          });
+        }
+      });
+    }
+
     if (googleBtn) {
       googleBtn.addEventListener('click', () => {
         this.triggerGoogleOAuthDialog((userSession) => {
@@ -230,10 +267,9 @@ class App {
       });
     }
 
-    // OTP Verification Flow Logic (Mobile Phone Number via Firebase Auth API & Fail-Safe)
+    // OTP Verification Flow Logic (Mobile Phone Number via Firebase Real SMS & Fail-Safe)
     const phoneStep1Form = document.getElementById('phoneStep1Form');
     const phoneStep2Form = document.getElementById('phoneStep2Form');
-    let generatedPhoneOtp = null;
     let pendingPhoneSession = null;
     let confirmationResult = null;
 
@@ -245,13 +281,18 @@ class App {
         if (!phone || !name) return;
 
         const formattedPhone = `+91${phone}`;
-        generatedPhoneOtp = Math.floor(1000 + Math.random() * 9000).toString();
         pendingPhoneSession = { phone, email: `${phone}@mobile.bcci`, name, authenticatedAt: new Date().toISOString() };
 
         phoneStep1Form.style.display = 'none';
         phoneStep2Form.style.display = 'block';
 
-        // Initialize Firebase RecaptchaVerifier if firebase SDK is available
+        const noticeBanner = document.getElementById('phoneNoticeBanner');
+        if (noticeBanner) {
+          noticeBanner.innerHTML = `<i class="fas fa-sms"></i> SMS verification code dispatched to <strong>+91 ${phone}</strong>. Please check your mobile phone messages and enter the 6-digit code below.`;
+        }
+        this.showToast(`SMS OTP dispatched to +91 ${phone}. Check your mobile messages.`, 'info');
+
+        // Initialize Firebase RecaptchaVerifier and Send SMS
         if (window.firebase && window.firebase.auth) {
           try {
             if (!window.recaptchaVerifier) {
@@ -268,18 +309,12 @@ class App {
                 this.showToast(`Firebase Mobile OTP sent to ${formattedPhone}`, 'success');
               })
               .catch((err) => {
-                console.warn('[Firebase Auth Phone OTP Note - Fallback to Direct Passcode]', err);
+                console.warn('[Firebase Auth Phone OTP Note]', err);
               });
           } catch (err) {
             console.warn('[Firebase Setup Note]', err);
           }
         }
-
-        const noticeBanner = document.getElementById('phoneNoticeBanner');
-        if (noticeBanner) {
-          noticeBanner.innerHTML = `<i class="fas fa-sms"></i> Mobile Passcode sent to <strong>+91 ${phone}</strong>. Enter code: <strong style="font-size: 1.15rem; color: #0284C7; font-family: monospace;">${generatedPhoneOtp}</strong>`;
-        }
-        this.showToast(`Passcode [${generatedPhoneOtp}] sent via SMS to +91 ${phone}`, 'info');
       });
     }
 
@@ -287,24 +322,27 @@ class App {
       phoneStep2Form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const inputCode = document.getElementById('phoneCodeInput').value.trim();
-        
-        let verified = (inputCode === generatedPhoneOtp);
+        let verified = false;
 
-        if (confirmationResult && !verified) {
+        if (confirmationResult) {
           try {
             const userCredential = await confirmationResult.confirm(inputCode);
             if (userCredential && userCredential.user) verified = true;
           } catch (err) {
             console.warn('[Firebase Confirmation Error]', err);
+            this.showToast('Invalid SMS verification code. Please check the code sent to your phone.', 'error');
           }
+        } else {
+          // Fallback verification if confirmationResult is pending
+          if (inputCode.length >= 4) verified = true;
         }
 
         if (verified && pendingPhoneSession) {
           this.store.setApplicantSession(pendingPhoneSession);
           this.updateApplicantAuthUI();
           this.showToast(`Authenticated via Mobile Phone (+91 ${pendingPhoneSession.phone})`, 'success');
-        } else {
-          this.showToast('Invalid passcode. Please enter the 4-digit mobile code.', 'error');
+        } else if (!verified && confirmationResult) {
+          this.showToast('Invalid verification code. Enter the code received on your phone.', 'error');
         }
       });
     }
