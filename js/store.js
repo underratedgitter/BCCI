@@ -71,10 +71,15 @@ export class Store {
     return newApp;
   }
 
-  getApplicationByEmail(email) {
-    if (!email) return null;
-    const cleanEmail = email.toLowerCase().trim();
-    return this.getApplications().find(app => (app.email || '').toLowerCase().trim() === cleanEmail);
+  getApplicationByEmail(emailOrPhone) {
+    if (!emailOrPhone) return null;
+    const clean = emailOrPhone.toLowerCase().trim();
+    const digits = emailOrPhone.replace(/\D/g, '');
+    return this.getApplications().find(app => {
+      const emailMatch = (app.email || '').toLowerCase().trim() === clean;
+      const phoneMatch = digits.length >= 7 && (app.phone || '').replace(/\D/g, '').endsWith(digits);
+      return emailMatch || phoneMatch;
+    });
   }
 
   getMembershipValidity(app) {
@@ -124,6 +129,10 @@ export class Store {
   }
 
   updateApplicationStatus(id, newStatus) {
+    if (!this.isAdminAuthed()) {
+      console.warn('[Authorization Warning] Admin authentication required to update application status.');
+      return null;
+    }
     const apps = this.getApplications();
     const index = apps.findIndex(app => app.id === id);
     if (index !== -1) {
@@ -200,6 +209,10 @@ export class Store {
   }
 
   sendApprovalEmail(application) {
+    if (!this.isAdminAuthed()) {
+      console.warn('[Authorization Warning] Admin authentication required to send approval emails.');
+      return null;
+    }
     const sentEmails = this.getSentEmails();
     const repName = application.repName || application.firstName || 'Member Representative';
     const emailData = {
