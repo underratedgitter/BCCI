@@ -1,14 +1,18 @@
 {
   "name": "bcci-bharuch-portal",
-  "version": "1.0.0",
-  "description": "BCCI Bharuch Chamber of Commerce & Industry — Membership Portal",
+  "version": "4.1.0",
+  "description": "BCCI Bharuch Chamber of Commerce & Industry — Official Membership Portal with server-backed data persistence",
   "type": "module",
   "scripts": {
     "dev": "vercel dev",
-    "deploy": "vercel --prod"
+    "deploy": "vercel --prod",
+    "typecheck": "echo 'No TypeScript configured — vanilla JS project'"
   },
   "dependencies": {
     "@upstash/redis": "^1.38.2",
     "nodemailer": "^6.9.14"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

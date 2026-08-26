@@ -1,80 +1,128 @@
 /* ==========================================================================
-   BCCI BHARUCH - Data Store & Local Persistence Manager
+   BCCI BHARUCH - Data Store & API Client
+   All server operations go through Vercel API routes (Redis-backed).
+   localStorage is ONLY used for client-side session caching.
    ========================================================================== */
 
-const STORAGE_KEYS = {
-  APPLICATIONS: 'bcci_membership_applications',
-  ENQUIRIES: 'bcci_enquiries',
-  ADMIN_AUTH: 'bcci_admin_session',
-  APPLICANT_SESSION: 'bcci_applicant_session',
-  SENT_EMAILS: 'bcci_sent_approval_emails'
-};
+const API_BASE = ''; // Same origin in production
 
-// Clean Empty Initial Seed Data for Real Production Testing
-const INITIAL_APPLICATIONS = [];
-const INITIAL_ENQUIRIES = [];
+const STORAGE_KEYS = {
+  ADMIN_SESSION: 'bcci_admin_session',
+  APPLICANT_SESSION: 'bcci_applicant_session',
+};
 
 export class Store {
   constructor() {
-    this.initStorage();
+    // No localStorage initialization needed for server-backed data
   }
 
-  initStorage() {
-    // Purge legacy mock data (APP-1001 / APP-1002 / ENQ-501) if present in local storage
-    const currentApps = JSON.parse(localStorage.getItem(STORAGE_KEYS.APPLICATIONS) || '[]');
-    if (currentApps.some(app => app.id === 'APP-1001' || app.id === 'APP-1002')) {
-      localStorage.removeItem(STORAGE_KEYS.APPLICATIONS);
-    }
+  /* ── API Helper ──────────────────────────────────────────────────── */
+  async apiCall(endpoint, options = {}) {
+    const { method = 'GET', body, adminAuth = false } = options;
+    const headers = { 'Content-Type': 'application/json' };
 
-    const currentEnqs = JSON.parse(localStorage.getItem(STORAGE_KEYS.ENQUIRIES) || '[]');
-    if (currentEnqs.some(enq => enq.id === 'ENQ-501')) {
-      localStorage.removeItem(STORAGE_KEYS.ENQUIRIES);
-    }
-
-    if (!localStorage.getItem(STORAGE_KEYS.APPLICATIONS)) {
-      localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify([]));
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.ENQUIRIES)) {
-      localStorage.setItem(STORAGE_KEYS.ENQUIRIES, JSON.stringify([]));
-    }
-  }
-
-  // Applications CRUD
-  getApplications() {
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.APPLICATIONS) || '[]');
-  }
-
-  getApplicationById(id) {
-    return this.getApplications().find(app => app.id === id);
-  }
-
-  addApplication(appData) {
-    const apps = this.getApplications();
-    const newApp = {
-      id: `APP-${Math.floor(1000 + Math.random() * 9000)}`,
-      ...appData,
-      status: 'Pending',
-      submittedAt: new Date().toISOString()
-    };
-    apps.unshift(newApp);
-    try {
-      localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(apps));
-    } catch (err) {
-      console.warn('[LocalStorage Quota Warning] Pruning older records to preserve storage space', err);
-      try {
-        const pruned = apps.slice(0, 15).map((item, idx) => idx === 0 ? item : { ...item, paymentProof: item.paymentProof ? '[Stored Image]' : '' });
-        localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(pruned));
-      } catch (e) {
-        console.error('[LocalStorage Error]', e);
+    if (adminAuth) {
+      const session = this.getAdminSession();
+      if (session && session.token) {
+        headers['Authorization'] = `Bearer ${session.token}`;
       }
     }
-    return newApp;
+
+    const fetchOptions = { method, headers };
+    if (body && method !== 'GET') {
+      fetchOptions.body = JSON.stringify(body);
+    }
+
+    const res = await fetch(`${API_BASE}${endpoint}`, fetchOptions);
+    const data = await res.json();
+
+    if (!res.ok) {
+      const error = new Error(data.error || `API error: ${res.status}`);
+      error.status = res.status;
+      error.data = data;
+      throw error;
+    }
+
+    return data;
   }
 
-  getApplicationByEmail(email) {
+  /* ════════════════════════════════════════════════════════════════════
+     APPLICATIONS — Server-backed CRUD
+     ════════════════════════════════════════════════════════════════════ */
+
+  async getApplications() {
+    try {
+      const result = await this.apiCall('/api/applications', { adminAuth: true });
+      return result.applications || [];
+    } catch (err) {
+      console.error('[Store] Failed to fetch applications:', err.message);
+      return [];
+    }
+  }
+
+  async getApplicationById(id) {
+    const apps = await this.getApplications();
+    return apps.find(app => app.id === id) || null;
+  }
+
+  async addApplication(appData) {
+    try {
+      const result = await this.apiCall('/api/applications', {
+        method: 'POST',
+        body: appData
+      });
+      return result.application;
+    } catch (err) {
+      console.error('[Store] Failed to add application:', err.message);
+      throw err;
+    }
+  }
+
+  async getApplicationByEmail(email) {
     if (!email) return null;
-    const cleanEmail = email.toLowerCase().trim();
-    return this.getApplications().find(app => (app.email || '').toLowerCase().trim() === cleanEmail);
+    const apps = await this.getApplications();
+    return apps.find(app => (app.email || '').toLowerCase().trim() === email.toLowerCase().trim()) || null;
+  }
+
+  async updateApplicationStatus(id, newStatus) {
+    try {
+      const result = await this.apiCall('/api/applications', {
+        method: 'PATCH',
+        body: { id, status: newStatus },
+        adminAuth: true
+      });
+      return result.application;
+    } catch (err) {
+      console.error('[Store] Failed to update application:', err.message);
+      throw err;
+    }
+  }
+
+  async renewMembership(appId, utrRef = '') {
+    // Renewal extends the membership by 1 year client-side
+    // (server stores renewalYears as part of the application)
+    try {
+      const apps = await this.getApplications();
+      const app = apps.find(a => a.id === appId);
+      if (!app) return null;
+
+      // Update via PATCH with renewal data
+      const result = await this.apiCall('/api/applications', {
+        method: 'PATCH',
+        body: {
+          id: appId,
+          status: 'Approved',
+          renewalYears: (app.renewalYears || 1) + 1,
+          lastRenewedAt: new Date().toISOString(),
+          paymentRef: utrRef || app.paymentRef,
+        },
+        adminAuth: true
+      });
+      return result.application;
+    } catch (err) {
+      console.error('[Store] Failed to renew membership:', err.message);
+      throw err;
+    }
   }
 
   getMembershipValidity(app) {
@@ -102,76 +150,105 @@ export class Store {
       validUntilISO: validUntil.toISOString(),
       daysRemaining: Math.max(0, daysRemaining),
       yearsTenure: yearsToAdd,
-      state: state
+      state: state,
     };
   }
 
-  renewMembership(appId, utrRef = '') {
-    const apps = this.getApplications();
-    const index = apps.findIndex(a => a.id === appId);
-    if (index !== -1) {
-      apps[index].renewalYears = (apps[index].renewalYears || 1) + 1;
-      apps[index].lastRenewedAt = new Date().toISOString();
-      if (utrRef) apps[index].paymentRef = utrRef;
-      try {
-        localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(apps));
-      } catch (err) {
-        console.warn('[LocalStorage Renewal Update Error]', err);
-      }
-      return apps[index];
-    }
-    return null;
-  }
+  /* ════════════════════════════════════════════════════════════════════
+     ENQUIRIES — Server-backed CRUD
+     ════════════════════════════════════════════════════════════════════ */
 
-  updateApplicationStatus(id, newStatus) {
-    const apps = this.getApplications();
-    const index = apps.findIndex(app => app.id === id);
-    if (index !== -1) {
-      apps[index].status = newStatus;
-      if (newStatus === 'Approved' && !apps[index].approvedAt) {
-        apps[index].approvedAt = new Date().toISOString();
-      }
-      try {
-        localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(apps));
-      } catch (err) {
-        console.warn('[LocalStorage Update Error]', err);
-      }
-      return apps[index];
-    }
-    return null;
-  }
-
-  // Enquiries CRUD
-  getEnquiries() {
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.ENQUIRIES) || '[]');
-  }
-
-  addEnquiry(enquiryData) {
-    const enquiries = this.getEnquiries();
-    const newEnq = {
-      id: `ENQ-${Math.floor(500 + Math.random() * 500)}`,
-      ...enquiryData,
-      submittedAt: new Date().toISOString()
-    };
-    enquiries.unshift(newEnq);
+  async getEnquiries() {
     try {
-      localStorage.setItem(STORAGE_KEYS.ENQUIRIES, JSON.stringify(enquiries));
+      const result = await this.apiCall('/api/enquiries');
+      return result.enquiries || [];
     } catch (err) {
-      console.warn('[LocalStorage Enquiry Error]', err);
+      console.error('[Store] Failed to fetch enquiries:', err.message);
+      return [];
     }
-    return newEnq;
   }
 
-  // Admin Authentication Helpers
+  async addEnquiry(enquiryData) {
+    try {
+      const result = await this.apiCall('/api/enquiries', {
+        method: 'POST',
+        body: enquiryData
+      });
+      return result.enquiry;
+    } catch (err) {
+      console.error('[Store] Failed to add enquiry:', err.message);
+      throw err;
+    }
+  }
+
+  /* ════════════════════════════════════════════════════════════════════
+     ADMIN AUTHENTICATION — Server-backed with session tokens
+     ════════════════════════════════════════════════════════════════════ */
+
+  getAdminSession() {
+    const data = localStorage.getItem(STORAGE_KEYS.ADMIN_SESSION);
+    if (!data) return null;
+    try {
+      const session = JSON.parse(data);
+      // Check if client-side session is expired
+      if (session.expiresAt && Date.now() > session.expiresAt) {
+        localStorage.removeItem(STORAGE_KEYS.ADMIN_SESSION);
+        return null;
+      }
+      return session;
+    } catch {
+      localStorage.removeItem(STORAGE_KEYS.ADMIN_SESSION);
+      return null;
+    }
+  }
+
   isAdminAuthed() {
-    return localStorage.getItem(STORAGE_KEYS.ADMIN_AUTH) === 'true';
+    return this.getAdminSession() !== null;
   }
 
-  setAdminAuth(status) {
-    localStorage.setItem(STORAGE_KEYS.ADMIN_AUTH, status ? 'true' : 'false');
+  async setAdminAuth(username, password) {
+    try {
+      const result = await this.apiCall('/api/admin-auth', {
+        method: 'POST',
+        body: { username, password }
+      });
+
+      if (result.success && result.session) {
+        const clientSession = {
+          token: result.session.token,
+          username: result.session.username,
+          createdAt: result.session.createdAt,
+          expiresAt: Date.now() + result.session.expiresIn,
+        };
+        localStorage.setItem(STORAGE_KEYS.ADMIN_SESSION, JSON.stringify(clientSession));
+        return { success: true };
+      }
+
+      return { success: false, error: result.error };
+    } catch (err) {
+      return { success: false, error: err.message || 'Login failed.' };
+    }
   }
 
-  // Applicant OAuth Session Helpers
+  async clearAdminSession() {
+    const session = this.getAdminSession();
+    if (session && session.token) {
+      try {
+        await this.apiCall('/api/admin-auth', {
+          method: 'DELETE',
+          adminAuth: true
+        });
+      } catch (err) {
+        console.warn('[Store] Failed to invalidate server session:', err.message);
+      }
+    }
+    localStorage.removeItem(STORAGE_KEYS.ADMIN_SESSION);
+  }
+
+  /* ════════════════════════════════════════════════════════════════════
+     APPLICANT SESSION — Client-side only (OTP verified)
+     ════════════════════════════════════════════════════════════════════ */
+
   getApplicantSession() {
     const data = localStorage.getItem(STORAGE_KEYS.APPLICANT_SESSION);
     return data ? JSON.parse(data) : null;
@@ -185,73 +262,115 @@ export class Store {
     localStorage.removeItem(STORAGE_KEYS.APPLICANT_SESSION);
   }
 
-  validateAdminCredentials(username, password) {
-    if (!username || !password) return false;
-    const u = username.toLowerCase().trim();
-    const p = password.trim();
-    const validUsers = ['admin', 'admin@bccibharuch.in', 'sp9023156004@gmail.com', 'bcci', 'secretariat'];
-    const validPasswords = ['admin', 'admin123', 'bcci2026', 'password', 'bcci', 'secretariat'];
-    return validUsers.includes(u) && (validPasswords.includes(p.toLowerCase()) || p.length >= 4);
-  }
+  /* ════════════════════════════════════════════════════════════════════
+     EMAIL NOTIFICATION HELPERS (Client-side generation, sent via API)
+     ════════════════════════════════════════════════════════════════════ */
 
-  // Approval Confirmation Email Dispatcher
-  getSentEmails() {
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.SENT_EMAILS) || '[]');
-  }
-
-  sendApprovalEmail(application) {
-    const sentEmails = this.getSentEmails();
-    const repName = application.repName || application.firstName || 'Member Representative';
-    const emailData = {
-      id: `MAIL-${Math.floor(1000 + Math.random() * 9000)}`,
-      appId: application.id,
-      company: application.company,
+  generateApprovalEmailData(application) {
+    const repName = application.repName || 'Member Representative';
+    return {
       recipientName: repName,
-      recipientEmail: application.email || 'applicant@company.com',
-      membershipType: application.membershipType || 'Corporate',
+      recipientEmail: application.email,
       subject: `Official Membership Approval - Bharuch Chamber of Commerce & Industry (${application.id})`,
-      sentAt: new Date().toISOString(),
-      body: `Dear ${repName},\n\nWe are pleased to inform you that your application for BCCI Membership (${application.id}) for "${application.company}" has been formally REVIEWED and APPROVED by the BCCI Secretariat Board.\n\nYour institutional membership is now ACTIVE. You are entitled to all member privileges, trade facilitation services, and policy representation under the Bharuch Chamber of Commerce & Industry.\n\nOfficial Membership Record:\n- Application ID: ${application.id}\n- Enterprise: ${application.company}\n- Approved On: ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}\n- Status: ACTIVATED & APPROVED\n\nWelcome to Asia's Largest Industrial Corridor Network.\n\nWarm Regards,\nBCCI Secretariat & Membership Board\nBharuch Chamber of Commerce & Industry\nadmin@bccibharuch.in | +91 7861906384`
+      body: `Dear ${repName},
+
+We are pleased to inform you that your application for BCCI Membership (${application.id}) for "${application.company}" has been formally REVIEWED and APPROVED by the BCCI Secretariat Board.
+
+Your institutional membership is now ACTIVE. You are entitled to all member privileges, trade facilitation services, and policy representation under the Bharuch Chamber of Commerce & Industry.
+
+Official Membership Record:
+- Application ID: ${application.id}
+- Enterprise: ${application.company}
+- Approved On: ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+- Status: ACTIVATED & APPROVED
+
+Welcome to Asia's Largest Industrial Corridor Network.
+
+Warm Regards,
+BCCI Secretariat & Membership Board
+Bharuch Chamber of Commerce & Industry
+admin@bccibharuch.in | +91 7861906384`
     };
-    sentEmails.unshift(emailData);
-    localStorage.setItem(STORAGE_KEYS.SENT_EMAILS, JSON.stringify(sentEmails));
-    return emailData;
   }
 
-  sendAdminNewApplicationNotification(application) {
-    const adminEmail = 'sp9023156004@gmail.com';
-    const repName = application.repName || `${application.firstName || ''} ${application.lastName || ''}`.trim() || 'Applicant';
-    const notification = {
-      id: `NOTIF-${Math.floor(1000 + Math.random() * 9000)}`,
-      appId: application.id,
-      company: application.company,
-      adminEmail: adminEmail,
+  generateAdminNotificationData(application) {
+    const repName = application.repName || 'Applicant';
+    return {
       subject: `[ADMIN ALERT] New BCCI Membership Application: ${application.company} (${application.id})`,
-      sentAt: new Date().toISOString(),
-      body: `ATTN: BCCI Secretariat & Admin Board,\n\nA new membership application has been submitted on the BCCI Official Portal and is pending your review & approval.\n\nApplication Summary:\n- Application ID: ${application.id}\n- Company Name: ${application.company}\n- Representative: ${repName} (${application.repDesignation || 'Delegate'})\n- Sector: ${application.businessServices || 'N/A'}\n- Scale: ${application.enterpriseType || 'N/A'} • ${application.legalStatus || 'N/A'}\n- Email: ${application.email}\n- Phone: ${application.phone}\n- GSTIN: ${application.gstNo || 'N/A'}\n- UTR Ref: ${application.paymentRef || 'N/A'}\n- Date Submitted: ${new Date().toLocaleString('en-IN')}\n\nPlease sign in to the BCCI Admin Portal to inspect details and approve or reject this membership.`
+      body: `ATTN: BCCI Secretariat & Admin Board,
+
+A new membership application has been submitted on the BCCI Official Portal and is pending your review & approval.
+
+Application Summary:
+- Application ID: ${application.id}
+- Company Name: ${application.company}
+- Representative: ${repName} (${application.repDesignation || 'Delegate'})
+- Sector: ${application.businessServices || 'N/A'}
+- Scale: ${application.enterpriseType || 'N/A'} • ${application.legalStatus || 'N/A'}
+- Email: ${application.email}
+- Phone: ${application.phone}
+- GSTIN: ${application.gstNo || 'N/A'}
+- UTR Ref: ${application.paymentRef || 'N/A'}
+- Date Submitted: ${new Date().toLocaleString('en-IN')}
+
+Please sign in to the BCCI Admin Portal to inspect details and approve or reject this membership.`
     };
-    return notification;
   }
 
-  sendApplicantReceivedEmail(application) {
-    const sentEmails = this.getSentEmails();
-    const repName = application.repName || `${application.firstName || ''} ${application.lastName || ''}`.trim() || 'Valued Applicant';
-    const emailData = {
-      id: `ACK-${Math.floor(1000 + Math.random() * 9000)}`,
-      appId: application.id,
-      company: application.company,
+  generateApplicantReceivedEmailData(application) {
+    const repName = application.repName || 'Valued Applicant';
+    return {
       recipientName: repName,
       recipientEmail: application.email,
       subject: `BCCI Membership Application Received (${application.id}) - Pending Admin Verification`,
-      sentAt: new Date().toISOString(),
-      body: `Dear ${repName},\n\nThank you for applying for Institutional Membership with the Bharuch Chamber of Commerce & Industry (BCCI).\n\nWe have successfully received your membership application for "${application.company}".\n\nApplication Record Details:\n- Application Reference ID: ${application.id}\n- Enterprise / Firm: ${application.company}\n- Representative: ${repName}\n- Date Submitted: ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}\n- Status: PENDING ADMIN APPROVAL & VERIFICATION\n\nNext Steps:\nAs per BCCI institutional regulations, your application credentials, legal documentation, and payment proof reference are currently undergoing verification by the BCCI Secretariat Administration.\n\nOnce reviewed and approved by the Secretariat Board, you will receive a formal Membership Confirmation & Welcome Email activating your institutional membership privileges.\n\nFor urgent enquiries, you may contact the BCCI Secretariat office at admin@bccibharuch.in or +91 7861906384.\n\nWarm Regards,\nBCCI Secretariat & Membership Board\nBharuch Chamber of Commerce & Industry\nStation Road, Bharuch - 392001`
+      body: `Dear ${repName},
+
+Thank you for applying for Institutional Membership with the Bharuch Chamber of Commerce & Industry (BCCI).
+
+We have successfully received your membership application for "${application.company}".
+
+Application Record Details:
+- Application Reference ID: ${application.id}
+- Enterprise / Firm: ${application.company}
+- Representative: ${repName}
+- Date Submitted: ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+- Status: PENDING ADMIN APPROVAL & VERIFICATION
+
+Next Steps:
+As per BCCI institutional regulations, your application credentials, legal documentation, and payment proof reference are currently undergoing verification by the BCCI Secretariat Administration.
+
+Once reviewed and approved by the Secretariat Board, you will receive a formal Membership Confirmation & Welcome Email activating your institutional membership privileges.
+
+For urgent enquiries, you may contact the BCCI Secretariat office at admin@bccibharuch.in or +91 7861906384.
+
+Warm Regards,
+BCCI Secretariat & Membership Board
+Bharuch Chamber of Commerce & Industry
+Station Road, Bharuch - 392001`
     };
-    sentEmails.unshift(emailData);
-    localStorage.setItem(STORAGE_KEYS.SENT_EMAILS, JSON.stringify(sentEmails));
-    return emailData;
   }
 
-  // Static Data Providers
+  /* ════════════════════════════════════════════════════════════════════
+     EMAIL DISPATCH — Sends via /api/send-email (Resend + SMTP fallback)
+     ════════════════════════════════════════════════════════════════════ */
+
+  async sendEmail(type, to, data) {
+    try {
+      const result = await this.apiCall('/api/send-email', {
+        method: 'POST',
+        body: { type, to, data }
+      });
+      return result;
+    } catch (err) {
+      console.error(`[Store] Failed to send ${type} email:`, err.message);
+      return { success: false, error: err.message };
+    }
+  }
+
+  /* ════════════════════════════════════════════════════════════════════
+     STATIC DATA — Remains client-side (no server needed)
+     ════════════════════════════════════════════════════════════════════ */
+
   getLeadership() {
     return [
       { name: 'MR. KIRAN K. MAJMUDAR', role: 'President', category: 'Executive Board', initials: 'KM', image: 'assets/President_photo.webp', linkedin: 'https://www.linkedin.com/in/kiran-k-majmudar-52b235308/' },
@@ -266,49 +385,19 @@ export class Store {
 
   getServices() {
     return [
-      {
-        id: 'coo',
-        title: 'Certificate of Origin',
-        icon: 'fa-certificate',
-        desc: 'BCCI issues official Certificates of Origin certifying country of manufacture for seamless export clearance and global trade compliance.'
-      },
-      {
-        id: 'attestation',
-        title: 'Document Attestation',
-        icon: 'fa-file-signature',
-        desc: 'Authentication of commercial invoices, packing lists, and trade documents for embassy attestation and government regulatory bodies.'
-      },
-      {
-        id: 'visa',
-        title: 'Visa Recommendation Letters',
-        icon: 'fa-passport',
-        desc: 'Formal recommendation letters issued to member delegates for expedited business travel visas, trade expos, and international delegations.'
-      },
-      {
-        id: 'trade',
-        title: 'Trade Facilitation',
-        icon: 'fa-globe-asia',
-        desc: 'Guidance and advisory for domestic and international trade, customs coordination, and B2B expansion networking.'
-      },
-      {
-        id: 'advisory',
-        title: 'Business & Policy Advisory',
-        icon: 'fa-briefcase',
-        desc: 'Advocacy for Ease of Doing Business (EoDB), policy reform representations, legal compliance guidance, and regulatory support.'
-      },
-      {
-        id: 'training',
-        title: 'Training & Workshops',
-        icon: 'fa-chalkboard-teacher',
-        desc: 'Regular seminars, skill enhancement workshops, GST updates, technology adoption sessions, and leadership forums.'
-      }
+      { id: 'coo', title: 'Certificate of Origin', icon: 'fa-certificate', desc: 'BCCI issues official Certificates of Origin certifying country of manufacture for seamless export clearance and global trade compliance.' },
+      { id: 'attestation', title: 'Document Attestation', icon: 'fa-file-signature', desc: 'Authentication of commercial invoices, packing lists, and trade documents for embassy attestation and government regulatory bodies.' },
+      { id: 'visa', title: 'Visa Recommendation Letters', icon: 'fa-passport', desc: 'Formal recommendation letters issued to member delegates for expedited business travel visas, trade expos, and international delegations.' },
+      { id: 'trade', title: 'Trade Facilitation', icon: 'fa-globe-asia', desc: 'Guidance and advisory for domestic and international trade, customs coordination, and B2B expansion networking.' },
+      { id: 'advisory', title: 'Business & Policy Advisory', icon: 'fa-briefcase', desc: 'Advocacy for Ease of Doing Business (EoDB), policy reform representations, legal compliance guidance, and regulatory support.' },
+      { id: 'training', title: 'Training & Workshops', icon: 'fa-chalkboard-teacher', desc: 'Regular seminars, skill enhancement workshops, GST updates, technology adoption sessions, and leadership forums.' }
     ];
   }
 
   getFaqs() {
     return [
       { q: 'What is Bharuch Chamber of Commerce & Industry (BCCI)?', a: 'BCCI is a trusted institutional platform representing the collective strength of commerce and industry in Bharuch district. It acts as an authoritative voice for business growth, policy advocacy, and inter-industry collaboration.' },
-      { q: 'Why is Bharuch considered an important industrial hub?', a: 'Bharuch is Asia’s largest industrial hub with massive investments in Chemicals, Petrochemicals, Fertilizers, Pharmaceuticals, Textiles, Logistics, and Energy. It houses over 12,000 MSMEs and 625+ large industries.' },
+      { q: 'Why is Bharuch considered an important industrial hub?', a: 'Bharuch is Asia\'s largest industrial hub with massive investments in Chemicals, Petrochemicals, Fertilizers, Pharmaceuticals, Textiles, Logistics, and Energy. It houses over 12,000 MSMEs and 625+ large industries.' },
       { q: 'How does the Admin Approval process work for new members?', a: 'When you submit the Membership Form, your registration status remains "Pending Admin Approval". The BCCI Admin Board reviews your company credentials, GST/PAN documentation, and approves the application before member access is granted.' },
       { q: 'What are the main membership categories?', a: 'BCCI offers Corporate Membership, Associate Membership, and Associate Limited Membership based on enterprise scale and legal structure.' },
       { q: 'How does BCCI support Ease of Doing Business (EoDB)?', a: 'BCCI works closely with state government bodies, GIDC authorities, and central ministries to address policy friction, reduce compliance bottlenecks, and advocate business-friendly industrial reforms.' },
