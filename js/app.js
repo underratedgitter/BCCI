@@ -171,20 +171,19 @@ class App {
       });
     }
 
-    // ── Sign Out ───────────────────────────────────────────────────────
-    if (signOutBtn) {
-      signOutBtn.addEventListener('click', () => {
-        this.store.clearApplicantSession();
-        this.updateApplicantAuthUI();
-        this.showToast('Session ended. You have been signed out.', 'info');
-      });
-    }
-
-    // ── Dynamic listeners for Digital Card & Renewal ───────────────────
+    // ── Sign Out Handlers ─────────────────────────────────────────────
     document.addEventListener('click', (e) => {
+      const signOutBtn = e.target.closest('#applicantSignOutBtn') || e.target.closest('.btnUserSignOut');
       const cardBtn = e.target.closest('.btnViewDigitalCard');
       const renewBtn = e.target.closest('.btnRenewMembership');
       const session = this.store.getApplicantSession();
+
+      if (signOutBtn) {
+        this.store.clearApplicantSession();
+        this.closeModal();
+        this.updateApplicantAuthUI();
+        this.showToast('Session ended. You have been signed out successfully.', 'info');
+      }
 
       if (cardBtn && session) {
         const memberApp = this.store.getApplicationByEmail(session.email);
@@ -203,11 +202,8 @@ class App {
       profileBtn.addEventListener('click', () => {
         const session = this.store.getApplicantSession();
         if (session && session.email) {
-          const banner = document.getElementById('applicantAuthBanner');
-          if (banner) {
-            banner.style.display = 'flex';
-            banner.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
+          const memberApp = this.store.getApplicationByEmail(session.email);
+          this.showApplicantProfileModal(session, memberApp);
         } else {
           const gate = document.getElementById('applicantAuthGate');
           if (gate) {
@@ -220,6 +216,68 @@ class App {
     }
 
     this.updateApplicantAuthUI();
+  }
+
+  showApplicantProfileModal(session, memberApp) {
+    let statusHtml = '<span style="color: #64748B; background: #F1F5F9; padding: 3px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: 600;">Form Not Submitted</span>';
+    let detailsHtml = '';
+
+    if (memberApp) {
+      if (memberApp.status === 'Approved') {
+        const validity = this.store.getMembershipValidity(memberApp);
+        statusHtml = `<span style="color: #059669; background: #ECFDF5; border: 1px solid #A7F3D0; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 700;"><i class="fas fa-check-circle"></i> ⭐ ACTIVE MEMBER</span>`;
+        detailsHtml = `
+          <div style="background: #F8FAFC; border: 1px solid #E2E8F0; padding: 1rem; border-radius: 8px; margin: 1rem 0; font-size: 0.85rem;">
+            <div><strong>Company:</strong> ${memberApp.company}</div>
+            <div><strong>Member ID:</strong> <code style="color: var(--primary); font-weight:700;">${memberApp.id}</code></div>
+            <div><strong>Valid Until:</strong> ${validity ? validity.validUntilDate : 'Active'}</div>
+          </div>
+        `;
+      } else if (memberApp.status === 'Pending') {
+        statusHtml = `<span style="color: #D97706; background: #FEF3C7; border: 1px solid #FDE68A; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 700;"><i class="fas fa-clock"></i> ⌛ PENDING ADMIN APPROVAL</span>`;
+        detailsHtml = `
+          <div style="background: #FEF3C7; border: 1px solid #FDE68A; color: #92400E; padding: 0.85rem; border-radius: 8px; margin: 1rem 0; font-size: 0.85rem;">
+            <strong>Ref ID: ${memberApp.id}</strong> — Submitted on ${new Date(memberApp.submittedAt).toLocaleDateString()}. Pending Secretariat review.
+          </div>
+        `;
+      }
+    }
+
+    this.showModal({
+      title: `<i class="fas fa-user-circle" style="color: var(--primary);"></i> My BCCI Profile &amp; Account`,
+      content: `
+        <div style="padding: 0.5rem 0;">
+          <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+            <div style="width: 52px; height: 52px; background: linear-gradient(135deg, #0F2C59 0%, #1E3E62 100%); color: #FFD700; border: 2px solid #D4AF37; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.3rem;">
+              ${(session.name || session.email).charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <div style="font-size: 1.1rem; font-weight: 700; color: #0F172A;">${session.name || 'BCCI Applicant'}</div>
+              <div style="font-size: 0.85rem; color: #64748B;">${session.email}</div>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 1rem;">
+            <label style="font-size: 0.75rem; text-transform: uppercase; color: #94A3B8; font-weight: 700; display: block; margin-bottom: 4px;">Account Status</label>
+            ${statusHtml}
+          </div>
+
+          ${detailsHtml}
+
+          <div style="display: flex; flex-direction: column; gap: 0.6rem; margin-top: 1.5rem;">
+            ${memberApp && memberApp.status === 'Approved' ? `
+              <button type="button" class="btn-primary btnViewDigitalCard" style="width: 100%; justify-content: center; font-size: 0.85rem;">
+                <i class="fas fa-id-card"></i> View Digital Membership Pass
+              </button>
+            ` : ''}
+            <button type="button" class="btnUserSignOut" style="width: 100%; justify-content: center; padding: 0.65rem; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: var(--radius-sm); color: #EF4444; font-size: 0.88rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
+              <i class="fas fa-sign-out-alt"></i> Sign Out Account
+            </button>
+            <button type="button" class="btn-secondary" id="modalCloseBtn" style="width: 100%; justify-content: center;">Close</button>
+          </div>
+        </div>
+      `
+    });
   }
 
   updateApplicantAuthUI() {
