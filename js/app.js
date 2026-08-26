@@ -191,23 +191,7 @@ class App {
       }
     });
 
-    const profileBtn = document.getElementById('btnHeaderUserProfile');
-    if (profileBtn) {
-      profileBtn.addEventListener('click', async () => {
-        const session = this.store.getApplicantSession();
-        if (session && session.email) {
-          const memberApp = await this.store.getApplicationByEmail(session.email);
-          this.showApplicantProfileModal(session, memberApp);
-        } else {
-          const gate = document.getElementById('applicantAuthGate');
-          if (gate) {
-            gate.style.display = 'block';
-            gate.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            this.showToast('Please enter your email to sign in or apply.', 'info');
-          }
-        }
-      });
-    }
+    // Profile button handler removed — now handled by profile dropdown
 
     this.updateApplicantAuthUI();
   }
@@ -554,6 +538,9 @@ class App {
     const drawerContainer = document.getElementById('mobileDrawerAuthContainer');
     const session = this.store.getApplicantSession();
 
+    // Close any open dropdowns
+    document.querySelectorAll('.nav-profile-dropdown.open').forEach(d => d.classList.remove('open'));
+
     let desktopHtml = '';
     let drawerHtml = '';
 
@@ -575,21 +562,34 @@ class App {
         </button>
       `;
     } else if (session && session.email) {
-      const badgeLabel = 'My Profile';
+      const initial = (session.name || session.email).charAt(0).toUpperCase();
       desktopHtml = `
-        <button type="button" class="btn-primary btnHeaderUserProfile" style="padding: 0.45rem 0.95rem; font-size: 0.82rem; background: linear-gradient(135deg, #0F2C59 0%, #1E3E62 100%); border: 1px solid #D4AF37; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(15,44,89,0.2);">
-          <i class="fas fa-user-circle" style="color: #FFD700; font-size: 1rem;"></i> ${badgeLabel}
-        </button>
-        <button type="button" class="btnUserSignOut btn-secondary" style="padding: 0.45rem 0.85rem; font-size: 0.82rem; color: #EF4444; border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.1); font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;" title="Sign Out">
-          <i class="fas fa-sign-out-alt"></i> Sign Out
+        <div class="nav-profile-wrapper">
+          <button type="button" class="nav-profile-avatar" id="navProfileAvatarBtn" title="My Profile">
+            ${initial}
+            <span class="online-dot"></span>
+          </button>
+          <div class="nav-profile-dropdown" id="navProfileDropdown"></div>
+        </div>
+      `;
+      drawerHtml = `
+        <div class="nav-profile-wrapper" style="width:100%;">
+          <button type="button" class="nav-profile-avatar" id="mobileProfileAvatarBtn" title="My Profile" style="margin: 0 auto 0.5rem; display: flex;">
+            ${initial}
+            <span class="online-dot"></span>
+          </button>
+          <div class="nav-profile-dropdown" id="mobileProfileDropdown" style="position: static; width: 100%; transform: none; box-shadow: 0 1px 4px rgba(0,0,0,0.08);"></div>
+        </div>
+      `;
+    } else {
+      desktopHtml = `
+        <button type="button" class="btn-signin-nav" onclick="document.querySelector('[data-view-nav=membership]').click()">
+          <i class="fas fa-user"></i> Sign In
         </button>
       `;
       drawerHtml = `
-        <button type="button" class="btn-primary btnHeaderUserProfile" style="width: 100%; justify-content: center; padding: 0.6rem; font-size: 0.875rem; background: linear-gradient(135deg, #0F2C59 0%, #1E3E62 100%); border: 1px solid #D4AF37; font-weight: 700; margin-bottom: 0.5rem;">
-          <i class="fas fa-user-circle" style="color: #FFD700;"></i> ${badgeLabel}
-        </button>
-        <button type="button" class="btnUserSignOut btn-secondary" style="width: 100%; justify-content: center; padding: 0.6rem; font-size: 0.875rem; color: #EF4444; border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.1); font-weight: 700;">
-          <i class="fas fa-sign-out-alt"></i> Sign Out Account
+        <button type="button" class="btn-signin-nav" style="width: 100%; justify-content: center;" onclick="document.querySelector('[data-view-nav=membership]').click()">
+          <i class="fas fa-user"></i> Sign In
         </button>
       `;
     }
@@ -597,21 +597,52 @@ class App {
     if (desktopContainer) desktopContainer.innerHTML = desktopHtml;
     if (drawerContainer) drawerContainer.innerHTML = drawerHtml;
 
+    // Admin sign out
     document.querySelectorAll('.btnNavSignOut').forEach(btn => {
       btn.onclick = () => this.handleAdminSignOut();
     });
 
-    document.querySelectorAll('.btnHeaderUserProfile').forEach(btn => {
-      btn.onclick = async () => {
-        const activeSession = this.store.getApplicantSession();
-        if (activeSession && activeSession.email) {
-          const memberApp = await this.store.getApplicationByEmail(activeSession.email);
-          this.showApplicantProfileModal(activeSession, memberApp);
-        } else {
-          this.renderView('membership');
+    // Profile dropdown toggle
+    const setupDropdownToggle = (avatarBtnId, dropdownId) => {
+      const avatarBtn = document.getElementById(avatarBtnId);
+      const dropdown = document.getElementById(dropdownId);
+      if (!avatarBtn || !dropdown) return;
+
+      avatarBtn.onclick = async (e) => {
+        e.stopPropagation();
+        const isOpen = dropdown.classList.contains('open');
+        // Close all other dropdowns
+        document.querySelectorAll('.nav-profile-dropdown.open').forEach(d => d.classList.remove('open'));
+        if (!isOpen) {
+          // Build dropdown content
+          const activeSession = this.store.getApplicantSession();
+          let memberApp = null;
+          let validity = null;
+          if (activeSession && activeSession.email) {
+            memberApp = await this.store.getApplicationByEmail(activeSession.email);
+            if (memberApp && memberApp.status === 'Approved') {
+              validity = this.store.getMembershipValidity(memberApp);
+            }
+          }
+          dropdown.innerHTML = this._buildProfileDropdownHtml(activeSession, memberApp, validity);
+          this._bindProfileDropdownActions(dropdown);
+          dropdown.classList.add('open');
         }
       };
-    });
+    };
+
+    setupDropdownToggle('navProfileAvatarBtn', 'navProfileDropdown');
+    setupDropdownToggle('mobileProfileAvatarBtn', 'mobileProfileDropdown');
+
+    // Close dropdown on outside click (only bind once)
+    if (!this._outsideClickBound) {
+      this._outsideClickBound = true;
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('.nav-profile-wrapper')) {
+          document.querySelectorAll('.nav-profile-dropdown.open').forEach(d => d.classList.remove('open'));
+        }
+      });
+    }
 
     document.querySelectorAll('#navAuthContainer [data-view-nav], #mobileDrawerAuthContainer [data-view-nav]').forEach(el => {
       el.onclick = (e) => {
@@ -619,6 +650,129 @@ class App {
         this.closeMobileDrawer();
         this.renderView(el.getAttribute('data-view-nav'));
       };
+    });
+
+    // Populate dropdowns if already open
+    this._populateProfileDropdowns();
+  }
+
+  _buildProfileDropdownHtml(session, memberApp, validity) {
+    const initial = (session.name || session.email).charAt(0).toUpperCase();
+    const displayName = session.name || 'BCCI Member';
+    const displayEmail = session.email;
+
+    let statusHtml = '';
+    let infoHtml = '';
+
+    if (memberApp) {
+      if (memberApp.status === 'Approved') {
+        let statusClass = 'active';
+        let statusIcon = 'fa-check-circle';
+        let statusText = '⭐ Active Member';
+        if (validity && validity.state === 'RENEWAL_DUE') {
+          statusClass = 'pending';
+          statusIcon = 'fa-exclamation-triangle';
+          statusText = `⚠️ Renewal Due (${validity.daysRemaining} days)`;
+        } else if (validity && validity.state === 'EXPIRED') {
+          statusClass = 'expired';
+          statusIcon = 'fa-times-circle';
+          statusText = '❌ Membership Expired';
+        }
+        statusHtml = `<div class="profile-dropdown-status ${statusClass}"><i class="fas ${statusIcon}"></i> ${statusText}</div>`;
+        infoHtml = `
+          <div class="profile-dropdown-info"><span class="info-label">Company</span><span class="info-value">${memberApp.company}</span></div>
+          <div class="profile-dropdown-info"><span class="info-label">Member ID</span><span class="info-value" style="font-family:monospace;color:var(--primary);">${memberApp.id}</span></div>
+          <div class="profile-dropdown-info"><span class="info-label">Valid Until</span><span class="info-value" style="color:${validity && validity.state === 'EXPIRED' ? '#DC2626' : '#059669'};">${validity ? validity.validUntilDate : 'Active'}</span></div>
+        `;
+      } else if (memberApp.status === 'Pending') {
+        statusHtml = `<div class="profile-dropdown-status pending"><i class="fas fa-hourglass-half"></i> ⏳ Pending Approval</div>`;
+        infoHtml = `
+          <div class="profile-dropdown-info"><span class="info-label">Company</span><span class="info-value">${memberApp.company}</span></div>
+          <div class="profile-dropdown-info"><span class="info-label">Ref ID</span><span class="info-value" style="font-family:monospace;color:#D97706;">${memberApp.id}</span></div>
+          <div class="profile-dropdown-info"><span class="info-label">Submitted</span><span class="info-value">${new Date(memberApp.submittedAt).toLocaleDateString()}</span></div>
+        `;
+      }
+    } else {
+      statusHtml = `<div class="profile-dropdown-status unverified"><i class="fas fa-info-circle"></i> Verified via Email OTP</div>`;
+    }
+
+    let actionsHtml = '';
+    if (memberApp && memberApp.status === 'Approved') {
+      actionsHtml = `
+        <button class="pd-btn-gold pdBtnDigitalCard"><i class="fas fa-id-card"></i> View Digital Card</button>
+        <button class="pd-btn-primary pdBtnRenew"><i class="fas fa-sync-alt"></i> Annual Renewal</button>
+      `;
+    } else if (!memberApp) {
+      actionsHtml = `
+        <button class="pd-btn-primary pdBtnApply"><i class="fas fa-building"></i> Apply for Membership</button>
+      `;
+    }
+    actionsHtml += `
+      <button class="pd-btn-danger pdBtnSignOut"><i class="fas fa-sign-out-alt"></i> Sign Out</button>
+    `;
+
+    return `
+      <div class="profile-dropdown-header">
+        <div class="profile-dropdown-avatar">${initial}</div>
+        <div>
+          <div class="profile-dropdown-name">${displayName}</div>
+          <div class="profile-dropdown-email">${displayEmail}</div>
+        </div>
+      </div>
+      <div class="profile-dropdown-body">
+        ${statusHtml}
+        ${infoHtml}
+      </div>
+      <div class="profile-dropdown-actions">
+        ${actionsHtml}
+      </div>
+    `;
+  }
+
+  _bindProfileDropdownActions(dropdown) {
+    dropdown.querySelector('.pdBtnDigitalCard')?.addEventListener('click', async () => {
+      dropdown.classList.remove('open');
+      const session = this.store.getApplicantSession();
+      if (session && session.email) {
+        const memberApp = await this.store.getApplicationByEmail(session.email);
+        if (memberApp) this.showDigitalMemberCardModal(memberApp);
+      }
+    });
+    dropdown.querySelector('.pdBtnRenew')?.addEventListener('click', async () => {
+      dropdown.classList.remove('open');
+      const session = this.store.getApplicantSession();
+      if (session && session.email) {
+        const memberApp = await this.store.getApplicationByEmail(session.email);
+        if (memberApp) this.showRenewalModal(memberApp);
+      }
+    });
+    dropdown.querySelector('.pdBtnApply')?.addEventListener('click', () => {
+      dropdown.classList.remove('open');
+      this.closeMobileDrawer();
+      this.renderView('membership');
+    });
+    dropdown.querySelector('.pdBtnSignOut')?.addEventListener('click', () => {
+      dropdown.classList.remove('open');
+      this.handleApplicantSignOut();
+    });
+  }
+
+  async _populateProfileDropdowns() {
+    const session = this.store.getApplicantSession();
+    if (!session || !session.email) return;
+
+    const memberApp = await this.store.getApplicationByEmail(session.email);
+    let validity = null;
+    if (memberApp && memberApp.status === 'Approved') {
+      validity = this.store.getMembershipValidity(memberApp);
+    }
+
+    ['navProfileDropdown', 'mobileProfileDropdown'].forEach(id => {
+      const dd = document.getElementById(id);
+      if (dd && dd.children.length === 0) {
+        dd.innerHTML = this._buildProfileDropdownHtml(session, memberApp, validity);
+        this._bindProfileDropdownActions(dd);
+      }
     });
   }
 
@@ -628,6 +782,13 @@ class App {
     this.updateNavAuthUI();
     this.showToast('Signed out of Admin session.', 'info');
     this.renderView('home');
+  }
+
+  handleApplicantSignOut() {
+    this.store.clearApplicantSession();
+    this.updateNavAuthUI();
+    this.updateApplicantAuthUI();
+    this.showToast('Session ended. You have been signed out successfully.', 'info');
   }
 
   openMobileDrawer() {
