@@ -287,11 +287,13 @@ class App {
     const emailDisplay = document.getElementById('applicantEmailDisplay');
     const avatarInitial = document.getElementById('applicantAvatarInitial');
     const profileBtnText = document.getElementById('userProfileBtnText');
+    const headerSignOutBtn = document.getElementById('btnHeaderSignOut');
 
     const session = this.store.getApplicantSession();
     if (session && session.email) {
       if (gate) gate.style.display = 'none';
       if (banner) banner.style.display = 'flex';
+      if (headerSignOutBtn) headerSignOutBtn.style.display = 'inline-flex';
       
       // Check if this authenticated user has an existing membership application
       const memberApp = this.store.getApplicationByEmail(session.email);
@@ -378,6 +380,7 @@ class App {
       if (wrapper) wrapper.style.display = 'none';
       this.updateHeaderMemberBadge(null, null);
       if (profileBtnText) profileBtnText.textContent = 'My Profile / Sign In';
+      if (headerSignOutBtn) headerSignOutBtn.style.display = 'none';
     }
   }
 
