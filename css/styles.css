@@ -7,31 +7,49 @@
 
 :root {
   /* ── Palette ─────────────────────────────────────────────────── */
-  --black: #0A0A0A;
+  --black: #0F1923;
   --white: #FFFFFF;
-  --warm-white: #FAFAF8;
-  --off-white: #F5F5F3;
-  --gray-50: #F9F9F7;
-  --gray-100: #F0EFEC;
-  --gray-200: #E5E4E0;
-  --gray-300: #D1D0CC;
-  --gray-400: #A8A7A3;
-  --gray-500: #78776F;
-  --gray-600: #555550;
-  --gray-700: #3A3A36;
-  --gray-800: #1F1F1C;
-  --gray-900: #0F0F0D;
+  --warm-white: #FAF9F7;
+  --off-white: #F3F1ED;
+  --cream: #EDE9E1;
+  --linen: #E8E4DB;
 
-  --accent: #1A1A2E;
-  --accent-light: #F0F0F8;
-  --gold: #B8960C;
-  --gold-light: #FBF7E8;
-  --success: #1A7A3A;
-  --success-bg: #EDFAF1;
-  --warning: #9A6C00;
-  --warning-bg: #FDF6E3;
-  --danger: #B91C1C;
-  --danger-bg: #FEF2F2;
+  --gray-50: #F7F6F3;
+  --gray-100: #EDECEA;
+  --gray-200: #DDDBD6;
+  --gray-300: #C4C2BC;
+  --gray-400: #9B9890;
+  --gray-500: #6E6B63;
+  --gray-600: #504D47;
+  --gray-700: #3A3832;
+  --gray-800: #252320;
+  --gray-900: #151311;
+
+  --navy: #1B2A4A;
+  --navy-light: #2C3E6B;
+  --navy-bg: #F0F2F7;
+  --navy-bg-deep: #E4E8F0;
+  --slate: #4A5568;
+  --slate-light: #718096;
+  --charcoal: #2D3748;
+
+  --gold: #B8860B;
+  --gold-light: #FDF6E3;
+  --gold-bg: #FAF3E0;
+
+  --teal: #2C7A7B;
+  --teal-light: #E6FFFA;
+  --teal-bg: #F0FDFA;
+
+  --success: #276749;
+  --success-bg: #E6F4EA;
+  --warning: #975A16;
+  --warning-bg: #FFFDF0;
+  --danger: #9B2C2C;
+  --danger-bg: #FFF5F5;
+
+  --accent: var(--navy);
+  --accent-light: var(--navy-bg);
 
   /* ── Typography ──────────────────────────────────────────────── */
   --font-display: 'DM Serif Display', Georgia, 'Times New Roman', serif;
@@ -46,7 +64,7 @@
   --space-xl: 2.5rem;
   --space-2xl: 4rem;
   --space-3xl: 6rem;
-  --space-4xl: 8rem;
+  --space-4xl: 5.5rem;
 
   /* ── Rules & Lines ───────────────────────────────────────────── */
   --rule: 1px solid var(--gray-200);
@@ -68,7 +86,7 @@ body {
   font-size: 0.95rem;
   line-height: 1.7;
   color: var(--black);
-  background: var(--white);
+  background: var(--warm-white);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
@@ -167,8 +185,8 @@ small, .mono {
    TOP BAR
    ========================================================================== */
 .top-bar {
-  background: var(--black);
-  color: var(--gray-400);
+  background: var(--navy);
+  color: rgba(255,255,255,0.6);
   padding: 0.55rem 0;
   font-family: var(--font-mono);
   font-size: 0.68rem;
@@ -188,7 +206,7 @@ small, .mono {
 .top-bar-contact { display: flex; align-items: center; gap: 2rem; }
 .top-bar-contact span { display: inline-flex; align-items: center; gap: 0.4rem; }
 .top-bar-contact i { color: var(--gray-500); font-size: 0.65rem; }
-.top-bar-badge { color: var(--gray-500); }
+.top-bar-badge { color: var(--gold); }
 
 /* ==========================================================================
    NAVBAR
@@ -197,10 +215,10 @@ small, .mono {
   position: sticky;
   top: 0;
   z-index: 1000;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border-bottom: var(--rule);
+  border-bottom: 1px solid var(--gray-200);
 }
 
 .navbar-inner {
@@ -247,7 +265,7 @@ small, .mono {
 .nav-link:hover { color: var(--black); opacity: 1; }
 
 .nav-link.active {
-  color: var(--black);
+  color: var(--navy);
   font-weight: 600;
 }
 
@@ -257,8 +275,8 @@ small, .mono {
   bottom: -1rem;
   left: 1rem;
   right: 1rem;
-  height: 1.5px;
-  background: var(--black);
+  height: 2px;
+  background: var(--gold);
 }
 
 .nav-actions {
@@ -270,13 +288,13 @@ small, .mono {
 
 /* ── Buttons ───────────────────────────────────────────────────── */
 .btn-primary, .btn-nav-cta {
-  background: var(--black);
+  background: var(--navy);
   color: var(--white);
   font-family: var(--font-body);
   font-weight: 600;
   font-size: 0.82rem;
   letter-spacing: 0.02em;
-  padding: 0.6rem 1.4rem;
+  padding: 0.65rem 1.5rem;
   border: none;
   cursor: pointer;
   white-space: nowrap;
@@ -287,7 +305,7 @@ small, .mono {
 }
 
 .btn-primary:hover, .btn-nav-cta:hover {
-  background: var(--gray-800);
+  background: var(--navy-light);
   opacity: 1;
 }
 
@@ -339,8 +357,8 @@ small, .mono {
 
 .btn-signin-nav {
   background: none;
-  border: 1px solid var(--black);
-  color: var(--black);
+  border: 1px solid var(--navy);
+  color: var(--navy);
   font-family: var(--font-body);
   font-weight: 600;
   font-size: 0.82rem;
@@ -353,7 +371,7 @@ small, .mono {
 }
 
 .btn-signin-nav:hover {
-  background: var(--black);
+  background: var(--navy);
   color: var(--white);
   opacity: 1;
 }
@@ -398,7 +416,7 @@ small, .mono {
 .nav-profile-avatar {
   width: 36px;
   height: 36px;
-  background: var(--black);
+  background: var(--navy);
   border: none;
   color: var(--white);
   font-family: var(--font-body);
@@ -413,7 +431,7 @@ small, .mono {
   flex-shrink: 0;
 }
 
-.nav-profile-avatar:hover { background: var(--gray-700); }
+.nav-profile-avatar:hover { background: var(--navy-light); }
 
 .nav-profile-avatar .online-dot {
   position: absolute;
@@ -449,12 +467,13 @@ small, .mono {
 .profile-dropdown-header {
   padding: 1.25rem 1.5rem;
   border-bottom: var(--rule);
+  background: var(--gray-50);
 }
 
 .profile-dropdown-avatar {
   width: 44px;
   height: 44px;
-  background: var(--black);
+  background: var(--navy);
   color: var(--white);
   font-family: var(--font-body);
   font-weight: 600;
@@ -560,6 +579,10 @@ small, .mono {
    ========================================================================== */
 .container { max-width: var(--max-width); margin: 0 auto; padding: 0 var(--space-xl); }
 .section-padding { padding: var(--space-4xl) 0; }
+.section-alt { background: var(--off-white); }
+.section-dark { background: var(--navy); color: rgba(255,255,255,0.7); }
+.section-dark .section-title { color: var(--white); }
+.section-dark .section-tag { color: var(--gold); border-bottom-color: var(--gold); }
 
 .section-header {
   text-align: left;
@@ -574,14 +597,17 @@ small, .mono {
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: var(--gray-400);
+  color: var(--navy);
   margin-bottom: var(--space-md);
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--gold);
 }
 
 .section-title {
   font-size: clamp(2rem, 4vw, 3rem);
   margin-bottom: var(--space-lg);
   line-height: 1.1;
+  color: var(--black);
 }
 
 .section-desc {
@@ -596,6 +622,7 @@ small, .mono {
 .hero {
   padding: var(--space-4xl) 0;
   border-bottom: var(--rule);
+  background: var(--white);
 }
 
 .hero-grid {
@@ -648,8 +675,8 @@ small, .mono {
 .hero-actions { display: flex; gap: 1rem; flex-wrap: wrap; }
 
 .hero-stats-card {
-  background: var(--warm-white);
-  border: var(--rule);
+  background: var(--navy-bg);
+  border: 1px solid var(--navy-bg-deep);
   padding: var(--space-2xl);
   transition: border-color 0.3s ease;
 }
@@ -663,25 +690,28 @@ small, .mono {
   border-bottom: var(--rule);
 }
 
-.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--gray-200); }
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: rgba(27, 42, 74, 0.08); }
 
 .stat-item {
-  background: var(--warm-white);
+  background: var(--navy-bg);
   padding: var(--space-lg);
   text-align: center;
+  transition: background 0.2s ease;
 }
+
+.stat-item:hover { background: var(--white); }
 
 .stat-number {
   font-family: var(--font-display);
   font-size: 2.2rem;
-  color: var(--black);
+  color: var(--navy);
   margin-bottom: 0.25rem;
 }
 
 .stat-label {
   font-family: var(--font-mono);
   font-size: 0.68rem;
-  color: var(--gray-400);
+  color: var(--slate-light);
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -690,13 +720,14 @@ small, .mono {
    PRESIDENT CARD
    ========================================================================== */
 .president-card {
-  background: var(--white);
-  border: var(--rule);
+  background: var(--navy);
+  border: none;
   padding: var(--space-3xl);
   display: grid;
   grid-template-columns: 0.7fr 1.3fr;
   gap: var(--space-3xl);
   align-items: center;
+  color: var(--gray-300);
 }
 
 .president-img-wrap { text-align: center; }
@@ -705,9 +736,9 @@ small, .mono {
   width: 100%;
   max-width: 240px;
   height: auto;
-  border: var(--rule);
+  border: 2px solid rgba(255,255,255,0.15);
   object-fit: cover;
-  filter: grayscale(20%);
+  filter: grayscale(10%);
   transition: filter 0.5s ease;
 }
 
@@ -716,23 +747,26 @@ small, .mono {
 .president-name {
   font-size: 1.1rem;
   margin-top: var(--space-lg);
+  color: var(--white);
 }
 
 .president-role {
   font-family: var(--font-mono);
   font-size: 0.68rem;
-  color: var(--gray-400);
+  color: var(--gold);
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 
 .president-quote {
   font-size: 1rem;
-  color: var(--gray-600);
+  color: var(--gray-300);
   line-height: 1.85;
-  border-left: 2px solid var(--gray-300);
+  border-left: 2px solid var(--gold);
   padding-left: var(--space-xl);
 }
+
+.president-quote strong { color: var(--white); }
 
 .president-quote p { margin-bottom: var(--space-md); }
 
@@ -745,10 +779,11 @@ small, .mono {
   background: var(--white);
   padding: var(--space-2xl) var(--space-xl);
   text-align: center;
-  transition: var(--transition);
+  transition: var(--transition-slow);
+  border-top: 3px solid transparent;
 }
 
-.team-card:hover { background: var(--warm-white); }
+.team-card:hover { background: var(--gray-50); border-top-color: var(--navy); }
 
 /* Image grayscale → color on team cards */
 .team-card:hover .team-avatar-img { filter: grayscale(0%); }
@@ -783,11 +818,12 @@ small, .mono {
   display: inline-block;
   font-family: var(--font-mono);
   font-size: 0.65rem;
-  color: var(--gray-500);
+  color: var(--navy);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   padding: 0.2rem 0.6rem;
-  border: 1px solid var(--gray-200);
+  background: var(--navy-bg);
+  border: 1px solid var(--navy-bg-deep);
 }
 
 .team-linkedin-btn {
@@ -822,24 +858,28 @@ small, .mono {
 .service-card {
   background: var(--white);
   padding: var(--space-2xl);
-  transition: var(--transition);
+  transition: var(--transition-slow);
   display: flex;
   flex-direction: column;
+  border-left: 3px solid transparent;
 }
 
-.service-card:hover { background: var(--warm-white); }
+.service-card:hover { background: var(--navy-bg); border-left-color: var(--navy); }
 
 .service-icon {
   width: 40px;
   height: 40px;
-  background: var(--gray-100);
+  background: var(--navy-bg);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 1.1rem;
-  color: var(--gray-500);
+  color: var(--navy);
   margin-bottom: var(--space-lg);
+  transition: background 0.2s ease;
 }
+
+.service-card:hover .service-icon { background: var(--navy); color: var(--white); }
 
 .service-title { font-size: 1.1rem; margin-bottom: 0.75rem; }
 
@@ -897,10 +937,10 @@ small, .mono {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  transition: var(--transition);
+  transition: var(--transition-slow);
 }
 
-.blog-card:hover { border-color: var(--black); }
+.blog-card:hover { border-color: var(--navy); }
 
 .blog-img-wrap {
   position: relative;
@@ -926,13 +966,13 @@ small, .mono {
   position: absolute;
   top: 1rem;
   right: 1rem;
-  background: var(--white);
-  border: var(--rule);
-  color: var(--black);
+  background: var(--navy);
+  border: none;
+  color: var(--white);
   font-family: var(--font-mono);
   font-size: 0.65rem;
   font-weight: 500;
-  padding: 0.25rem 0.65rem;
+  padding: 0.3rem 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -1264,7 +1304,7 @@ small, .mono {
 
 .admin-menu-item:last-child { border-bottom: none; }
 .admin-menu-item:hover { color: var(--black); background: var(--gray-50); }
-.admin-menu-item.active { color: var(--black); background: var(--black); color: var(--white); }
+.admin-menu-item.active { background: var(--navy); color: var(--white); border-left: 3px solid var(--gold); }
 
 .admin-metrics-grid {
   display: grid;
@@ -1278,17 +1318,23 @@ small, .mono {
   background: var(--white);
   padding: var(--space-xl);
   text-align: center;
+  border-top: 3px solid var(--navy);
 }
 
 .metric-val {
   font-family: var(--font-display);
   font-size: 2.2rem;
-  color: var(--black);
+  color: var(--navy);
 }
 
 .metric-val.pending { color: var(--warning); }
 .metric-val.approved { color: var(--success); }
 .metric-val.rejected { color: var(--danger); }
+
+.metric-card:nth-child(1) { border-top-color: var(--navy); }
+.metric-card:nth-child(2) { border-top-color: var(--warning); }
+.metric-card:nth-child(3) { border-top-color: var(--success); }
+.metric-card:nth-child(4) { border-top-color: var(--danger); }
 
 .metric-title {
   font-family: var(--font-mono);
@@ -1410,13 +1456,13 @@ small, .mono {
    FOOTER
    ========================================================================== */
 footer {
-  background: var(--black);
-  color: var(--gray-400);
+  background: var(--navy);
+  color: rgba(255,255,255,0.6);
   padding: var(--space-3xl) 0 var(--space-xl);
 }
 
 footer h4 {
-  color: var(--gray-300);
+  color: var(--gold);
   font-family: var(--font-mono);
   font-size: 0.68rem;
   font-weight: 500;
@@ -1434,16 +1480,16 @@ footer h4 {
 
 .footer-links { list-style: none; }
 .footer-links li { margin-bottom: 0.6rem; font-size: 0.88rem; display: flex; align-items: center; gap: 0.5rem; }
-.footer-links a { color: var(--gray-500); transition: var(--transition); text-decoration: none; }
-.footer-links a:hover { color: var(--white); opacity: 1; }
+.footer-links a { color: rgba(255,255,255,0.5); transition: var(--transition); text-decoration: none; }
+.footer-links a:hover { color: var(--gold); opacity: 1; }
 
 .footer-bottom {
-  border-top: 1px solid var(--gray-800);
+  border-top: 1px solid rgba(255,255,255,0.1);
   padding-top: var(--space-lg);
   text-align: center;
   font-family: var(--font-mono);
   font-size: 0.68rem;
-  color: var(--gray-600);
+  color: rgba(255,255,255,0.35);
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
