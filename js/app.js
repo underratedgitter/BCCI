@@ -15,10 +15,6 @@ class App {
   }
 
   init() {
-    if (!localStorage.getItem('bcci_resend_api_key')) {
-      const activeKey = ['re_', '3aymJv8x_', '64nneTrayP8UapBk627jjnDe'].join('');
-      localStorage.setItem('bcci_resend_api_key', activeKey);
-    }
     this.bindNavigation();
     this.updateNavAuthUI();
     this.renderView('home');
@@ -31,163 +27,160 @@ class App {
     this.setupLightboxEvents();
   }
 
+  /* ── Email OTP API (Vercel Serverless) ────────────────────────────── */
+  get OTP_API_BASE() {
+    // In production: same-origin Vercel deployment
+    // In local dev: vercel dev runs on same port
+    return '';
+  }
+
+  async callOtpApi(endpoint, payload) {
+    const res = await fetch(`${this.OTP_API_BASE}${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok && res.status !== 400 && res.status !== 429) {
+      throw new Error(`Server error: ${res.status}`);
+    }
+    return res.json();
+  }
+
   setupApplicantAuthHandlers() {
-    const googleBtn = document.getElementById('googleAuthBtn');
     const signOutBtn = document.getElementById('applicantSignOutBtn');
-
-    // Global Safe JWT Decoder
-    const parseJwt = (token) => {
-      try {
-        const base64Url = token.split('.')[1];
-        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-        const jsonPayload = decodeURIComponent(atob(base64).split('').map((c) => {
-          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        }).join(''));
-        return JSON.parse(jsonPayload);
-      } catch (e) {
-        console.error('[JWT Parse Error]', e);
-        return null;
-      }
-    };
-
-    // Global Google Identity Services Callback
-    window.handleGoogleCredentialResponse = (response) => {
-      if (response && response.credential) {
-        try {
-          const payload = parseJwt(response.credential);
-          if (payload && payload.email) {
-            const sessionData = {
-              email: payload.email,
-              name: payload.name || payload.email.split('@')[0],
-              avatar: payload.picture || '',
-              authenticatedAt: new Date().toISOString()
-            };
-            this.store.setApplicantSession(sessionData);
-            this.updateApplicantAuthUI();
-            this.showToast(`Authenticated via Google as ${payload.email}`, 'success');
-          }
-        } catch (err) {
-          console.warn('[Google Credential Response Error]', err);
-        }
-      }
-    };
-
-    if (googleBtn) {
-      googleBtn.addEventListener('click', () => {
-        this.triggerGoogleOAuthDialog((userSession) => {
-          this.store.setApplicantSession(userSession);
-          this.updateApplicantAuthUI();
-          this.showToast(`Authenticated as ${userSession.email}`, 'success');
-        });
-      });
-    }
-
-    // Tab switching for Auth Gate
-    const tabGoogle = document.getElementById('tabBtnGoogle');
-    const tabOtp = document.getElementById('tabBtnOtp');
-    const panelGoogle = document.getElementById('authPanelGoogle');
-    const panelOtp = document.getElementById('authPanelOtp');
-
-    if (tabGoogle && tabOtp && panelGoogle && panelOtp) {
-      tabGoogle.addEventListener('click', () => {
-        tabGoogle.classList.add('active');
-        tabGoogle.style.background = '#FFFFFF';
-        tabGoogle.style.color = 'var(--primary)';
-        tabGoogle.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
-        
-        tabOtp.classList.remove('active');
-        tabOtp.style.background = 'transparent';
-        tabOtp.style.color = '#64748B';
-        tabOtp.style.boxShadow = 'none';
-
-        panelGoogle.style.display = 'block';
-        panelOtp.style.display = 'none';
-      });
-
-      tabOtp.addEventListener('click', () => {
-        tabOtp.classList.add('active');
-        tabOtp.style.background = '#FFFFFF';
-        tabOtp.style.color = 'var(--primary)';
-        tabOtp.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
-
-        tabGoogle.classList.remove('active');
-        tabGoogle.style.background = 'transparent';
-        tabGoogle.style.color = '#64748B';
-        tabGoogle.style.boxShadow = 'none';
-
-        panelGoogle.style.display = 'none';
-        panelOtp.style.display = 'block';
-      });
-    }
-
-    // OTP Verification Flow Logic
     const otpStep1Form = document.getElementById('otpStep1Form');
     const otpStep2Form = document.getElementById('otpStep2Form');
-    let generatedOtp = null;
-    let pendingOtpSession = null;
+    const otpSendBtn = document.getElementById('otpSendBtn');
+    const otpVerifyBtn = document.getElementById('otpVerifyBtn');
+    const otpResendBtn = document.getElementById('otpResendBtn');
+    const otpBackBtn = document.getElementById('otpBackBtn');
+
+    // Tracks the email & name used when sending the OTP
+    let pendingSession = null;
+
+    // ── Helper: set button loading state ──────────────────────────────
+    const setLoading = (btn, loading, label, icon) => {
+      if (!btn) return;
+      btn.disabled = loading;
+      btn.innerHTML = loading
+        ? `<i class="fas fa-spinner fa-spin"></i> ${label}`
+        : `<i class="${icon}"></i> ${label}`;
+    };
+
+    // ── Step 1: Send OTP ───────────────────────────────────────────────
+    const sendOtp = async (email, name) => {
+      setLoading(otpSendBtn, true, 'Sending Code…', 'fas fa-spinner fa-spin');
+      try {
+        const result = await this.callOtpApi('/api/send-otp', { email, name });
+        if (result.success) {
+          pendingSession = { email, name };
+          otpStep1Form.style.display = 'none';
+          otpStep2Form.style.display = 'block';
+          const noticeBanner = document.getElementById('otpNoticeBanner');
+          if (noticeBanner) {
+            noticeBanner.innerHTML = `<i class="fas fa-envelope-open-text"></i> Verification code sent to <strong>${email}</strong>. Check your inbox (and spam folder).`;
+          }
+          this.showToast(`Verification code sent to ${email}`, 'success');
+        } else {
+          this.showToast(result.error || 'Failed to send code. Please try again.', 'error');
+        }
+      } catch (err) {
+        console.error('[OTP Send Error]', err);
+        this.showToast('Network error. Please check your connection and try again.', 'error');
+      } finally {
+        setLoading(otpSendBtn, false, 'Send Verification Code', 'fas fa-paper-plane');
+      }
+    };
 
     if (otpStep1Form) {
       otpStep1Form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const email = document.getElementById('otpEmailInput').value.trim();
+        const email = document.getElementById('otpEmailInput').value.trim().toLowerCase();
         const name = document.getElementById('otpNameInput').value.trim();
         if (!email || !name) return;
-
-        generatedOtp = Math.floor(1000 + Math.random() * 9000).toString();
-        pendingOtpSession = { email, name, authenticatedAt: new Date().toISOString() };
-
-        otpStep1Form.style.display = 'none';
-        otpStep2Form.style.display = 'block';
-
-        const noticeBanner = document.getElementById('otpNoticeBanner');
-        if (noticeBanner) {
-          noticeBanner.innerHTML = `<i class="fas fa-key"></i> Passcode dispatched to <strong>${email}</strong>. Enter code: <strong style="font-size: 1.15rem; color: #059669; font-family: monospace;">${generatedOtp}</strong>`;
-        }
-        this.showToast(`Passcode [${generatedOtp}] dispatched to ${email}`, 'info');
-
-        // Real Email Dispatch via FormSubmit AJAX API
-        try {
-          fetch(`https://formsubmit.co/ajax/${encodeURIComponent(email)}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({
-              _subject: `BCCI Bharuch Verification Code: ${generatedOtp}`,
-              _template: 'table',
-              Applicant_Name: name,
-              Official_Email: email,
-              Verification_Code: generatedOtp,
-              Message: 'Use this 4-digit code on the BCCI Membership Portal to unlock your membership application form.'
-            })
-          }).catch(err => console.warn('[OTP Email Dispatch Warn]', err));
-        } catch (err) {
-          console.warn('[OTP Dispatch Catch]', err);
-        }
+        await sendOtp(email, name);
       });
     }
 
+    // ── Resend button ──────────────────────────────────────────────────
+    if (otpResendBtn) {
+      otpResendBtn.addEventListener('click', async () => {
+        if (!pendingSession) return;
+        otpResendBtn.disabled = true;
+        otpResendBtn.textContent = 'Sending…';
+        await sendOtp(pendingSession.email, pendingSession.name);
+        // Clear the code field for fresh entry
+        const codeInput = document.getElementById('otpCodeInput');
+        if (codeInput) codeInput.value = '';
+        otpResendBtn.disabled = false;
+        otpResendBtn.textContent = 'Resend Code';
+      });
+    }
+
+    // ── Back button ───────────────────────────────────────────────────
+    if (otpBackBtn) {
+      otpBackBtn.addEventListener('click', () => {
+        pendingSession = null;
+        otpStep2Form.style.display = 'none';
+        otpStep1Form.style.display = 'block';
+        const codeInput = document.getElementById('otpCodeInput');
+        if (codeInput) codeInput.value = '';
+      });
+    }
+
+    // ── Step 2: Verify OTP ─────────────────────────────────────────────
     if (otpStep2Form) {
-      otpStep2Form.addEventListener('submit', (e) => {
+      otpStep2Form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const inputCode = document.getElementById('otpCodeInput').value.trim();
-        if (inputCode === generatedOtp && pendingOtpSession) {
-          this.store.setApplicantSession(pendingOtpSession);
-          this.updateApplicantAuthUI();
-          this.showToast(`Authenticated via Email OTP as ${pendingOtpSession.email}`, 'success');
-        } else {
-          this.showToast('Invalid verification passcode. Please enter the 4-digit code.', 'error');
+        if (!pendingSession) return;
+        const code = document.getElementById('otpCodeInput').value.trim();
+        if (!code || code.length !== 6) {
+          this.showToast('Please enter the full 6-digit verification code.', 'warning');
+          return;
+        }
+
+        setLoading(otpVerifyBtn, true, 'Verifying…', 'fas fa-spinner fa-spin');
+        try {
+          const result = await this.callOtpApi('/api/verify-otp', {
+            email: pendingSession.email,
+            name: pendingSession.name,
+            code
+          });
+
+          if (result.success && result.session) {
+            this.store.setApplicantSession(result.session);
+            this.updateApplicantAuthUI();
+            this.showToast(`Welcome, ${result.session.name}! Identity verified successfully.`, 'success');
+            pendingSession = null;
+          } else {
+            this.showToast(result.error || 'Invalid code. Please try again.', 'error');
+            // Shake the input for UX feedback
+            const codeInput = document.getElementById('otpCodeInput');
+            if (codeInput) {
+              codeInput.style.borderColor = '#EF4444';
+              codeInput.value = '';
+              setTimeout(() => { codeInput.style.borderColor = ''; }, 2000);
+            }
+          }
+        } catch (err) {
+          console.error('[OTP Verify Error]', err);
+          this.showToast('Network error. Please check your connection and try again.', 'error');
+        } finally {
+          setLoading(otpVerifyBtn, false, 'Verify & Access Application', 'fas fa-check-shield');
         }
       });
     }
 
+    // ── Sign Out ───────────────────────────────────────────────────────
     if (signOutBtn) {
       signOutBtn.addEventListener('click', () => {
         this.store.clearApplicantSession();
         this.updateApplicantAuthUI();
-        this.showToast('Applicant session signed out.', 'info');
+        this.showToast('Session ended. You have been signed out.', 'info');
       });
     }
 
-    // Dynamic Delegate Listeners for Digital Card & Renewal
+    // ── Dynamic listeners for Digital Card & Renewal ───────────────────
     document.addEventListener('click', (e) => {
       const cardBtn = e.target.closest('.btnViewDigitalCard');
       const renewBtn = e.target.closest('.btnRenewMembership');
@@ -455,98 +448,6 @@ class App {
           
           // Re-render UI
           this.setupApplicantAuthHandlers();
-        });
-      }
-    }, 100);
-  }
-
-  triggerGoogleOAuthDialog(callback) {
-    if (window.google && window.google.accounts && window.google.accounts.id) {
-      try {
-        window.google.accounts.id.initialize({
-          client_id: '984292781459-1lstfue0bjhde1fachhk2264gcbb9ot7.apps.googleusercontent.com',
-          callback: (response) => {
-            if (response && response.credential) {
-              const payload = JSON.parse(atob(response.credential.split('.')[1]));
-              const sessionData = {
-                email: payload.email,
-                name: payload.name || payload.email.split('@')[0],
-                avatar: payload.picture,
-                authenticatedAt: new Date().toISOString()
-              };
-              this.store.setApplicantSession(sessionData);
-              callback(sessionData);
-              this.showToast(`Authenticated via Google as ${payload.email}`, 'success');
-            }
-          }
-        });
-        window.google.accounts.id.prompt();
-        return;
-      } catch (err) {
-        console.warn('[Google SDK Prompt]', err);
-      }
-    }
-    this.showGoogleAuthModal(callback);
-  }
-
-  showGoogleAuthModal(callback) {
-    this.showModal({
-      title: `<div style="display: flex; align-items: center; gap: 10px;">
-        <svg width="22" height="22" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.74-.06-1.28-.19-1.84H9v3.34h4.96c-.1.83-.64 2.08-1.84 2.92l2.84 2.2c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.84-2.2c-.76.53-1.78.9-3.12.9-2.38 0-4.41-1.57-5.13-3.72L.97 13.02C2.49 16.05 5.5 18 9 18z"/><path fill="#FBBC05" d="M3.87 10.8c-.18-.53-.28-1.1-.28-1.8s.1-1.27.28-1.8L.97 4.98C.35 6.22 0 7.63 0 9s.35 2.78.97 4.02l2.9-2.22z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.59C13.46.89 11.43 0 9 0 5.5 0 2.49 1.95.97 4.98l2.9 2.22c.72-2.15 2.75-3.62 5.13-3.62z"/></svg>
-        <span style="color: #1E293B; font-weight: 700;">Sign in with Google</span>
-      </div>`,
-      content: `
-        <div style="padding: 0.5rem 0;">
-          <div style="text-align: center; margin-bottom: 1.5rem;">
-            <div style="font-size: 1.1rem; font-weight: 700; color: var(--primary);">BCCI Applicant Identity Authentication</div>
-            <div style="font-size: 0.85rem; color: #64748B; margin-top: 2px;">Authenticate your Google account to proceed with membership registration.</div>
-          </div>
-
-          <form id="googleAuthModalForm">
-            <div class="form-group" style="margin-bottom: 1.25rem;">
-              <label class="form-label">Google Email Address <span class="req">*</span></label>
-              <div style="position: relative;">
-                <input type="email" id="googleEmailInput" class="form-control" placeholder="e.g. yourname@gmail.com or company@gmail.com" required style="padding-left: 2.5rem;" />
-                <i class="fab fa-google" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #4285F4;"></i>
-              </div>
-            </div>
-
-            <div class="form-group" style="margin-bottom: 1.5rem;">
-              <label class="form-label">Full Name / Representative Name <span class="req">*</span></label>
-              <div style="position: relative;">
-                <input type="text" id="googleNameInput" class="form-control" placeholder="e.g. Suraj Patel" required style="padding-left: 2.5rem;" />
-                <i class="fas fa-user" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #64748B;"></i>
-              </div>
-            </div>
-
-            <div style="display: flex; gap: 0.75rem;">
-              <button type="submit" class="btn-primary" style="flex: 1; justify-content: center; font-weight: 700; padding: 0.75rem; background: #4285F4; border-color: #3b78e7;">
-                <i class="fas fa-shield-check"></i> Authenticate &amp; Continue
-              </button>
-            </div>
-          </form>
-          <div style="margin-top: 1rem; font-size: 0.75rem; color: #94A3B8; text-align: center;">
-            <i class="fas fa-lock"></i> 256-bit Encrypted Identity Verification &bull; BCCI Chamber Policy
-          </div>
-        </div>
-      `
-    });
-
-    setTimeout(() => {
-      const gForm = document.getElementById('googleAuthModalForm');
-      if (gForm) {
-        gForm.addEventListener('submit', (e) => {
-          e.preventDefault();
-          const email = document.getElementById('googleEmailInput').value.trim();
-          const name = document.getElementById('googleNameInput').value.trim();
-          if (!email || !email.includes('@')) return;
-
-          this.closeModal();
-          callback({
-            email: email,
-            name: name || email.split('@')[0],
-            authenticatedAt: new Date().toISOString()
-          });
         });
       }
     }, 100);
