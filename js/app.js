@@ -28,6 +28,32 @@ class App {
     this.setupModalEvents();
     this.setupLightboxEvents();
     this.setupScrollToTop();
+    this.setupScrollReveal();
+  }
+
+  setupScrollReveal() {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.reveal, .stagger-children').forEach(el => observer.observe(el));
+
+    // Re-observe on view changes
+    this._revealObserver = observer;
+  }
+
+  _refreshScrollReveal() {
+    if (!this._revealObserver) return;
+    setTimeout(() => {
+      document.querySelectorAll('.reveal:not(.visible), .stagger-children:not(.visible)').forEach(el => {
+        this._revealObserver.observe(el);
+      });
+    }, 100);
   }
 
   setupScrollToTop() {
@@ -908,6 +934,9 @@ class App {
 
     // Show/hide scroll-to-top button
     this._updateScrollToTopBtn();
+
+    // Refresh scroll reveal for new content
+    this._refreshScrollReveal();
 
     document.querySelectorAll('.view-page').forEach(page => { page.style.display = 'none'; });
 

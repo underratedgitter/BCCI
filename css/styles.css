@@ -54,6 +54,7 @@
   --rule-accent: 1px solid var(--black);
 
   --transition: all 0.2s ease;
+  --transition-slow: all 0.4s cubic-bezier(0.25, 0.1, 0.25, 1);
   --max-width: 1200px;
 }
 
@@ -93,9 +94,59 @@ a {
   color: var(--black);
   text-decoration: none;
   transition: var(--transition);
+  position: relative;
 }
 
 a:hover { opacity: 0.6; }
+
+/* Underline animation for links */
+a.link-underline::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background: var(--black);
+  transition: width 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+a.link-underline:hover::after { width: 100%; }
+a.link-underline:hover { opacity: 1; }
+
+/* ── Scroll Reveal Animations ────────────────────────────────── */
+.reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s cubic-bezier(0.25, 0.1, 0.25, 1), transform 0.6s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.reveal-delay-1 { transition-delay: 0.1s; }
+.reveal-delay-2 { transition-delay: 0.2s; }
+.reveal-delay-3 { transition-delay: 0.3s; }
+.reveal-delay-4 { transition-delay: 0.4s; }
+
+/* Staggered children */
+.stagger-children > * {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.stagger-children.visible > *:nth-child(1) { transition-delay: 0.05s; }
+.stagger-children.visible > *:nth-child(2) { transition-delay: 0.1s; }
+.stagger-children.visible > *:nth-child(3) { transition-delay: 0.15s; }
+.stagger-children.visible > *:nth-child(4) { transition-delay: 0.2s; }
+.stagger-children.visible > *:nth-child(5) { transition-delay: 0.25s; }
+.stagger-children.visible > *:nth-child(6) { transition-delay: 0.3s; }
+.stagger-children.visible > *:nth-child(7) { transition-delay: 0.35s; }
+.stagger-children.visible > *:nth-child(8) { transition-delay: 0.4s; }
+.stagger-children.visible > * { opacity: 1; transform: translateY(0); }
 
 small, .mono {
   font-family: var(--font-mono);
@@ -103,6 +154,14 @@ small, .mono {
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+
+/* ── Refined Spacing Utilities ────────────────────────────────── */
+.tracking-wide { letter-spacing: 0.12em; }
+.tracking-tight { letter-spacing: -0.02em; }
+.uppercase { text-transform: uppercase; }
+.muted { color: var(--gray-400); }
+.rule-top { border-top: var(--rule); padding-top: var(--space-xl); }
+.rule-bottom { border-bottom: var(--rule); padding-bottom: var(--space-xl); }
 
 /* ==========================================================================
    TOP BAR
@@ -592,7 +651,10 @@ small, .mono {
   background: var(--warm-white);
   border: var(--rule);
   padding: var(--space-2xl);
+  transition: border-color 0.3s ease;
 }
+
+.hero-stats-card:hover { border-color: var(--gray-300); }
 
 .hero-stats-card h3 {
   font-size: 1rem;
@@ -646,7 +708,10 @@ small, .mono {
   border: var(--rule);
   object-fit: cover;
   filter: grayscale(20%);
+  transition: filter 0.5s ease;
 }
+
+.president-img:hover { filter: grayscale(0%); }
 
 .president-name {
   font-size: 1.1rem;
@@ -684,6 +749,10 @@ small, .mono {
 }
 
 .team-card:hover { background: var(--warm-white); }
+
+/* Image grayscale → color on team cards */
+.team-card:hover .team-avatar-img { filter: grayscale(0%); }
+.team-avatar-img { filter: grayscale(20%); transition: filter 0.5s ease; }
 
 .team-avatar {
   width: 64px;
@@ -844,6 +913,14 @@ small, .mono {
 
 .blog-img { width: 100%; height: 100%; object-fit: cover; object-position: top center; transition: transform 0.5s ease; }
 .blog-card:hover .blog-img { transform: scale(1.03); }
+
+/* Image treatment: grayscale → color on hover */
+.img-editorial {
+  filter: grayscale(15%);
+  transition: filter 0.5s ease, transform 0.5s ease;
+}
+
+.img-editorial:hover { filter: grayscale(0%); transform: scale(1.02); }
 
 .blog-tag {
   position: absolute;
