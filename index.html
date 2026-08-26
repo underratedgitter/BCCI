@@ -7,32 +7,16 @@
   <meta name="theme-color" content="#0F2C59" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="description"
-    content="Official portal of Bharuch Chamber of Commerce & Industry (BCCI). Apply for institutional membership, access trade support, verify certificates, and connect with Asia's industrial hub." />
-  <meta property="og:title" content="Bharuch Chamber of Commerce & Industry (BCCI) | Official Portal" />
-  <meta property="og:description"
-    content="Official portal of Bharuch Chamber of Commerce & Industry (BCCI). Apply for institutional membership and member services." />
-  <meta property="og:type" content="website" />
-  <meta property="og:image" content="assets/BCCIBHARUCH.webp" />
   <title>Bharuch Chamber of Commerce & Industry (BCCI) | Official Portal</title>
-  <!-- BCCI Favicon Icons for Browser Tab -->
-  <link rel="icon" type="image/webp" href="assets/BCCIBHARUCH.webp" />
-  <link rel="shortcut icon" type="image/webp" href="assets/BCCIBHARUCH.webp" />
-  <link rel="apple-touch-icon" href="assets/BCCIBHARUCH.webp" />
-
-  <!-- Google Fonts: Plus Jakarta Sans & Inter -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap"
-    rel="stylesheet" />
+  <meta name="description"
+    content="Official website of Bharuch Chamber of Commerce & Industry (BCCI) - Asia's largest industrial hub representing 12,000+ MSMEs and 625+ large industries." />
 
   <!-- FontAwesome 6 -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <!-- Google Identity Services SDK -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <!-- Custom Stylesheet (v11.0 Force Cache Refresh) -->
-  <link rel="stylesheet" href="css/styles.css?v=11.0.0" />
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="css/styles.css?v=2.4.0" />
 </head>
 
 <body>
@@ -46,9 +30,7 @@
         <span><i class="fas fa-map-marker-alt"></i> City Center, Station Road, Bharuch - 392001</span>
       </div>
       <div>
-        <span class="top-bar-badge"><img src="assets/BCCIBHARUCH.webp" alt="BCCI Logo"
-            style="height: 18px; width: 18px; object-fit: contain; vertical-align: middle; border-radius: 50%;" />
-          Asia's Largest Industrial Hub</span>
+        <span class="top-bar-badge"><i class="fas fa-globe-asia"></i> Asia's Largest Industrial Hub</span>
       </div>
     </div>
   </div>
@@ -647,64 +629,45 @@
           membership accounts remain in <u>Pending Status</u> until reviewed and approved by the BCCI Administration.
         </div>
 
-        <!-- Compact Login Action Banner (Appears above membership form) -->
-        <div id="alreadyMemberBanner"
-          style="max-width: 860px; margin: 0 auto 1.5rem auto; background: linear-gradient(135deg, #0F2C59 0%, #1E3E62 100%); border: 1px solid #D4AF37; border-radius: var(--radius-md); padding: 1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; color: #FFFFFF; box-shadow: 0 4px 15px rgba(15, 44, 89, 0.1);">
-          <div style="display: flex; align-items: center; gap: 0.75rem;">
-            <i class="fas fa-user-check" style="color: #FFD700; font-size: 1.25rem;"></i>
-            <div>
-              <strong style="color: #FFFFFF; font-size: 0.95rem;">Already Registered or Returning Applicant?</strong>
-              <div style="color: #94A3B8; font-size: 0.825rem;">Log in using Google, Email OTP, or Mobile Phone Number.
-              </div>
-            </div>
+        <!-- Unified Executive Authentication Suite (Appears when NOT signed in) -->
+        <div id="applicantAuthGate" style="max-width: 650px; margin: 0 auto 2.5rem auto; background: linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%); border: 1px solid var(--border-color); border-top: 4px solid #D4AF37; border-radius: var(--radius-lg); padding: 2.5rem 2rem; box-shadow: 0 15px 35px rgba(15,44,89,0.1); text-align: center; position: relative; overflow: hidden;">
+          <div style="width: 80px; height: 80px; background: #FFFFFF; border: 3px solid #D4AF37; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 1.25rem; box-shadow: 0 8px 20px rgba(15,44,89,0.15); padding: 6px;" class="bcci-gate-logo-container">
+            <img src="assets/BCCIBHARUCH.webp" alt="BCCI Bharuch Logo" style="width: 100%; height: 100%; object-fit: contain; border-radius: 50%;" />
           </div>
-          <button type="button" id="toggleAuthGateBtn" class="btn-secondary"
-            style="padding: 0.5rem 1.1rem; font-size: 0.85rem; color: #FFD700; border-color: #D4AF37; background: rgba(212,175,55,0.1); font-weight: 700; cursor: pointer;">
-            <i class="fas fa-sign-in-alt"></i> Click here to Log In
-          </button>
-        </div>
-
-        <!-- Unified Executive Authentication Suite (Collapsible / Expandable) -->
-        <div id="applicantAuthGate"
-          style="display: none; max-width: 650px; margin: 0 auto 2.5rem auto; background: linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%); border: 1px solid var(--border-color); border-top: 4px solid #D4AF37; border-radius: var(--radius-lg); padding: 2.5rem 2rem; box-shadow: 0 15px 35px rgba(15,44,89,0.1); text-align: center; position: relative; overflow: hidden;">
-          <div
-            style="width: 80px; height: 80px; background: #FFFFFF; border: 3px solid #D4AF37; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 1.25rem; box-shadow: 0 8px 20px rgba(15,44,89,0.15); padding: 6px;"
-            class="bcci-gate-logo-container">
-            <img src="assets/BCCIBHARUCH.webp" alt="BCCI Bharuch Logo"
-              style="width: 100%; height: 100%; object-fit: contain; border-radius: 50%;" />
-          </div>
-          <h3
-            style="font-size: 1.45rem; font-weight: 800; color: var(--primary); margin-bottom: 0.35rem; letter-spacing: -0.3px;">
-            Applicant Authentication Gate</h3>
+          <h3 style="font-size: 1.45rem; font-weight: 800; color: var(--primary); margin-bottom: 0.35rem; letter-spacing: -0.3px;">Applicant Authentication Gate</h3>
           <p style="color: #64748B; font-size: 0.95rem; margin-bottom: 1.75rem; line-height: 1.55;">
-            Authenticate with <strong>Google Account</strong>, <strong>Email OTP</strong>, or <strong>Mobile Phone
-              Number</strong> to log in and check your membership status.
+            To verify applicant identity and prevent spam, please authenticate with your <strong>Google Account</strong> or <strong>Business Email OTP</strong> to unlock the membership application.
           </p>
 
           <!-- Tab Navigation for Authentication Options -->
-          <div
-            style="display: flex; gap: 0.35rem; background: #F1F5F9; padding: 4px; border-radius: 10px; margin-bottom: 1.5rem; flex-wrap: wrap;">
-            <button type="button" id="tabBtnGoogle" class="auth-tab-btn active"
-              style="flex: 1; min-width: 130px; padding: 0.65rem 0.5rem; border: none; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; background: #FFFFFF; color: var(--primary); box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: all 0.2s;">
-              <i class="fab fa-google" style="color: #4285F4; margin-right: 4px;"></i> Google
+          <div style="display: flex; gap: 0.5rem; background: #F1F5F9; padding: 4px; border-radius: 10px; margin-bottom: 1.5rem;">
+            <button type="button" id="tabBtnGoogle" class="auth-tab-btn active" style="flex: 1; padding: 0.65rem; border: none; border-radius: 8px; font-weight: 700; font-size: 0.88rem; cursor: pointer; background: #FFFFFF; color: var(--primary); box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: all 0.2s;">
+              <i class="fab fa-google" style="color: #4285F4; margin-right: 6px;"></i> Google Sign-In
             </button>
-            <button type="button" id="tabBtnOtp" class="auth-tab-btn"
-              style="flex: 1; min-width: 130px; padding: 0.65rem 0.5rem; border: none; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; background: transparent; color: #64748B; transition: all 0.2s;">
-              <i class="fas fa-envelope" style="color: #D97706; margin-right: 4px;"></i> Email OTP
-            </button>
-            <button type="button" id="tabBtnPhone" class="auth-tab-btn"
-              style="flex: 1; min-width: 130px; padding: 0.65rem 0.5rem; border: none; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; background: transparent; color: #64748B; transition: all 0.2s;">
-              <i class="fas fa-mobile-alt" style="color: #10B981; margin-right: 4px;"></i> Phone OTP
+            <button type="button" id="tabBtnOtp" class="auth-tab-btn" style="flex: 1; padding: 0.65rem; border: none; border-radius: 8px; font-weight: 700; font-size: 0.88rem; cursor: pointer; background: transparent; color: #64748B; transition: all 0.2s;">
+              <i class="fas fa-key" style="color: #D97706; margin-right: 6px;"></i> Email OTP Verification
             </button>
           </div>
 
           <!-- Section 1: Google Sign-In Panel -->
           <div id="authPanelGoogle" style="display: block;">
             <div style="display: flex; flex-direction: column; gap: 0.75rem; align-items: center; justify-content: center; margin-bottom: 1rem;">
-              <button type="button" id="googleSignInBtn" class="btn-secondary"
-                style="width: 100%; max-width: 320px; justify-content: center; padding: 0.8rem 1.2rem; border: 1px solid #CBD5E1; background: #FFFFFF; color: #0F172A; font-weight: 700; font-size: 0.95rem; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); cursor: pointer; display: inline-flex; align-items: center; gap: 10px;">
-                <i class="fab fa-google" style="color: #4285F4; font-size: 1.15rem;"></i> Continue with Google
-              </button>
+              <div id="g_id_onload"
+                   data-client_id="984292781459-1lstfue0bjhde1fachhk2264gcbb9ot7.apps.googleusercontent.com"
+                   data-context="signin"
+                   data-ux_mode="popup"
+                   data-callback="handleGoogleCredentialResponse"
+                   data-auto_prompt="false">
+              </div>
+              <div class="g_id_signin"
+                   data-type="standard"
+                   data-shape="rectangular"
+                   data-theme="outline"
+                   data-text="signin_with"
+                   data-size="large"
+                   data-logo_alignment="left"
+                   data-width="320">
+              </div>
             </div>
           </div>
 
@@ -713,439 +676,359 @@
             <form id="otpStep1Form">
               <div class="form-group" style="margin-bottom: 1.25rem;">
                 <label class="form-label">Official Business Email Address <span class="req">*</span></label>
-                <input type="email" id="otpEmailInput" class="form-control" placeholder="e.g. delegate@company.com"
-                  required />
+                <input type="email" id="otpEmailInput" class="form-control" placeholder="e.g. delegate@company.com" required />
               </div>
               <div class="form-group" style="margin-bottom: 1.5rem;">
                 <label class="form-label">Representative Name <span class="req">*</span></label>
                 <input type="text" id="otpNameInput" class="form-control" placeholder="e.g. Rajesh Shah" required />
               </div>
-              <button type="submit" class="btn-primary"
-                style="width: 100%; justify-content: center; font-weight: 700; padding: 0.75rem; background: var(--primary);">
+              <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; font-weight: 700; padding: 0.75rem; background: var(--primary);">
                 <i class="fas fa-paper-plane"></i> Send Verification Passcode
               </button>
             </form>
 
             <form id="otpStep2Form" style="display: none; margin-top: 1rem;">
-              <div
-                style="background: #FEF3C7; border: 1px solid #FDE68A; color: #92400E; padding: 0.85rem; border-radius: 8px; margin-bottom: 1.25rem; font-size: 0.85rem;"
-                id="otpNoticeBanner">
-                <i class="fas fa-info-circle"></i> Verification passcode sent to your email. Enter the 4-digit code
-                below to unlock.
+              <div style="background: #FEF3C7; border: 1px solid #FDE68A; color: #92400E; padding: 0.85rem; border-radius: 8px; margin-bottom: 1.25rem; font-size: 0.85rem;" id="otpNoticeBanner">
+                <i class="fas fa-info-circle"></i> Verification passcode sent to your email. Enter the 4-digit code below to unlock.
               </div>
               <div class="form-group" style="margin-bottom: 1.25rem;">
                 <label class="form-label">Enter 4-Digit Passcode <span class="req">*</span></label>
-                <input type="text" id="otpCodeInput" class="form-control" placeholder="e.g. 7402" maxlength="4"
-                  style="letter-spacing: 4px; font-size: 1.2rem; font-weight: 700; text-align: center;" required />
+                <input type="text" id="otpCodeInput" class="form-control" placeholder="e.g. 7402" maxlength="4" style="letter-spacing: 4px; font-size: 1.2rem; font-weight: 700; text-align: center;" required />
               </div>
-              <button type="submit" class="btn-primary"
-                style="width: 100%; justify-content: center; font-weight: 700; padding: 0.75rem; background: #10B981; border-color: #059669;">
+              <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; font-weight: 700; padding: 0.75rem; background: #10B981; border-color: #059669;">
                 <i class="fas fa-check-circle"></i> Verify Code &amp; Access Form
               </button>
             </form>
           </div>
 
-          <!-- Section 3: Phone Number OTP Verification Panel -->
-          <div id="authPanelPhone" style="display: none; text-align: left;">
-            <form id="phoneStep1Form">
-              <div class="form-group" style="margin-bottom: 1.25rem;">
-                <label class="form-label">Mobile Phone Number <span class="req">*</span></label>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                  <span
-                    style="padding: 0.75rem; background: #F1F5F9; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-weight: 700; color: var(--primary);">+91</span>
-                  <input type="tel" id="phoneNumInput" class="form-control" placeholder="e.g. 9876543210"
-                    pattern="[0-9]{10}" maxlength="10" required />
-                </div>
-              </div>
-              <div class="form-group" style="margin-bottom: 1.5rem;">
-                <label class="form-label">Representative Name <span class="req">*</span></label>
-                <input type="text" id="phoneNameInput" class="form-control" placeholder="e.g. Rajesh Shah" required />
-              </div>
-
-              <button type="submit" class="btn-primary"
-                style="width: 100%; justify-content: center; font-weight: 700; padding: 0.75rem; background: var(--primary);">
-                <i class="fas fa-mobile-alt"></i> Send Mobile Passcode
-              </button>
-            </form>
-
-            <form id="phoneStep2Form" style="display: none; margin-top: 1rem;">
-              <div
-                style="background: #E0F2FE; border: 1px solid #BAE6FD; color: #075985; padding: 0.85rem; border-radius: 8px; margin-bottom: 1.25rem; font-size: 0.85rem;"
-                id="phoneNoticeBanner">
-                <i class="fas fa-sms"></i> An SMS verification code has been dispatched to your mobile phone number.
-                Enter the code below to log in.
-              </div>
-              <div class="form-group" style="margin-bottom: 1.25rem;">
-                <label class="form-label">Enter SMS Verification Code <span class="req">*</span></label>
-                <input type="text" id="phoneCodeInput" class="form-control" placeholder="e.g. 123456" maxlength="6"
-                  style="letter-spacing: 4px; font-size: 1.2rem; font-weight: 700; text-align: center;" required />
-              </div>
-              <button type="submit" class="btn-primary"
-                style="width: 100%; justify-content: center; font-weight: 700; padding: 0.75rem; background: #10B981; border-color: #059669;">
-                <i class="fas fa-check-circle"></i> Verify Code &amp; Log In
-              </button>
-            </form>
-          </div>
-
-          <div
-            style="margin-top: 1.25rem; font-size: 0.8rem; color: #94A3B8; display: flex; align-items: center; justify-content: center; gap: 0.4rem; border-top: 1px solid #F1F5F9; padding-top: 1rem;">
+          <div style="margin-top: 1.25rem; font-size: 0.8rem; color: #94A3B8; display: flex; align-items: center; justify-content: center; gap: 0.4rem; border-top: 1px solid #F1F5F9; padding-top: 1rem;">
             <i class="fas fa-lock"></i> 256-bit Encrypted Identity Protocol &bull; BCCI Chamber Security Policy
           </div>
         </div>
 
         <!-- Executive Verified Applicant Identity Banner (Appears when signed in) -->
-        <div id="applicantAuthBanner"
-          style="display: none; max-width: 860px; margin: 0 auto 2rem auto; background: linear-gradient(135deg, #0F2C59 0%, #1E3E62 100%); border: 1px solid #D4AF37; border-radius: var(--radius-lg); padding: 1.25rem 1.5rem; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; box-shadow: 0 10px 25px rgba(15, 44, 89, 0.15);">
+        <div id="applicantAuthBanner" style="display: none; max-width: 860px; margin: 0 auto 2rem auto; background: linear-gradient(135deg, #0F2C59 0%, #1E3E62 100%); border: 1px solid #D4AF37; border-radius: var(--radius-lg); padding: 1.25rem 1.5rem; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; box-shadow: 0 10px 25px rgba(15, 44, 89, 0.15);">
           <div style="display: flex; align-items: center; gap: 1rem;">
-            <div
-              style="width: 48px; height: 48px; background: rgba(212, 175, 55, 0.18); border: 2px solid #D4AF37; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #FFD700; font-weight: 800; font-size: 1.2rem;"
-              id="applicantAvatarInitial">G</div>
+            <div style="width: 48px; height: 48px; background: rgba(212, 175, 55, 0.18); border: 2px solid #D4AF37; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #FFD700; font-weight: 800; font-size: 1.2rem;" id="applicantAvatarInitial">G</div>
             <div>
-              <div
-                style="font-size: 0.8rem; color: #D4AF37; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; display: flex; align-items: center; gap: 6px;">
+              <div style="font-size: 0.8rem; color: #D4AF37; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; display: flex; align-items: center; gap: 6px;">
                 <i class="fas fa-shield-alt"></i> Verified Applicant Profile &bull; Official BCCI Portal
               </div>
-              <div style="font-size: 1.05rem; color: #FFFFFF; font-weight: 700; margin-top: 2px;"
-                id="applicantEmailDisplay"></div>
+              <div style="font-size: 1.05rem; color: #FFFFFF; font-weight: 700; margin-top: 2px;" id="applicantEmailDisplay"></div>
             </div>
           </div>
-          <button type="button" id="applicantSignOutBtn" class="btn-secondary"
-            style="padding: 0.4rem 0.95rem; font-size: 0.8rem; color: #FFD700; border-color: #D4AF37; background: rgba(255,255,255,0.05); font-weight: 600;">
+          <button type="button" id="applicantSignOutBtn" class="btn-secondary" style="padding: 0.4rem 0.95rem; font-size: 0.8rem; color: #FFD700; border-color: #D4AF37; background: rgba(255,255,255,0.05); font-weight: 600;">
             <i class="fas fa-sign-out-alt"></i> Switch Account
           </button>
         </div>
 
-        <div id="membershipFormWrapper" style="max-width: 1200px; margin: 0 auto;">
-          <div class="membership-layout-grid"
-            style="display: grid; grid-template-columns: 1fr 340px; gap: 2rem; align-items: start;">
+        <div id="membershipFormWrapper" style="display: none; max-width: 1200px; margin: 0 auto;">
+          <div class="membership-layout-grid" style="display: grid; grid-template-columns: 1fr 340px; gap: 2rem; align-items: start;">
             <!-- Left Column: Membership Form -->
             <div class="form-container" style="max-width: 100%; margin: 0;">
               <form id="membershipForm">
                 <h3 style="color: var(--primary); margin-bottom: 1.5rem; font-size: 1.2rem;">
                   <i class="fas fa-building"></i> Company &amp; Entity Profile
                 </h3>
-                <div class="form-grid">
-                  <div class="form-group full-width">
-                    <label class="form-label">Registered Enterprise / Firm Name <span class="req">*</span></label>
-                    <input type="text" class="form-control" name="company"
-                      placeholder="e.g. Gujarat Petrochem Synthetics Ltd." required />
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Legal Status <span class="req">*</span></label>
-                    <select class="form-select" name="legalStatus" required>
-                      <option value="Pvt. Ltd.">Private Limited (Pvt. Ltd.)</option>
-                      <option value="Public Ltd.">Public Limited</option>
-                      <option value="Partnership">Partnership Firm</option>
-                      <option value="LLP">Limited Liability Partnership (LLP)</option>
-                      <option value="Proprietorship">Proprietorship</option>
-                      <option value="Trust/Society">Trust / Society</option>
-                    </select>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Enterprise Category <span class="req">*</span></label>
-                    <select class="form-select" name="enterpriseType" required>
-                      <option value="Micro">Micro Enterprise</option>
-                      <option value="Small">Small Enterprise</option>
-                      <option value="Medium">Medium Enterprise</option>
-                      <option value="Large">Large / Multinational</option>
-                    </select>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Primary Business Services <span class="req">*</span></label>
-                    <select class="form-select" name="businessServices" required>
-                      <option value="Chemical & Petrochemicals">Chemical &amp; Petrochemicals</option>
-                      <option value="Pharmaceuticals">Pharmaceuticals</option>
-                      <option value="Information Technology">Information Technology &amp; AI</option>
-                      <option value="Textile & Garments">Textile &amp; Garments</option>
-                      <option value="Power & Energy">Power &amp; Energy</option>
-                      <option value="International Trade">International Trade &amp; Logistics</option>
-                      <option value="Basic Product Industry">Basic Product Industry (Cement, Glass, Metal)</option>
-                    </select>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Annual Turnover (INR)</label>
-                    <input type="text" class="form-control" name="annualTurnover" placeholder="e.g. 25 Crore" />
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Total Employee Headcount</label>
-                    <input type="number" class="form-control" name="employees" placeholder="e.g. 150" />
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">GSTIN Number <span class="req">*</span></label>
-                    <input type="text" class="form-control" name="gstNo" placeholder="e.g. 24AAAAA0000A1Z5"
-                      maxlength="15" pattern="^[0-9]{2}[A-Za-z]{5}[0-9]{4}[A-Za-z]{1}[1-9A-Za-z]{1}[Zz][0-9A-Za-z]{1}$"
-                      autocomplete="off" required />
-                    <small class="form-hint">15-character GSTIN (auto-uppercase)</small>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">PAN Number <span class="req">*</span></label>
-                    <input type="text" class="form-control" name="panNo" placeholder="e.g. ABCDE1234F" maxlength="10"
-                      pattern="^[A-Za-z]{5}[0-9]{4}[A-Za-z]{1}$" autocomplete="off" required />
-                    <small class="form-hint">10-character PAN (auto-uppercase)</small>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">CIN (If Corporate)</label>
-                    <input type="text" class="form-control" name="cin" placeholder="e.g. L24110GJ1998PLC034120"
-                      maxlength="21" pattern="^[LUu][0-9]{5}[A-Za-z]{2}[0-9]{4}[A-Za-z]{3}[0-9]{6}$"
-                      autocomplete="off" />
-                    <small class="form-hint">21-character Corporate ID (if applicable)</small>
-                  </div>
+            <div class="form-grid">
+              <div class="form-group full-width">
+                <label class="form-label">Registered Enterprise / Firm Name <span class="req">*</span></label>
+                <input type="text" class="form-control" name="company"
+                  placeholder="e.g. Gujarat Petrochem Synthetics Ltd." required />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Legal Status <span class="req">*</span></label>
+                <select class="form-select" name="legalStatus" required>
+                  <option value="Pvt. Ltd.">Private Limited (Pvt. Ltd.)</option>
+                  <option value="Public Ltd.">Public Limited</option>
+                  <option value="Partnership">Partnership Firm</option>
+                  <option value="LLP">Limited Liability Partnership (LLP)</option>
+                  <option value="Proprietorship">Proprietorship</option>
+                  <option value="Trust/Society">Trust / Society</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Enterprise Category <span class="req">*</span></label>
+                <select class="form-select" name="enterpriseType" required>
+                  <option value="Micro">Micro Enterprise</option>
+                  <option value="Small">Small Enterprise</option>
+                  <option value="Medium">Medium Enterprise</option>
+                  <option value="Large">Large / Multinational</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Primary Business Services <span class="req">*</span></label>
+                <select class="form-select" name="businessServices" required>
+                  <option value="Chemical & Petrochemicals">Chemical &amp; Petrochemicals</option>
+                  <option value="Pharmaceuticals">Pharmaceuticals</option>
+                  <option value="Information Technology">Information Technology &amp; AI</option>
+                  <option value="Textile & Garments">Textile &amp; Garments</option>
+                  <option value="Power & Energy">Power &amp; Energy</option>
+                  <option value="International Trade">International Trade &amp; Logistics</option>
+                  <option value="Basic Product Industry">Basic Product Industry (Cement, Glass, Metal)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Annual Turnover (INR)</label>
+                <input type="text" class="form-control" name="annualTurnover" placeholder="e.g. 25 Crore" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Total Employee Headcount</label>
+                <input type="number" class="form-control" name="employees" placeholder="e.g. 150" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">GSTIN Number <span class="req">*</span></label>
+                <input type="text" class="form-control" name="gstNo" placeholder="e.g. 24AAAAA0000A1Z5" maxlength="15"
+                  pattern="^[0-9]{2}[A-Za-z]{5}[0-9]{4}[A-Za-z]{1}[1-9A-Za-z]{1}[Zz][0-9A-Za-z]{1}$" autocomplete="off"
+                  required />
+                <small class="form-hint">15-character GSTIN (auto-uppercase)</small>
+              </div>
+              <div class="form-group">
+                <label class="form-label">PAN Number <span class="req">*</span></label>
+                <input type="text" class="form-control" name="panNo" placeholder="e.g. ABCDE1234F" maxlength="10"
+                  pattern="^[A-Za-z]{5}[0-9]{4}[A-Za-z]{1}$" autocomplete="off" required />
+                <small class="form-hint">10-character PAN (auto-uppercase)</small>
+              </div>
+              <div class="form-group">
+                <label class="form-label">CIN (If Corporate)</label>
+                <input type="text" class="form-control" name="cin" placeholder="e.g. L24110GJ1998PLC034120"
+                  maxlength="21" pattern="^[LUu][0-9]{5}[A-Za-z]{2}[0-9]{4}[A-Za-z]{3}[0-9]{6}$" autocomplete="off" />
+                <small class="form-hint">21-character Corporate ID (if applicable)</small>
+              </div>
 
-                  <div class="form-group full-width" style="margin-top: 1rem;">
-                    <h3 style="color: var(--primary); margin-bottom: 1rem; font-size: 1.2rem;">
-                      <i class="fas fa-map-marked-alt"></i> Address &amp; Location
-                    </h3>
-                  </div>
-                  <div class="form-group full-width">
-                    <label class="form-label">Office / Plant Address <span class="req">*</span></label>
-                    <input type="text" class="form-control" name="address"
-                      placeholder="Enter Full Street / GIDC Address" required />
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">District <span class="req">*</span></label>
-                    <select class="form-select" name="district" required>
-                      <option value="Bharuch" selected>Bharuch</option>
-                      <option value="Surat">Surat</option>
-                      <option value="Vadodara">Vadodara</option>
-                      <option value="Anand">Anand</option>
-                      <option value="Ahmedabad">Ahmedabad</option>
-                    </select>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Pincode <span class="req">*</span></label>
-                    <input type="text" class="form-control" name="pincode" placeholder="e.g. 392001" maxlength="6"
-                      pattern="^[1-9][0-9]{5}$" autocomplete="off" required />
-                    <small class="form-hint">6-digit postal pincode</small>
-                  </div>
+              <div class="form-group full-width" style="margin-top: 1rem;">
+                <h3 style="color: var(--primary); margin-bottom: 1rem; font-size: 1.2rem;">
+                  <i class="fas fa-map-marked-alt"></i> Address &amp; Location
+                </h3>
+              </div>
+              <div class="form-group full-width">
+                <label class="form-label">Office / Plant Address <span class="req">*</span></label>
+                <input type="text" class="form-control" name="address" placeholder="Enter Full Street / GIDC Address"
+                  required />
+              </div>
+              <div class="form-group">
+                <label class="form-label">District <span class="req">*</span></label>
+                <select class="form-select" name="district" required>
+                  <option value="Bharuch" selected>Bharuch</option>
+                  <option value="Surat">Surat</option>
+                  <option value="Vadodara">Vadodara</option>
+                  <option value="Anand">Anand</option>
+                  <option value="Ahmedabad">Ahmedabad</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Pincode <span class="req">*</span></label>
+                <input type="text" class="form-control" name="pincode" placeholder="e.g. 392001" maxlength="6"
+                  pattern="^[1-9][0-9]{5}$" autocomplete="off" required />
+                <small class="form-hint">6-digit postal pincode</small>
+              </div>
 
-                  <div class="form-group full-width" style="margin-top: 1rem;">
-                    <h3 style="color: var(--primary); margin-bottom: 1rem; font-size: 1.2rem;">
-                      <i class="fas fa-user-tie"></i> Authorized Representative
-                    </h3>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Representative Name <span class="req">*</span></label>
-                    <input type="text" class="form-control" name="repName" placeholder="Full Name" required />
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Designation <span class="req">*</span></label>
-                    <input type="text" class="form-control" name="repDesignation"
-                      placeholder="e.g. Managing Director / CEO" required />
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Official Email <span class="req">*</span></label>
-                    <input type="email" class="form-control" name="email" placeholder="admin@company.com" required />
-                    <small class="form-hint">Valid official email ID</small>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Mobile Number <span class="req">*</span></label>
-                    <input type="tel" class="form-control" name="phone" placeholder="e.g. 9825012345" maxlength="10"
-                      pattern="^[6-9][0-9]{9}$" autocomplete="off" required />
-                    <small class="form-hint">10-digit Indian Mobile Number</small>
-                  </div>
+              <div class="form-group full-width" style="margin-top: 1rem;">
+                <h3 style="color: var(--primary); margin-bottom: 1rem; font-size: 1.2rem;">
+                  <i class="fas fa-user-tie"></i> Authorized Representative
+                </h3>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Representative Name <span class="req">*</span></label>
+                <input type="text" class="form-control" name="repName" placeholder="Full Name" required />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Designation <span class="req">*</span></label>
+                <input type="text" class="form-control" name="repDesignation" placeholder="e.g. Managing Director / CEO"
+                  required />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Official Email <span class="req">*</span></label>
+                <input type="email" class="form-control" name="email" placeholder="admin@company.com" required />
+                <small class="form-hint">Valid official email ID</small>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Mobile Number <span class="req">*</span></label>
+                <input type="tel" class="form-control" name="phone" placeholder="e.g. 9825012345" maxlength="10"
+                  pattern="^[6-9][0-9]{9}$" autocomplete="off" required />
+                <small class="form-hint">10-digit Indian Mobile Number</small>
+              </div>
 
-                  <!-- MEMBERSHIP FEE PAYMENT & QR CODE SECTION AT LAST -->
-                  <div class="form-group full-width" style="margin-top: 2rem;">
-                    <div class="form-qr-payment-container">
-                      <h3
-                        style="color: var(--primary); margin-bottom: 0.5rem; font-size: 1.25rem; display: flex; align-items: center; gap: 0.5rem;">
-                        <i class="fas fa-qrcode" style="color: var(--accent-gold-dark);"></i> Step 2: Membership Payment
-                        &amp; QR Code
-                      </h3>
-                      <p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1.25rem;">
-                        Scan the official BCCI ICICI Bank UPI QR code below to complete membership payment, or attach
-                        your
-                        payment transaction UTR reference number.
-                      </p>
+              <!-- MEMBERSHIP FEE PAYMENT & QR CODE SECTION AT LAST -->
+              <div class="form-group full-width" style="margin-top: 2rem;">
+                <div class="form-qr-payment-container">
+                  <h3
+                    style="color: var(--primary); margin-bottom: 0.5rem; font-size: 1.25rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <i class="fas fa-qrcode" style="color: var(--accent-gold-dark);"></i> Step 2: Membership Payment
+                    &amp; QR Code
+                  </h3>
+                  <p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1.25rem;">
+                    Scan the official BCCI ICICI Bank UPI QR code below to complete membership payment, or attach your
+                    payment transaction UTR reference number.
+                  </p>
 
-                      <div class="form-qr-grid">
-                        <div class="form-qr-preview-card">
-                          <img src="assets/banks.webp" alt="BCCI Official Scan and Pay QR Poster" class="form-qr-img"
-                            data-lightbox />
-                          <div style="margin-top: 0.5rem; text-align: center;">
-                            <small style="color: var(--text-muted); font-weight: 500;"><i
-                                class="fas fa-search-plus"></i>
-                              Tap poster to enlarge</small>
-                          </div>
-                        </div>
+                  <div class="form-qr-grid">
+                    <div class="form-qr-preview-card">
+                      <img src="assets/banks.webp" alt="BCCI Official Scan and Pay QR Poster" class="form-qr-img"
+                        data-lightbox />
+                      <div style="margin-top: 0.5rem; text-align: center;">
+                        <small style="color: var(--text-muted); font-weight: 500;"><i class="fas fa-search-plus"></i>
+                          Tap poster to enlarge</small>
+                      </div>
+                    </div>
 
-                        <div class="form-qr-details">
-                          <div
-                            style="background: #F8FAFC; border: 1px solid var(--border-color); padding: 1.25rem; border-radius: var(--radius-md); margin-bottom: 1rem;">
-                            <h4 style="color: var(--primary); font-size: 0.95rem; margin-bottom: 0.75rem;">
-                              <i class="fas fa-building-columns"></i> Official Beneficiary Details
-                            </h4>
-                            <p style="font-size: 0.85rem; color: var(--text-main); margin-bottom: 0.4rem;">
-                              <strong>Account Name:</strong> M/S. BHARUCH CHAMBER OF COMMERCE AND INDUSTRY
-                            </p>
-                            <p style="font-size: 0.85rem; color: var(--text-main); margin-bottom: 0.4rem;">
-                              <strong>Bank:</strong> ICICI Bank
-                            </p>
-                            <p style="font-size: 0.85rem; color: var(--primary); margin-bottom: 0.4rem;">
-                              <strong>UPI ID:</strong> <code
-                                style="background: #EFF6FF; padding: 2px 6px; border-radius: 4px; color: var(--accent-blue); font-weight: 700;">7861906384.eazypay@icici</code>
-                            </p>
-                            <p style="font-size: 0.8rem; color: var(--text-muted);">
-                              <i class="fas fa-phone-alt" style="color: var(--success);"></i> Support Helpline: +91
-                              7861906384 | info@bccibharuch.in
-                            </p>
-                          </div>
-
-                          <div class="form-group">
-                            <label class="form-label">Payment UTR / Transaction Ref No. (Optional)</label>
-                            <input type="text" class="form-control" name="paymentRef"
-                              placeholder="e.g. UPI/423589012345" />
-                            <small style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.2rem;">
-                              If you have already paid via UPI, enter your transaction ID here for instant payment
-                              matching
-                              by BCCI Admin.
-                            </small>
-                          </div>
-                        </div>
+                    <div class="form-qr-details">
+                      <div
+                        style="background: #F8FAFC; border: 1px solid var(--border-color); padding: 1.25rem; border-radius: var(--radius-md); margin-bottom: 1rem;">
+                        <h4 style="color: var(--primary); font-size: 0.95rem; margin-bottom: 0.75rem;">
+                          <i class="fas fa-building-columns"></i> Official Beneficiary Details
+                        </h4>
+                        <p style="font-size: 0.85rem; color: var(--text-main); margin-bottom: 0.4rem;">
+                          <strong>Account Name:</strong> M/S. BHARUCH CHAMBER OF COMMERCE AND INDUSTRY
+                        </p>
+                        <p style="font-size: 0.85rem; color: var(--text-main); margin-bottom: 0.4rem;">
+                          <strong>Bank:</strong> ICICI Bank
+                        </p>
+                        <p style="font-size: 0.85rem; color: var(--primary); margin-bottom: 0.4rem;">
+                          <strong>UPI ID:</strong> <code
+                            style="background: #EFF6FF; padding: 2px 6px; border-radius: 4px; color: var(--accent-blue); font-weight: 700;">7861906384.eazypay@icici</code>
+                        </p>
+                        <p style="font-size: 0.8rem; color: var(--text-muted);">
+                          <i class="fas fa-phone-alt" style="color: var(--success);"></i> Support Helpline: +91
+                          7861906384 | info@bccibharuch.in
+                        </p>
                       </div>
 
-                      <!-- PROMINENT DEDICATED FULL-WIDTH PAYMENT PROOF SCREENSHOT UPLOAD SECTION -->
-                      <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed var(--border-color);">
-                        <h3
-                          style="color: var(--primary); margin-bottom: 0.5rem; font-size: 1.15rem; display: flex; align-items: center; gap: 0.5rem;">
-                          <i class="fas fa-camera" style="color: var(--accent-gold-dark);"></i> Upload Payment Receipt
-                          Screenshot <span class="req">*</span>
-                        </h3>
-                        <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
-                          Please attach a clear photo or screenshot of your successful UPI / Bank payment transfer for
-                          Admin
-                          verification.
-                        </p>
+                      <div class="form-group">
+                        <label class="form-label">Payment UTR / Transaction Ref No. (Optional)</label>
+                        <input type="text" class="form-control" name="paymentRef" placeholder="e.g. UPI/423589012345" />
+                        <small style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.2rem;">
+                          If you have already paid via UPI, enter your transaction ID here for instant payment matching
+                          by BCCI Admin.
+                        </small>
+                      </div>
+                    </div>
+                  </div>
 
-                        <div class="file-upload-box" id="paymentProofDropzone"
-                          style="background: #FFFFFF; border: 2px dashed #93C5FD; border-radius: var(--radius-md); padding: 1.75rem 1.25rem; text-align: center; cursor: pointer;">
-                          <input type="file" name="paymentProof" id="paymentProofInput" accept="image/*"
-                            class="file-upload-input" required />
-                          <div class="file-upload-content" id="paymentProofPlaceholder">
-                            <div
-                              style="width: 56px; height: 56px; background: #EFF6FF; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--primary); font-size: 1.5rem; margin-bottom: 0.75rem;">
-                              <i class="fas fa-cloud-upload-alt"></i>
-                            </div>
-                            <div
-                              style="font-weight: 700; font-size: 0.95rem; color: var(--primary); margin-bottom: 0.25rem;">
-                              Click here to choose file OR Drag &amp; Drop your Payment Screenshot
-                            </div>
-                            <span
-                              style="display: inline-block; background: #DBEAFE; color: #1E40AF; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; margin-top: 0.25rem;">
-                              Supports JPG, PNG, WEBP (Max 5MB)
-                            </span>
-                          </div>
-                          <div class="file-upload-preview" id="paymentProofPreview" style="display: none;">
-                            <img id="paymentProofImg" src="" alt="Payment Receipt Screenshot"
-                              style="max-height: 220px; border-radius: var(--radius-md); border: 2px solid var(--primary); box-shadow: var(--shadow-md); display: inline-block;" />
-                            <div
-                              style="margin-top: 0.75rem; display: flex; align-items: center; justify-content: center; gap: 0.75rem;">
-                              <span id="paymentProofFileName"
-                                style="font-size: 0.875rem; font-weight: 700; color: var(--primary);"></span>
-                              <button type="button" id="removePaymentProofBtn" class="btn-secondary"
-                                style="padding: 0.3rem 0.75rem; font-size: 0.8rem; color: #DC2626; border-color: #FCA5A5; background: #FEF2F2;">
-                                <i class="fas fa-trash-alt"></i> Remove &amp; Re-upload
-                              </button>
-                            </div>
-                          </div>
+                  <!-- PROMINENT DEDICATED FULL-WIDTH PAYMENT PROOF SCREENSHOT UPLOAD SECTION -->
+                  <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed var(--border-color);">
+                    <h3
+                      style="color: var(--primary); margin-bottom: 0.5rem; font-size: 1.15rem; display: flex; align-items: center; gap: 0.5rem;">
+                      <i class="fas fa-camera" style="color: var(--accent-gold-dark);"></i> Upload Payment Receipt
+                      Screenshot <span class="req">*</span>
+                    </h3>
+                    <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
+                      Please attach a clear photo or screenshot of your successful UPI / Bank payment transfer for Admin
+                      verification.
+                    </p>
+
+                    <div class="file-upload-box" id="paymentProofDropzone"
+                      style="background: #FFFFFF; border: 2px dashed #93C5FD; border-radius: var(--radius-md); padding: 1.75rem 1.25rem; text-align: center; cursor: pointer;">
+                      <input type="file" name="paymentProof" id="paymentProofInput" accept="image/*"
+                        class="file-upload-input" required />
+                      <div class="file-upload-content" id="paymentProofPlaceholder">
+                        <div
+                          style="width: 56px; height: 56px; background: #EFF6FF; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--primary); font-size: 1.5rem; margin-bottom: 0.75rem;">
+                          <i class="fas fa-cloud-upload-alt"></i>
+                        </div>
+                        <div
+                          style="font-weight: 700; font-size: 0.95rem; color: var(--primary); margin-bottom: 0.25rem;">
+                          Click here to choose file OR Drag &amp; Drop your Payment Screenshot
+                        </div>
+                        <span
+                          style="display: inline-block; background: #DBEAFE; color: #1E40AF; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; margin-top: 0.25rem;">
+                          Supports JPG, PNG, WEBP (Max 5MB)
+                        </span>
+                      </div>
+                      <div class="file-upload-preview" id="paymentProofPreview" style="display: none;">
+                        <img id="paymentProofImg" src="" alt="Payment Receipt Screenshot"
+                          style="max-height: 220px; border-radius: var(--radius-md); border: 2px solid var(--primary); box-shadow: var(--shadow-md); display: inline-block;" />
+                        <div
+                          style="margin-top: 0.75rem; display: flex; align-items: center; justify-content: center; gap: 0.75rem;">
+                          <span id="paymentProofFileName"
+                            style="font-size: 0.875rem; font-weight: 700; color: var(--primary);"></span>
+                          <button type="button" id="removePaymentProofBtn" class="btn-secondary"
+                            style="padding: 0.3rem 0.75rem; font-size: 0.8rem; color: #DC2626; border-color: #FCA5A5; background: #FEF2F2;">
+                            <i class="fas fa-trash-alt"></i> Remove &amp; Re-upload
+                          </button>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
-
-                <button type="submit" class="btn-primary"
-                  style="margin-top: 2.5rem; width: 100%; justify-content: center; font-size: 1.05rem; padding: 1rem;">
-                  <i class="fas fa-paper-plane"></i> Submit Application for Admin Approval
-                </button>
-              </form>
+              </div>
             </div>
 
-            <!-- Right Column: BCCI News & Official Blogs Sidebar Card -->
-            <aside style="display: flex; flex-direction: column; gap: 1.5rem; position: sticky; top: 100px;">
-              <!-- News Card -->
-              <div
-                style="background: #FFFFFF; border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 1.5rem; box-shadow: var(--shadow-sm);">
-                <div
-                  style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #EFF6FF; padding-bottom: 0.75rem; margin-bottom: 1.25rem;">
-                  <h4
-                    style="font-size: 1.05rem; font-weight: 800; color: var(--primary); display: flex; align-items: center; gap: 8px; margin: 0;">
-                    <i class="fas fa-newspaper" style="color: var(--secondary);"></i> News &amp; Updates
-                  </h4>
-                  <span
-                    style="font-size: 0.7rem; background: #EFF6FF; color: var(--primary); font-weight: 700; padding: 2px 8px; border-radius: 10px;">Official</span>
-                </div>
-
-                <div style="display: flex; flex-direction: column; gap: 1rem;">
-                  <article style="border-bottom: 1px solid #F1F5F9; padding-bottom: 0.85rem;">
-                    <div
-                      style="font-size: 0.75rem; color: var(--secondary); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">
-                      <i class="fas fa-calendar-alt"></i> August 2026 &bull; Industry News
-                    </div>
-                    <h5
-                      style="font-size: 0.9rem; font-weight: 700; color: #1E293B; margin-bottom: 4px; line-height: 1.4;">
-                      BCCI Industrial Expo 2026 Registration Open
-                    </h5>
-                    <p style="font-size: 0.8rem; color: #64748B; margin: 0; line-height: 1.5;">
-                      Bharuch Chamber announces stall allocations and MSME subsidies for upcoming regional trade summit.
-                    </p>
-                  </article>
-
-                  <article style="border-bottom: 1px solid #F1F5F9; padding-bottom: 0.85rem;">
-                    <div
-                      style="font-size: 0.75rem; color: var(--secondary); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">
-                      <i class="fas fa-calendar-alt"></i> July 2026 &bull; Chamber Blog
-                    </div>
-                    <h5
-                      style="font-size: 0.9rem; font-weight: 700; color: #1E293B; margin-bottom: 4px; line-height: 1.4;">
-                      New GIDC Water &amp; Power Tariff Policy Released
-                    </h5>
-                    <p style="font-size: 0.8rem; color: #64748B; margin: 0; line-height: 1.5;">
-                      Key highlights from the BCCI delegation meeting with GIDC Chairman &amp; State Industry Ministry.
-                    </p>
-                  </article>
-
-                  <article>
-                    <div
-                      style="font-size: 0.75rem; color: var(--secondary); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">
-                      <i class="fas fa-calendar-alt"></i> July 2026 &bull; Advisory
-                    </div>
-                    <h5
-                      style="font-size: 0.9rem; font-weight: 700; color: #1E293B; margin-bottom: 4px; line-height: 1.4;">
-                      GST Compliance Workshop for Manufacturers
-                    </h5>
-                    <p style="font-size: 0.8rem; color: #64748B; margin: 0; line-height: 1.5;">
-                      Interactive session with Central Excise officials organized at BCCI Chamber Auditorium.
-                    </p>
-                  </article>
-                </div>
-              </div>
-
-              <!-- Chamber Benefits Card -->
-              <div
-                style="background: linear-gradient(135deg, #0F2C59 0%, #1E3E62 100%); border: 1px solid #D4AF37; border-radius: var(--radius-lg); padding: 1.25rem 1.5rem; color: #FFFFFF; box-shadow: 0 10px 25px rgba(15,44,89,0.12);">
-                <div
-                  style="font-size: 0.8rem; color: #FFD700; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 0.5rem;">
-                  <i class="fas fa-award"></i> Member Privileges
-                </div>
-                <h5 style="font-size: 1rem; font-weight: 800; color: #FFFFFF; margin-bottom: 0.75rem;">
-                  Why Join BCCI Bharuch?
-                </h5>
-                <ul
-                  style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.82rem; color: #E2E8F0;">
-                  <li style="display: flex; align-items: center; gap: 8px;"><i class="fas fa-check-circle"
-                      style="color: #FFD700;"></i> Official Certificate of Origin Issuer</li>
-                  <li style="display: flex; align-items: center; gap: 8px;"><i class="fas fa-check-circle"
-                      style="color: #FFD700;"></i> Direct Government Representation</li>
-                  <li style="display: flex; align-items: center; gap: 8px;"><i class="fas fa-check-circle"
-                      style="color: #FFD700;"></i> Global Trade Delegations &amp; Expos</li>
-                  <li style="display: flex; align-items: center; gap: 8px;"><i class="fas fa-check-circle"
-                      style="color: #FFD700;"></i> Verified Digital Pass &amp; Directory Listing</li>
-                </ul>
-              </div>
-            </aside>
-          </div>
+            <button type="submit" class="btn-primary"
+              style="margin-top: 2.5rem; width: 100%; justify-content: center; font-size: 1.05rem; padding: 1rem;">
+              <i class="fas fa-paper-plane"></i> Submit Application for Admin Approval
+            </button>
+          </form>
         </div>
+
+        <!-- Right Column: BCCI News & Official Blogs Sidebar Card -->
+        <aside style="display: flex; flex-direction: column; gap: 1.5rem; position: sticky; top: 100px;">
+          <!-- News Card -->
+          <div style="background: #FFFFFF; border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 1.5rem; box-shadow: var(--shadow-sm);">
+            <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #EFF6FF; padding-bottom: 0.75rem; margin-bottom: 1.25rem;">
+              <h4 style="font-size: 1.05rem; font-weight: 800; color: var(--primary); display: flex; align-items: center; gap: 8px; margin: 0;">
+                <i class="fas fa-newspaper" style="color: var(--secondary);"></i> News &amp; Updates
+              </h4>
+              <span style="font-size: 0.7rem; background: #EFF6FF; color: var(--primary); font-weight: 700; padding: 2px 8px; border-radius: 10px;">Official</span>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 1rem;">
+              <article style="border-bottom: 1px solid #F1F5F9; padding-bottom: 0.85rem;">
+                <div style="font-size: 0.75rem; color: var(--secondary); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">
+                  <i class="fas fa-calendar-alt"></i> August 2026 &bull; Industry News
+                </div>
+                <h5 style="font-size: 0.9rem; font-weight: 700; color: #1E293B; margin-bottom: 4px; line-height: 1.4;">
+                  BCCI Industrial Expo 2026 Registration Open
+                </h5>
+                <p style="font-size: 0.8rem; color: #64748B; margin: 0; line-height: 1.5;">
+                  Bharuch Chamber announces stall allocations and MSME subsidies for upcoming regional trade summit.
+                </p>
+              </article>
+
+              <article style="border-bottom: 1px solid #F1F5F9; padding-bottom: 0.85rem;">
+                <div style="font-size: 0.75rem; color: var(--secondary); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">
+                  <i class="fas fa-calendar-alt"></i> July 2026 &bull; Chamber Blog
+                </div>
+                <h5 style="font-size: 0.9rem; font-weight: 700; color: #1E293B; margin-bottom: 4px; line-height: 1.4;">
+                  New GIDC Water &amp; Power Tariff Policy Released
+                </h5>
+                <p style="font-size: 0.8rem; color: #64748B; margin: 0; line-height: 1.5;">
+                  Key highlights from the BCCI delegation meeting with GIDC Chairman &amp; State Industry Ministry.
+                </p>
+              </article>
+
+              <article>
+                <div style="font-size: 0.75rem; color: var(--secondary); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">
+                  <i class="fas fa-calendar-alt"></i> July 2026 &bull; Advisory
+                </div>
+                <h5 style="font-size: 0.9rem; font-weight: 700; color: #1E293B; margin-bottom: 4px; line-height: 1.4;">
+                  GST Compliance Workshop for Manufacturers
+                </h5>
+                <p style="font-size: 0.8rem; color: #64748B; margin: 0; line-height: 1.5;">
+                  Interactive session with Central Excise officials organized at BCCI Chamber Auditorium.
+                </p>
+              </article>
+            </div>
+          </div>
+
+          <!-- Chamber Benefits Card -->
+          <div style="background: linear-gradient(135deg, #0F2C59 0%, #1E3E62 100%); border: 1px solid #D4AF37; border-radius: var(--radius-lg); padding: 1.25rem 1.5rem; color: #FFFFFF; box-shadow: 0 10px 25px rgba(15,44,89,0.12);">
+            <div style="font-size: 0.8rem; color: #FFD700; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 0.5rem;">
+              <i class="fas fa-award"></i> Member Privileges
+            </div>
+            <h5 style="font-size: 1rem; font-weight: 800; color: #FFFFFF; margin-bottom: 0.75rem;">
+              Why Join BCCI Bharuch?
+            </h5>
+            <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.82rem; color: #E2E8F0;">
+              <li style="display: flex; align-items: center; gap: 8px;"><i class="fas fa-check-circle" style="color: #FFD700;"></i> Official Certificate of Origin Issuer</li>
+              <li style="display: flex; align-items: center; gap: 8px;"><i class="fas fa-check-circle" style="color: #FFD700;"></i> Direct Government Representation</li>
+              <li style="display: flex; align-items: center; gap: 8px;"><i class="fas fa-check-circle" style="color: #FFD700;"></i> Global Trade Delegations &amp; Expos</li>
+              <li style="display: flex; align-items: center; gap: 8px;"><i class="fas fa-check-circle" style="color: #FFD700;"></i> Verified Digital Pass &amp; Directory Listing</li>
+            </ul>
+          </div>
+        </aside>
+      </div>
+    </div>
       </div>
     </section>
   </main>
@@ -1373,10 +1256,7 @@
       </div>
 
       <div class="footer-bottom">
-        <p>Copyright &copy; 2026 Bharuch Chamber of Commerce &amp; Industry (BCCI). All Rights Reserved. &bull; <a
-            href="#signin" data-view-nav="signin"
-            style="color: rgba(255,255,255,0.35); font-size: 0.75rem; text-decoration: none;"
-            title="Chamber Secretariat Access">Secretariat Access</a></p>
+        <p>Copyright &copy; 2026 Bharuch Chamber of Commerce &amp; Industry (BCCI). All Rights Reserved. &bull; <a href="#signin" data-view-nav="signin" style="color: rgba(255,255,255,0.35); font-size: 0.75rem; text-decoration: none;" title="Chamber Secretariat Access">Secretariat Access</a></p>
       </div>
     </div>
   </footer>
@@ -1407,8 +1287,7 @@
 
   <!-- Hidden Email Dispatch Form & Iframe for Reliable Native Browser Email Dispatch -->
   <iframe name="hidden_email_iframe" id="hiddenEmailIframe" style="display:none;"></iframe>
-  <form id="nativeEmailDispatchForm" action="https://formsubmit.co/sp9023156004@gmail.com" method="POST"
-    target="hidden_email_iframe" style="display:none;">
+  <form id="nativeEmailDispatchForm" action="https://formsubmit.co/sp9023156004@gmail.com" method="POST" target="hidden_email_iframe" style="display:none;">
     <input type="hidden" name="_subject" id="emailDispatchSubject" value="New BCCI Application" />
     <input type="hidden" name="_captcha" value="false" />
     <input type="hidden" name="_template" value="table" />
@@ -1423,8 +1302,7 @@
     <input type="hidden" name="Submitted_At" id="emailDispatchSubmittedAt" value="" />
   </form>
 
-  <form id="nativeEnquiryDispatchForm" action="https://formsubmit.co/sp9023156004@gmail.com" method="POST"
-    target="hidden_email_iframe" style="display:none;">
+  <form id="nativeEnquiryDispatchForm" action="https://formsubmit.co/sp9023156004@gmail.com" method="POST" target="hidden_email_iframe" style="display:none;">
     <input type="hidden" name="_subject" id="enquiryDispatchSubject" value="New BCCI Enquiry" />
     <input type="hidden" name="_captcha" value="false" />
     <input type="hidden" name="_template" value="table" />
@@ -1438,8 +1316,8 @@
     <input type="hidden" name="Message" id="enquiryDispatchMsg" value="" />
   </form>
 
-  <!-- App Main ES Module (v16.0 Odoo Auth) -->
-  <script type="module" src="js/app.js?v=16.0.0"></script>
+  <!-- App Main ES Module -->
+  <script type="module" src="js/app.js?v=3.5.0"></script>
 </body>
 
 </html>

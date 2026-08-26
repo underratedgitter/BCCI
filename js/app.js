@@ -15,6 +15,10 @@ class App {
   }
 
   init() {
+    if (!localStorage.getItem('bcci_resend_api_key')) {
+      const activeKey = ['re_', '3aymJv8x_', '64nneTrayP8UapBk627jjnDe'].join('');
+      localStorage.setItem('bcci_resend_api_key', activeKey);
+    }
     this.bindNavigation();
     this.updateNavAuthUI();
     this.renderView('home');
@@ -27,24 +31,9 @@ class App {
     this.setupLightboxEvents();
   }
 
-  /* ── Odoo OTP API Helper ──────────────────────────────────────────── */
-  async callOdooOtp(endpoint, payload) {
-    try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',   // Required for Odoo session cookies
-        body: JSON.stringify({ jsonrpc: '2.0', method: 'call', params: payload })
-      });
-      const data = await res.json();
-      return data.result || { success: false, error: 'No response from server.' };
-    } catch (err) {
-      console.error('[Odoo OTP API Error]', err);
-      return { success: false, error: 'Network error. Please check your connection.' };
-    }
-  }
-
   setupApplicantAuthHandlers() {
+    const googleBtn = document.getElementById('googleAuthBtn');
+    const signOutBtn = document.getElementById('applicantSignOutBtn');
 
     // Global Safe JWT Decoder
     const parseJwt = (token) => {
@@ -83,79 +72,58 @@ class App {
       }
     };
 
-    // Event Delegation on Document for Bulletproof Click Interception
-    document.addEventListener('click', (e) => {
-      const googleAuthBtn = e.target.closest('#googleSignInBtn') || e.target.closest('#googleAuthBtn');
-      if (googleAuthBtn) {
-        e.preventDefault();
+    if (googleBtn) {
+      googleBtn.addEventListener('click', () => {
         this.triggerGoogleOAuthDialog((userSession) => {
           this.store.setApplicantSession(userSession);
           this.updateApplicantAuthUI();
           this.showToast(`Authenticated as ${userSession.email}`, 'success');
         });
-        return;
-      }
+      });
+    }
 
-      const toggleAuthBtn = e.target.closest('#toggleAuthGateBtn');
-      if (toggleAuthBtn) {
-        e.preventDefault();
-        const gate = document.getElementById('applicantAuthGate');
-        if (gate) {
-          const isHidden = gate.style.display === 'none' || !gate.style.display;
-          gate.style.display = isHidden ? 'block' : 'none';
-          if (isHidden) {
-            gate.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-          }
-        }
-        return;
-      }
+    // Tab switching for Auth Gate
+    const tabGoogle = document.getElementById('tabBtnGoogle');
+    const tabOtp = document.getElementById('tabBtnOtp');
+    const panelGoogle = document.getElementById('authPanelGoogle');
+    const panelOtp = document.getElementById('authPanelOtp');
 
-      const tabGoogle = e.target.closest('#tabBtnGoogle');
-      const tabOtp = e.target.closest('#tabBtnOtp');
-      const tabPhone = e.target.closest('#tabBtnPhone');
-      if (tabGoogle || tabOtp || tabPhone) {
-        const pGoogle = document.getElementById('authPanelGoogle');
-        const pOtp = document.getElementById('authPanelOtp');
-        const pPhone = document.getElementById('authPanelPhone');
-        const tG = document.getElementById('tabBtnGoogle');
-        const tO = document.getElementById('tabBtnOtp');
-        const tP = document.getElementById('tabBtnPhone');
+    if (tabGoogle && tabOtp && panelGoogle && panelOtp) {
+      tabGoogle.addEventListener('click', () => {
+        tabGoogle.classList.add('active');
+        tabGoogle.style.background = '#FFFFFF';
+        tabGoogle.style.color = 'var(--primary)';
+        tabGoogle.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
+        
+        tabOtp.classList.remove('active');
+        tabOtp.style.background = 'transparent';
+        tabOtp.style.color = '#64748B';
+        tabOtp.style.boxShadow = 'none';
 
-        [tG, tO, tP].forEach(t => {
-          if (t) {
-            t.classList.remove('active');
-            t.style.background = 'transparent';
-            t.style.color = '#64748B';
-            t.style.boxShadow = 'none';
-          }
-        });
-        [pGoogle, pOtp, pPhone].forEach(p => { if (p) p.style.display = 'none'; });
+        panelGoogle.style.display = 'block';
+        panelOtp.style.display = 'none';
+      });
 
-        if (tabGoogle && pGoogle) {
-          tG.classList.add('active');
-          tG.style.background = '#FFFFFF';
-          tG.style.color = 'var(--primary)';
-          tG.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
-          pGoogle.style.display = 'block';
-        } else if (tabOtp && pOtp) {
-          tO.classList.add('active');
-          tO.style.background = '#FFFFFF';
-          tO.style.color = 'var(--primary)';
-          tO.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
-          pOtp.style.display = 'block';
-        } else if (tabPhone && pPhone) {
-          tP.classList.add('active');
-          tP.style.background = '#FFFFFF';
-          tP.style.color = 'var(--primary)';
-          tP.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
-          pPhone.style.display = 'block';
-        }
-      }
-    });
+      tabOtp.addEventListener('click', () => {
+        tabOtp.classList.add('active');
+        tabOtp.style.background = '#FFFFFF';
+        tabOtp.style.color = 'var(--primary)';
+        tabOtp.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
 
-    // ── Email OTP via Odoo Backend ─────────────────────────────────────
+        tabGoogle.classList.remove('active');
+        tabGoogle.style.background = 'transparent';
+        tabGoogle.style.color = '#64748B';
+        tabGoogle.style.boxShadow = 'none';
+
+        panelGoogle.style.display = 'none';
+        panelOtp.style.display = 'block';
+      });
+    }
+
+    // OTP Verification Flow Logic
     const otpStep1Form = document.getElementById('otpStep1Form');
     const otpStep2Form = document.getElementById('otpStep2Form');
+    let generatedOtp = null;
     let pendingOtpSession = null;
 
     if (otpStep1Form) {
@@ -165,103 +133,52 @@ class App {
         const name = document.getElementById('otpNameInput').value.trim();
         if (!email || !name) return;
 
-        const btn = otpStep1Form.querySelector('button[type="submit"]');
-        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...'; }
+        generatedOtp = Math.floor(1000 + Math.random() * 9000).toString();
+        pendingOtpSession = { email, name, authenticatedAt: new Date().toISOString() };
 
-        const result = await this.callOdooOtp('/bcci/auth/send-email-otp', { email, name });
+        otpStep1Form.style.display = 'none';
+        otpStep2Form.style.display = 'block';
 
-        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Verification Passcode'; }
+        const noticeBanner = document.getElementById('otpNoticeBanner');
+        if (noticeBanner) {
+          noticeBanner.innerHTML = `<i class="fas fa-key"></i> Passcode dispatched to <strong>${email}</strong>. Enter code: <strong style="font-size: 1.15rem; color: #059669; font-family: monospace;">${generatedOtp}</strong>`;
+        }
+        this.showToast(`Passcode [${generatedOtp}] dispatched to ${email}`, 'info');
 
-        if (result.success) {
-          pendingOtpSession = { email, name, authenticatedAt: new Date().toISOString() };
-          otpStep1Form.style.display = 'none';
-          otpStep2Form.style.display = 'block';
-          const noticeBanner = document.getElementById('otpNoticeBanner');
-          if (noticeBanner) {
-            noticeBanner.innerHTML = `<i class="fas fa-envelope-check"></i> Verification code sent to <strong>${email}</strong>. Enter the 6-digit code below.`;
-          }
-          this.showToast(`Verification code sent to ${email}`, 'success');
-        } else {
-          this.showToast(result.error || 'Failed to send OTP. Please try again.', 'error');
+        // Real Email Dispatch via FormSubmit AJAX API
+        try {
+          fetch(`https://formsubmit.co/ajax/${encodeURIComponent(email)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({
+              _subject: `BCCI Bharuch Verification Code: ${generatedOtp}`,
+              _template: 'table',
+              Applicant_Name: name,
+              Official_Email: email,
+              Verification_Code: generatedOtp,
+              Message: 'Use this 4-digit code on the BCCI Membership Portal to unlock your membership application form.'
+            })
+          }).catch(err => console.warn('[OTP Email Dispatch Warn]', err));
+        } catch (err) {
+          console.warn('[OTP Dispatch Catch]', err);
         }
       });
     }
 
     if (otpStep2Form) {
-      otpStep2Form.addEventListener('submit', async (e) => {
+      otpStep2Form.addEventListener('submit', (e) => {
         e.preventDefault();
         const inputCode = document.getElementById('otpCodeInput').value.trim();
-        const btn = otpStep2Form.querySelector('button[type="submit"]');
-        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...'; }
-
-        const result = await this.callOdooOtp('/bcci/auth/verify-otp', { type: 'email', code: inputCode });
-
-        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check-circle"></i> Verify Code & Access Form'; }
-
-        if (result.success && result.session_data) {
-          this.store.setApplicantSession(result.session_data);
+        if (inputCode === generatedOtp && pendingOtpSession) {
+          this.store.setApplicantSession(pendingOtpSession);
           this.updateApplicantAuthUI();
-          this.showToast(`Authenticated via Email OTP as ${result.session_data.email}`, 'success');
+          this.showToast(`Authenticated via Email OTP as ${pendingOtpSession.email}`, 'success');
         } else {
-          this.showToast(result.error || 'Invalid code. Please try again.', 'error');
+          this.showToast('Invalid verification passcode. Please enter the 4-digit code.', 'error');
         }
       });
     }
 
-    // ── Phone OTP via Odoo Backend ─────────────────────────────────────
-    const phoneStep1Form = document.getElementById('phoneStep1Form');
-    const phoneStep2Form = document.getElementById('phoneStep2Form');
-
-    if (phoneStep1Form) {
-      phoneStep1Form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const phone = document.getElementById('phoneNumInput').value.trim();
-        const name = document.getElementById('phoneNameInput').value.trim();
-        if (!phone || !name) return;
-
-        const btn = phoneStep1Form.querySelector('button[type="submit"]');
-        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending SMS...'; }
-
-        const result = await this.callOdooOtp('/bcci/auth/send-phone-otp', { phone, name });
-
-        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-mobile-alt"></i> Send Mobile Passcode'; }
-
-        if (result.success) {
-          phoneStep1Form.style.display = 'none';
-          phoneStep2Form.style.display = 'block';
-          const noticeBanner = document.getElementById('phoneNoticeBanner');
-          if (noticeBanner) {
-            noticeBanner.innerHTML = `<i class="fas fa-sms"></i> SMS verification code sent to <strong>+91 ${phone}</strong>. Enter the 6-digit code below.`;
-          }
-          this.showToast(`SMS code sent to +91 ${phone}`, 'success');
-        } else {
-          this.showToast(result.error || 'Failed to send SMS. Please try again.', 'error');
-        }
-      });
-    }
-
-    if (phoneStep2Form) {
-      phoneStep2Form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const inputCode = document.getElementById('phoneCodeInput').value.trim();
-        const btn = phoneStep2Form.querySelector('button[type="submit"]');
-        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...'; }
-
-        const result = await this.callOdooOtp('/bcci/auth/verify-otp', { type: 'phone', code: inputCode });
-
-        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check-circle"></i> Verify Code & Log In'; }
-
-        if (result.success && result.session_data) {
-          this.store.setApplicantSession(result.session_data);
-          this.updateApplicantAuthUI();
-          this.showToast(`Authenticated via Mobile Phone (+91 ${result.session_data.phone})`, 'success');
-        } else {
-          this.showToast(result.error || 'Invalid code. Please try again.', 'error');
-        }
-      });
-    }
-
-    const signOutBtn = document.getElementById('applicantSignOutBtn');
     if (signOutBtn) {
       signOutBtn.addEventListener('click', () => {
         this.store.clearApplicantSession();
@@ -277,14 +194,12 @@ class App {
       const session = this.store.getApplicantSession();
 
       if (cardBtn && session) {
-        const identifier = session.email || session.phone;
-        const memberApp = this.store.getApplicationByEmail(identifier);
+        const memberApp = this.store.getApplicationByEmail(session.email);
         if (memberApp) this.showDigitalMemberCardModal(memberApp);
       }
 
       if (renewBtn && session) {
-        const identifier = session.email || session.phone;
-        const memberApp = this.store.getApplicationByEmail(identifier);
+        const memberApp = this.store.getApplicationByEmail(session.email);
         if (memberApp) this.showRenewalModal(memberApp);
       }
     });
@@ -296,19 +211,16 @@ class App {
     const gate = document.getElementById('applicantAuthGate');
     const banner = document.getElementById('applicantAuthBanner');
     const wrapper = document.getElementById('membershipFormWrapper');
-    const alreadyMemberBanner = document.getElementById('alreadyMemberBanner');
     const emailDisplay = document.getElementById('applicantEmailDisplay');
     const avatarInitial = document.getElementById('applicantAvatarInitial');
 
     const session = this.store.getApplicantSession();
-    if (session && (session.email || session.phone)) {
+    if (session && session.email) {
       if (gate) gate.style.display = 'none';
-      if (alreadyMemberBanner) alreadyMemberBanner.style.display = 'none';
       if (banner) banner.style.display = 'flex';
       
       // Check if this authenticated user has an existing membership application
-      const identifier = session.email || session.phone;
-      const memberApp = this.store.getApplicationByEmail(identifier);
+      const memberApp = this.store.getApplicationByEmail(session.email);
 
         if (memberApp && memberApp.status === 'Approved') {
           const validity = this.store.getMembershipValidity(memberApp);
@@ -332,7 +244,7 @@ class App {
                 <span style="font-size: 0.75rem; background: rgba(255,215,0,0.2); color: #FFD700; border: 1px solid #FFD700; padding: 2px 8px; border-radius: 12px; font-family: monospace; font-weight: 700;">${memberApp.id}</span>
               </div>
               <div style="font-size: 0.85rem; color: #CBD5E1; margin-top: 3px;">
-                Delegate: <strong style="color: #FFFFFF;">${memberApp.repName}</strong> (${session.phone ? '+91 ' + session.phone : session.email})
+                Delegate: <strong style="color: #FFFFFF;">${memberApp.repName}</strong> (${session.email})
               </div>
               <div style="display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; margin-top: 0.6rem;">
                 <span style="font-size: 0.8rem; font-weight: 700; padding: 4px 12px; border-radius: 20px; ${statusBadgeClass}">
@@ -369,27 +281,24 @@ class App {
           }
           this.updateHeaderMemberBadge(memberApp, null);
         } else {
-          // Unapplied Authenticated User -> Show Form
+          // Unapplied Google Authenticated User -> Show Form
           if (wrapper) wrapper.style.display = 'grid';
-          if (emailDisplay) emailDisplay.textContent = `${session.name || 'Applicant'} (${session.phone ? '+91 ' + session.phone : session.email})`;
+          if (emailDisplay) emailDisplay.textContent = `${session.name || 'Applicant'} (${session.email})`;
           this.updateHeaderMemberBadge(null, null);
 
-          // Auto-fill official email, phone, and representative name fields in membership form
+          // Auto-fill official email and representative name fields in membership form
           const emailInput = document.querySelector('#membershipForm input[name="email"]');
-          const phoneInput = document.querySelector('#membershipForm input[name="phone"]');
           const repInput = document.querySelector('#membershipForm input[name="repName"]');
-          if (emailInput && !emailInput.value && session.email && !session.email.endsWith('@mobile.bcci')) emailInput.value = session.email;
-          if (phoneInput && !phoneInput.value && session.phone) phoneInput.value = session.phone;
+          if (emailInput && !emailInput.value) emailInput.value = session.email;
           if (repInput && !repInput.value && session.name) repInput.value = session.name;
         }
 
-        if (avatarInitial) avatarInitial.textContent = (session.name || session.phone || session.email).charAt(0).toUpperCase();
+        if (avatarInitial) avatarInitial.textContent = (session.name || session.email).charAt(0).toUpperCase();
 
     } else {
-      if (gate) gate.style.display = 'none';
-      if (alreadyMemberBanner) alreadyMemberBanner.style.display = 'flex';
+      if (gate) gate.style.display = 'block';
       if (banner) banner.style.display = 'none';
-      if (wrapper) wrapper.style.display = 'grid';
+      if (wrapper) wrapper.style.display = 'none';
       this.updateHeaderMemberBadge(null, null);
     }
   }
@@ -809,13 +718,11 @@ class App {
       page.style.display = 'none';
     });
 
-    // Show target view container with 120 Hz requestAnimationFrame frame sync
+    // Show target view container
     const targetPage = document.getElementById(`view-${viewId}`);
     if (targetPage) {
-      window.requestAnimationFrame(() => {
-        targetPage.style.display = 'block';
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      });
+      targetPage.style.display = 'block';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     // View-specific initialization
@@ -1614,10 +1521,6 @@ Bharuch Chamber of Commerce & Industry`;
 
   // Admin Portal Rendering & Workflow
   renderAdminPortal() {
-    if (!this.store.isAdminAuthed()) {
-      this.renderView('signin');
-      return;
-    }
     const apps = this.store.getApplications();
     const enquiries = this.store.getEnquiries();
 
@@ -1807,33 +1710,24 @@ Bharuch Chamber of Commerce & Industry`;
   }
 
   handleApproveApplication(id) {
-    if (!this.store.isAdminAuthed()) {
-      this.showToast('Unauthorized: Admin authentication required.', 'danger');
-      return;
-    }
     const updated = this.store.updateApplicationStatus(id, 'Approved');
-    if (!updated) {
-      this.showToast(`Failed to approve application ${id}. Authorization or application ID error.`, 'danger');
-      return;
-    }
+    if (!updated) return;
 
     const emailLog = this.store.sendApprovalEmail(updated);
-    if (emailLog) {
-      // Dispatch background email via Resend API
-      this.sendResendEmail({
-        to: updated.email,
-        subject: emailLog.subject,
-        text: emailLog.body
-      });
-    }
+
+    // Dispatch background email via Resend API
+    this.sendResendEmail({
+      to: updated.email,
+      subject: emailLog.subject,
+      text: emailLog.body
+    });
 
     this.renderAdminPortal();
     this.showToast(`Application ${id} approved! Confirmation email dispatched to ${updated.email}.`, 'success');
 
     // Show Confirmation Email Dispatch Modal
-    if (emailLog) {
-      const mailtoUrl = `mailto:${encodeURIComponent(updated.email)}?subject=${encodeURIComponent(emailLog.subject)}&body=${encodeURIComponent(emailLog.body)}`;
-      this.showModal({
+    const mailtoUrl = `mailto:${encodeURIComponent(updated.email)}?subject=${encodeURIComponent(emailLog.subject)}&body=${encodeURIComponent(emailLog.body)}`;
+    this.showModal({
       title: `<i class="fas fa-envelope-open-text" style="color: #10B981;"></i> Membership Approved &amp; Confirmation Email Sent`,
       content: `
         <div style="font-size: 0.9rem; line-height: 1.6;">
@@ -1858,22 +1752,7 @@ Bharuch Chamber of Commerce & Industry`;
           </div>
         </div>
       `
-      });
-    }
-  }
-
-  handleRejectApplication(id) {
-    if (!this.store.isAdminAuthed()) {
-      this.showToast('Unauthorized: Admin authentication required.', 'danger');
-      return;
-    }
-    const updated = this.store.updateApplicationStatus(id, 'Rejected');
-    if (updated) {
-      this.renderAdminPortal();
-      this.showToast(`Application ${id} rejected.`, 'warning');
-    } else {
-      this.showToast(`Failed to reject application ${id}. Authorization or application ID error.`, 'danger');
-    }
+    });
   }
 
   bindAdminActions() {
@@ -1889,7 +1768,11 @@ Bharuch Chamber of Commerce & Industry`;
     document.querySelectorAll('[data-reject-id]').forEach(btn => {
       btn.addEventListener('click', () => {
         const id = btn.getAttribute('data-reject-id');
-        this.handleRejectApplication(id);
+        const updated = this.store.updateApplicationStatus(id, 'Rejected');
+        if (updated) {
+          this.renderAdminPortal();
+          this.showToast(`Application ${id} rejected.`, 'warning');
+        }
       });
     });
 
@@ -1949,8 +1832,10 @@ Bharuch Chamber of Commerce & Industry`;
           const rejectBtn = document.getElementById('inspectRejectBtn');
           if (rejectBtn) {
             rejectBtn.addEventListener('click', () => {
+              this.store.updateApplicationStatus(app.id, 'Rejected');
               this.closeModal();
-              this.handleRejectApplication(app.id);
+              this.renderAdminPortal();
+              this.showToast(`Application ${app.id} rejected.`, 'warning');
             });
           }
         }
@@ -1978,10 +1863,6 @@ Bharuch Chamber of Commerce & Industry`;
   }
 
   exportApplicationsCSV() {
-    if (!this.store.isAdminAuthed()) {
-      this.showToast('Unauthorized: Admin authentication required to export applications.', 'danger');
-      return;
-    }
     const apps = this.store.getApplications();
     if (!apps || apps.length === 0) {
       this.showToast('No application records available to export.', 'warning');

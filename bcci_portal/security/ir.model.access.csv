@@ -1,5 +1,0 @@
-id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_bcci_membership_admin,bcci.membership.application admin,model_bcci_membership_application,base.group_user,1,1,1,1
-access_bcci_membership_public,bcci.membership.application public,model_bcci_membership_application,base.group_public,0,0,1,0
-access_bcci_enquiry_admin,bcci.enquiry admin,model_bcci_enquiry,base.group_user,1,1,1,1
-access_bcci_enquiry_public,bcci.enquiry public,model_bcci_enquiry,base.group_public,0,0,1,0
