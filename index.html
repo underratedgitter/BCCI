@@ -621,7 +621,7 @@
         </div>
 
         <div
-          style="max-width: 860px; margin: 0 auto 2rem auto; background: #FEF3C7; border: 1px solid #FDE68A; border-radius: var(--radius-md); padding: 1.25rem; font-size: 0.9rem; color: #92400E;">
+          style="max-width: 860px; margin: 0 auto 2rem auto; background: var(--gold-bg); border: 1px solid var(--gold); padding: 1rem 1.25rem; font-size: 0.9rem; color: var(--warning);">
           <i class="fas fa-shield-alt"></i> <strong>Admin Approval Policy:</strong> As per BCCI regulations, submitted
           membership accounts remain in <u>Pending Status</u> until reviewed and approved by the BCCI Administration.
         </div>
@@ -1022,41 +1022,43 @@
 
   <!-- 8. ADMIN SIGN IN PAGE VIEW -->
   <main id="view-signin" class="view-page" style="display: none;">
-    <section class="section-padding">
+    <section class="section-padding section-alt">
       <div class="container">
-        <div class="section-header">
+        <div class="section-header" style="text-align: center; max-width: 100%;">
           <span class="section-tag"><i class="fas fa-lock"></i> Administration Access</span>
           <h2 class="section-title">Admin Sign In Portal</h2>
           <p class="section-desc">Authenticate with official BCCI administrator credentials to access the approval
             portal.</p>
         </div>
 
-        <div class="form-container" style="max-width: 480px;">
+        <div class="signin-container">
           <form id="pageAdminLoginForm">
-            <div style="text-align: center; margin-bottom: 2rem;">
-              <div
-                style="width: 64px; height: 64px; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--primary); font-size: 1.75rem; margin-bottom: 1rem;">
-                <i class="fas fa-user-shield"></i>
-              </div>
-              <h3 style="color: var(--primary); font-size: 1.3rem;">Administrator Login</h3>
+            <div class="signin-icon">
+              <i class="fas fa-user-shield"></i>
             </div>
+            <h3 class="signin-title">Administrator Login</h3>
+            <p class="signin-subtitle">BCCI Secretariat Access</p>
 
-            <div class="form-group" style="margin-bottom: 1.25rem;">
+            <div class="form-group" style="margin-bottom: 1.5rem;">
               <label class="form-label">Username / Official Email <span class="req">*</span></label>
-              <input type="text" id="pageAdminUser" class="form-control" placeholder="Enter Admin Email or Username"
+              <input type="text" id="pageAdminUser" class="form-control" placeholder="admin@bccibharuch.in"
                 required autocomplete="username" />
             </div>
 
-            <div class="form-group" style="margin-bottom: 1.75rem;">
+            <div class="form-group" style="margin-bottom: 2rem;">
               <label class="form-label">Password <span class="req">*</span></label>
-              <input type="password" id="pageAdminPass" class="form-control" placeholder="Enter Password" required
+              <input type="password" id="pageAdminPass" class="form-control" placeholder="Enter your password" required
                 autocomplete="current-password" />
             </div>
 
             <button type="submit" class="btn-primary"
-              style="width: 100%; justify-content: center; padding: 0.85rem; font-size: 1rem;">
+              style="width: 100%; justify-content: center; padding: 0.85rem; font-size: 0.9rem;">
               <i class="fas fa-sign-in-alt"></i> Sign In to Admin Portal
             </button>
+
+            <p style="text-align: center; margin-top: 1.5rem; font-family: var(--font-mono); font-size: 0.68rem; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.08em;">
+              <i class="fas fa-lock" style="margin-right: 0.3rem;"></i> Secure Access Only
+            </p>
           </form>
         </div>
       </div>
