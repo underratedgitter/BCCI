@@ -197,6 +197,28 @@ class App {
       }
     });
 
+    // ── Profile Button Handler ─────────────────────────────────────────
+    const profileBtn = document.getElementById('btnHeaderUserProfile');
+    if (profileBtn) {
+      profileBtn.addEventListener('click', () => {
+        const session = this.store.getApplicantSession();
+        if (session && session.email) {
+          const banner = document.getElementById('applicantAuthBanner');
+          if (banner) {
+            banner.style.display = 'flex';
+            banner.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        } else {
+          const gate = document.getElementById('applicantAuthGate');
+          if (gate) {
+            gate.style.display = 'block';
+            gate.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            this.showToast('Please enter your email to sign in or apply.', 'info');
+          }
+        }
+      });
+    }
+
     this.updateApplicantAuthUI();
   }
 
@@ -206,6 +228,7 @@ class App {
     const wrapper = document.getElementById('membershipFormWrapper');
     const emailDisplay = document.getElementById('applicantEmailDisplay');
     const avatarInitial = document.getElementById('applicantAvatarInitial');
+    const profileBtnText = document.getElementById('userProfileBtnText');
 
     const session = this.store.getApplicantSession();
     if (session && session.email) {
@@ -253,8 +276,9 @@ class App {
             `;
           }
 
-          // Update Top Navbar Member Identity Badge
+          // Update Top Navbar Member Identity Badge & Profile Button
           this.updateHeaderMemberBadge(memberApp, validity);
+          if (profileBtnText) profileBtnText.textContent = `${memberApp.company} (Member)`;
 
         } else if (memberApp && memberApp.status === 'Pending') {
           if (wrapper) wrapper.style.display = 'none'; // Hide application form since pending review
@@ -273,11 +297,13 @@ class App {
             `;
           }
           this.updateHeaderMemberBadge(memberApp, null);
+          if (profileBtnText) profileBtnText.textContent = `Pending (${memberApp.id})`;
         } else {
-          // Unapplied Google Authenticated User -> Show Form
+          // Unapplied Authenticated User -> Show Form
           if (wrapper) wrapper.style.display = 'grid';
           if (emailDisplay) emailDisplay.textContent = `${session.name || 'Applicant'} (${session.email})`;
           this.updateHeaderMemberBadge(null, null);
+          if (profileBtnText) profileBtnText.textContent = `Profile (${session.name || session.email.split('@')[0]})`;
 
           // Auto-fill official email and representative name fields in membership form
           const emailInput = document.querySelector('#membershipForm input[name="email"]');
@@ -293,6 +319,7 @@ class App {
       if (banner) banner.style.display = 'none';
       if (wrapper) wrapper.style.display = 'none';
       this.updateHeaderMemberBadge(null, null);
+      if (profileBtnText) profileBtnText.textContent = 'My Profile / Sign In';
     }
   }
 
