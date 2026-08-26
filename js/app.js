@@ -598,6 +598,10 @@ class App {
       this.renderView('signin');
       return;
     }
+    if (viewId === 'signin' && this.adminAuthed) {
+      this.renderView('admin');
+      return;
+    }
 
     this.currentView = viewId;
 
@@ -1751,7 +1755,7 @@ Bharuch Chamber of Commerce & Industry`;
 
     // Tab Switcher inside Admin
     document.querySelectorAll('.admin-menu-item').forEach(item => {
-      item.addEventListener('click', () => {
+      item.onclick = () => {
         const tab = item.getAttribute('data-tab');
         document.querySelectorAll('.admin-menu-item').forEach(i => i.classList.remove('active'));
         item.classList.add('active');
@@ -1759,7 +1763,7 @@ Bharuch Chamber of Commerce & Industry`;
         document.querySelectorAll('.admin-tab-pane').forEach(pane => pane.style.display = 'none');
         const targetPane = document.getElementById(`tab-${tab}`);
         if (targetPane) targetPane.style.display = 'block';
-      });
+      };
     });
   }
 

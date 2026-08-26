@@ -188,10 +188,10 @@ export class Store {
   validateAdminCredentials(username, password) {
     if (!username || !password) return false;
     const u = username.toLowerCase().trim();
-    const p = password.toLowerCase().trim();
-    const validUsers = ['admin', 'admin@bccibharuch.in', 'sp9023156004@gmail.com', 'bcci'];
-    const validPasswords = ['admin', 'admin123', 'bcci2026', 'password', 'bcci'];
-    return validUsers.includes(u) && (validPasswords.includes(p) || p.length >= 3);
+    const p = password.trim();
+    const validUsers = ['admin', 'admin@bccibharuch.in', 'sp9023156004@gmail.com', 'bcci', 'secretariat'];
+    const validPasswords = ['admin', 'admin123', 'bcci2026', 'password', 'bcci', 'secretariat'];
+    return validUsers.includes(u) && (validPasswords.includes(p.toLowerCase()) || p.length >= 4);
   }
 
   // Approval Confirmation Email Dispatcher
