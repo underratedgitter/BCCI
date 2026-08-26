@@ -58,7 +58,7 @@ export default async function handler(req, res) {
   }
 
   // ── Verify OTP ───────────────────────────────────────────────────────
-  if (submittedCode !== storedOtp) {
+  if (submittedCode !== String(storedOtp)) {
     // Increment failed attempts
     const newAttempts = attempts + 1;
     await redis.set(attemptsKey, newAttempts.toString(), { ex: 600 });
