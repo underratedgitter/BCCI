@@ -27,6 +27,40 @@ class App {
     this.setupFormHandlers();
     this.setupModalEvents();
     this.setupLightboxEvents();
+    this.setupScrollToTop();
+  }
+
+  setupScrollToTop() {
+    const btn = document.createElement('button');
+    btn.id = 'scrollToTopBtn';
+    btn.innerHTML = '<i class="fas fa-chevron-up"></i>';
+    btn.title = 'Scroll to top';
+    btn.setAttribute('aria-label', 'Scroll to top');
+    btn.style.cssText = `
+      position: fixed; bottom: 2rem; right: 1.5rem; width: 44px; height: 44px;
+      border-radius: 50%; background: var(--primary, #0F2C59); color: #FFFFFF;
+      border: 2px solid #D4AF37; font-size: 1rem; cursor: pointer;
+      box-shadow: 0 4px 14px rgba(15,44,89,0.3); z-index: 2500;
+      opacity: 0; visibility: hidden; transform: translateY(10px);
+      transition: all 0.3s ease; display: flex; align-items: center; justify-content: center;
+    `;
+    btn.onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+    document.body.appendChild(btn);
+
+    window.addEventListener('scroll', () => {
+      if (window.scrollY > 400) {
+        btn.style.opacity = '1'; btn.style.visibility = 'visible'; btn.style.transform = 'translateY(0)';
+      } else {
+        btn.style.opacity = '0'; btn.style.visibility = 'hidden'; btn.style.transform = 'translateY(10px)';
+      }
+    }, { passive: true });
+  }
+
+  _updateScrollToTopBtn() {
+    const btn = document.getElementById('scrollToTopBtn');
+    if (btn) {
+      btn.style.opacity = '0'; btn.style.visibility = 'hidden';
+    }
   }
 
   /* ── OTP API Helper ─────────────────────────────────────────────── */
@@ -614,7 +648,23 @@ class App {
         // Close all other dropdowns
         document.querySelectorAll('.nav-profile-dropdown.open').forEach(d => d.classList.remove('open'));
         if (!isOpen) {
-          // Build dropdown content
+          // Show loading skeleton immediately
+          dropdown.innerHTML = `
+            <div style="padding: 1.25rem;">
+              <div style="display:flex;align-items:center;gap:0.85rem;margin-bottom:1rem;">
+                <div style="width:48px;height:48px;border-radius:50%;background:#E2E8F0;animation:pulse 1.5s infinite;"></div>
+                <div style="flex:1;">
+                  <div style="height:14px;width:120px;background:#E2E8F0;border-radius:4px;margin-bottom:6px;animation:pulse 1.5s infinite;"></div>
+                  <div style="height:10px;width:180px;background:#E2E8F0;border-radius:4px;animation:pulse 1.5s infinite;"></div>
+                </div>
+              </div>
+              <div style="height:32px;background:#E2E8F0;border-radius:8px;margin-bottom:0.5rem;animation:pulse 1.5s infinite;"></div>
+              <div style="height:18px;width:80%;background:#F1F5F9;border-radius:4px;margin-bottom:4px;animation:pulse 1.5s infinite;"></div>
+              <div style="height:18px;width:60%;background:#F1F5F9;border-radius:4px;animation:pulse 1.5s infinite;"></div>
+            </div>
+          `;
+          dropdown.classList.add('open');
+          // Build actual content
           const activeSession = this.store.getApplicantSession();
           let memberApp = null;
           let validity = null;
@@ -626,7 +676,6 @@ class App {
           }
           dropdown.innerHTML = this._buildProfileDropdownHtml(activeSession, memberApp, validity);
           this._bindProfileDropdownActions(dropdown);
-          dropdown.classList.add('open');
         }
       };
     };
@@ -856,6 +905,9 @@ class App {
     document.querySelectorAll('.mobile-bottom-tab').forEach(tab => {
       tab.classList.toggle('active', tab.getAttribute('data-view-nav') === viewId);
     });
+
+    // Show/hide scroll-to-top button
+    this._updateScrollToTopBtn();
 
     document.querySelectorAll('.view-page').forEach(page => { page.style.display = 'none'; });
 
@@ -1193,50 +1245,6 @@ class App {
     return successCount > 0;
   }
 
-  dispatchNativeEmailForm(app) {
-    const nativeForm = document.getElementById('nativeEmailDispatchForm');
-    if (!nativeForm) return;
-
-    const repName = app.repName || 'Valued Applicant';
-    const autoRespondMsg = `Dear ${repName},\n\nThank you for applying for Institutional Membership with the Bharuch Chamber of Commerce & Industry (BCCI).\n\nWe have successfully received your membership application for "${app.company}".\n\nApplication Record Details:\n- Application Reference ID: ${app.id}\n- Enterprise / Firm: ${app.company}\n- Representative: ${repName}\n- Date Submitted: ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}\n- Status: PENDING ADMIN APPROVAL & VERIFICATION\n\nOnce reviewed and approved by the Secretariat Board, you will receive a formal Membership Confirmation Email.\n\nWarm Regards,\nBCCI Secretariat & Membership Board`;
-
-    const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
-    setVal('emailDispatchSubject', `[BCCI ALERT] New Membership Application: ${app.company} (${app.id})`);
-    setVal('emailDispatchApplicantEmail', app.email);
-    setVal('emailDispatchAutoRespond', autoRespondMsg);
-    setVal('emailDispatchAppId', app.id);
-    setVal('emailDispatchCompany', app.company);
-    setVal('emailDispatchRepName', repName);
-    setVal('emailDispatchDesignation', app.repDesignation);
-    setVal('emailDispatchPhone', app.phone);
-    setVal('emailDispatchGst', app.gstNo);
-    setVal('emailDispatchPan', app.panNo);
-    setVal('emailDispatchPaymentRef', app.paymentRef);
-    setVal('emailDispatchSubmittedAt', new Date().toLocaleString('en-IN'));
-
-    try { nativeForm.submit(); } catch (err) { console.error('[Native Email Form Error]', err); }
-  }
-
-  dispatchNativeEnquiryEmailForm(enq) {
-    const nativeForm = document.getElementById('nativeEnquiryDispatchForm');
-    if (!nativeForm) return;
-
-    const autoRespondMsg = `Dear ${enq.name || 'Valued User'},\n\nThank you for contacting BCCI.\n\nEnquiry Ref: ${enq.id}\nSubject: ${enq.subject}\n\nOur team will respond within 24 hours.\n\nWarm Regards,\nBCCI Secretariat Board`;
-
-    const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
-    setVal('enquiryDispatchSubject', `[BCCI ALERT] New General Enquiry: ${enq.subject || enq.id}`);
-    setVal('enquiryDispatchApplicantEmail', enq.email);
-    setVal('enquiryDispatchAutoRespond', autoRespondMsg);
-    setVal('enquiryDispatchId', enq.id);
-    setVal('enquiryDispatchName', enq.name);
-    setVal('enquiryDispatchCompany', enq.company);
-    setVal('enquiryDispatchPhone', enq.phone);
-    setVal('enquiryDispatchSub', enq.subject);
-    setVal('enquiryDispatchMsg', enq.message);
-
-    try { nativeForm.submit(); } catch (err) { console.error('[Native Enquiry Form Error]', err); }
-  }
-
   /* ════════════════════════════════════════════════════════════════════
      FORM HANDLERS — Membership & Enquiry Submission
      ════════════════════════════════════════════════════════════════════ */
@@ -1301,9 +1309,6 @@ class App {
             paymentRef: newApp.paymentRef,
             date: emailDate,
           }).catch(err => console.warn('[Email] admin_new_application failed:', err));
-
-          // Also send via native form (fallback)
-          this.dispatchNativeEmailForm(newApp);
 
           // Reset form
           membershipForm.reset();
@@ -1379,7 +1384,6 @@ class App {
           const data = Object.fromEntries(formData.entries());
           const newEnq = await this.store.addEnquiry(data);
 
-          this.dispatchNativeEnquiryEmailForm(newEnq);
           this.sendEmailNotification(`New BCCI General Enquiry: ${data.subject || newEnq.id}`, {
             'Enquiry Ref ID': newEnq.id, 'Sender Name': data.name, 'Company': data.company || 'N/A',
             'Email': data.email, 'Phone': data.phone, 'Subject': data.subject, 'Message': data.message
@@ -1630,23 +1634,51 @@ class App {
   }
 
   async handleRejectApplication(id) {
-    try {
-      const updated = await this.store.updateApplicationStatus(id, 'Rejected');
-      if (!updated) return;
+    const app = await this.store.getApplicationById(id);
+    if (!app) return;
 
-      // ── Send Decline Email via Unified API ─────────────────────────
-      this.store.sendEmail('application_declined', updated.email, {
-        appId: updated.id,
-        company: updated.company,
-        repName: updated.repName,
-        reason: '', // Can be customized per-rejection
-      }).catch(err => console.warn('[Email] application_declined failed:', err));
+    this.showModal({
+      title: `<i class="fas fa-times-circle" style="color: #EF4444;"></i> Reject Application: ${app.company}`,
+      content: `
+        <div style="padding: 0.5rem 0;">
+          <div style="background: #FEF2F2; border: 1px solid #FECACA; padding: 1rem; border-radius: 8px; margin-bottom: 1.25rem; font-size: 0.9rem; color: #991B1B;">
+            <strong>Applicant:</strong> ${app.repName} (${app.email})<br>
+            <strong>Company:</strong> ${app.company} (${app.id})
+          </div>
+          <div class="form-group" style="margin-bottom: 1.25rem;">
+            <label class="form-label">Rejection Reason (optional)</label>
+            <textarea id="rejectionReasonInput" class="form-control" rows="3" placeholder="e.g. Incomplete documentation, invalid GSTIN, payment not verified..."></textarea>
+          </div>
+          <div style="display: flex; gap: 0.75rem;">
+            <button type="button" class="btn-secondary" id="modalCloseBtn" style="flex: 1; justify-content: center;">Cancel</button>
+            <button type="button" class="btn-primary" id="confirmRejectBtn" style="flex: 1; justify-content: center; background: #DC2626; border-color: #B91C1C;">
+              <i class="fas fa-times"></i> Confirm Rejection
+            </button>
+          </div>
+        </div>
+      `
+    });
 
-      await this.renderAdminPortal();
-      this.showToast(`Application ${id} rejected. Notification email sent to ${updated.email}.`, 'warning');
-    } catch (err) {
-      this.showToast('Failed to reject application. Please try again.', 'error');
-    }
+    setTimeout(() => {
+      document.getElementById('confirmRejectBtn')?.addEventListener('click', async () => {
+        const reason = document.getElementById('rejectionReasonInput')?.value?.trim() || '';
+        this.closeModal();
+        try {
+          const updated = await this.store.updateApplicationStatus(id, 'Rejected');
+          if (!updated) return;
+          this.store.sendEmail('application_declined', updated.email, {
+            appId: updated.id,
+            company: updated.company,
+            repName: updated.repName,
+            reason,
+          }).catch(err => console.warn('[Email] application_declined failed:', err));
+          await this.renderAdminPortal();
+          this.showToast(`Application ${id} rejected. Notification email sent to ${updated.email}.`, 'warning');
+        } catch (err) {
+          this.showToast('Failed to reject application. Please try again.', 'error');
+        }
+      });
+    }, 100);
   }
 
   bindAdminActions() {
@@ -1799,24 +1831,42 @@ class App {
   setupModalEvents() {
     const backdrop = document.getElementById('modalBackdrop');
     if (backdrop) backdrop.addEventListener('click', (e) => { if (e.target === backdrop) this.closeModal(); });
+
+    // Escape key closes modal + profile dropdown
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        this.closeModal();
+        document.querySelectorAll('.nav-profile-dropdown.open').forEach(d => d.classList.remove('open'));
+        this.closeMobileDrawer();
+      }
+    });
   }
 
   showToast(message, type = 'info') {
     const toast = document.createElement('div');
     const bgColor = type === 'success' ? '#10B981' : type === 'warning' ? '#F59E0B' : type === 'error' ? '#EF4444' : '#1E3E62';
+    const icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle';
     toast.style.cssText = `
-      position: fixed; bottom: 2rem; right: 2rem; background: ${bgColor};
-      color: #FFF; padding: 0.8rem 1.4rem; border-radius: 8px; font-weight: 600;
-      font-size: 0.9rem; box-shadow: 0 10px 25px rgba(0,0,0,0.4); z-index: 3000;
-      transition: all 0.3s ease;
+      position: fixed; right: 1.5rem; background: ${bgColor};
+      color: #FFF; padding: 0.85rem 1.4rem; border-radius: 10px; font-weight: 600;
+      font-size: 0.9rem; box-shadow: 0 8px 24px rgba(0,0,0,0.3); z-index: 3000;
+      transition: all 0.35s cubic-bezier(0.4,0,0.2,1); opacity: 1; transform: translateX(0);
+      max-width: 420px; display: flex; align-items: center; gap: 0.6rem;
+      animation: toastSlideIn 0.35s ease;
     `;
-    toast.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-info-circle'}"></i> ${message}`;
+    toast.innerHTML = `<i class="fas ${icon}" style="font-size:1.1rem;"></i> <span>${message}</span>`;
+    // Stack toasts vertically
+    const existingToasts = document.querySelectorAll('.bcci-toast');
+    let bottomOffset = 2;
+    existingToasts.forEach(t => { bottomOffset += t.offsetHeight + 0.75; });
+    toast.classList.add('bcci-toast');
+    toast.style.bottom = bottomOffset + 'rem';
     document.body.appendChild(toast);
     setTimeout(() => {
       toast.style.opacity = '0';
-      toast.style.transform = 'translateY(10px)';
-      setTimeout(() => toast.remove(), 300);
-    }, 3500);
+      toast.style.transform = 'translateX(120%)';
+      setTimeout(() => toast.remove(), 400);
+    }, 4000);
   }
 
   setupLightboxEvents() {

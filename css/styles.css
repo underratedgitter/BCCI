@@ -576,6 +576,16 @@ a:hover {
   color: #FFFFFF;
 }
 
+@keyframes toastSlideIn {
+  from { opacity: 0; transform: translateX(120%); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
 .mobile-menu-btn {
   display: none;
   background: none;
