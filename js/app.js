@@ -570,42 +570,78 @@ class App {
   updateNavAuthUI() {
     const desktopContainer = document.getElementById('navAuthContainer');
     const drawerContainer = document.getElementById('mobileDrawerAuthContainer');
+    const session = this.store.getApplicantSession();
 
-    const html = this.adminAuthed ? `
-      <button class="btn-admin-access" data-view-nav="admin" title="Admin Portal Active" style="width: 100%; justify-content: center;">
-        <i class="fas fa-user-shield"></i> Admin Portal
-      </button>
-      <button class="btn-signout-nav btnNavSignOut" title="Sign Out Admin Session" style="width: 100%; justify-content: center; margin-top: 0.5rem;">
-        <i class="fas fa-sign-out-alt"></i> Sign Out
-      </button>
-    ` : '';
+    let desktopHtml = '';
+    let drawerHtml = '';
 
-    if (desktopContainer) {
-      desktopContainer.innerHTML = this.adminAuthed ? `
+    if (this.adminAuthed) {
+      desktopHtml = `
         <button class="btn-admin-access" data-view-nav="admin" title="Admin Portal Active">
           <i class="fas fa-user-shield"></i> Admin Portal
         </button>
         <button class="btn-signout-nav btnNavSignOut" title="Sign Out Admin Session">
           <i class="fas fa-sign-out-alt"></i> Sign Out
         </button>
-      ` : '';
+      `;
+      drawerHtml = `
+        <button class="btn-admin-access" data-view-nav="admin" title="Admin Portal Active" style="width: 100%; justify-content: center;">
+          <i class="fas fa-user-shield"></i> Admin Portal
+        </button>
+        <button class="btn-signout-nav btnNavSignOut" title="Sign Out Admin Session" style="width: 100%; justify-content: center; margin-top: 0.5rem;">
+          <i class="fas fa-sign-out-alt"></i> Sign Out
+        </button>
+      `;
+    } else if (session && session.email) {
+      const memberApp = this.store.getApplicationByEmail(session.email);
+      let badgeLabel = 'My Profile';
+      if (memberApp && memberApp.status === 'Approved') badgeLabel = `${memberApp.company}`;
+      else if (memberApp && memberApp.status === 'Pending') badgeLabel = `Pending (${memberApp.id})`;
+
+      desktopHtml = `
+        <button type="button" class="btn-primary btnHeaderUserProfile" style="padding: 0.45rem 0.95rem; font-size: 0.82rem; background: linear-gradient(135deg, #0F2C59 0%, #1E3E62 100%); border: 1px solid #D4AF37; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(15,44,89,0.2);">
+          <i class="fas fa-user-circle" style="color: #FFD700; font-size: 1rem;"></i> ${badgeLabel}
+        </button>
+        <button type="button" class="btnUserSignOut btn-secondary" style="padding: 0.45rem 0.85rem; font-size: 0.82rem; color: #EF4444; border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.1); font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;" title="Sign Out">
+          <i class="fas fa-sign-out-alt"></i> Sign Out
+        </button>
+      `;
+      drawerHtml = `
+        <button type="button" class="btn-primary btnHeaderUserProfile" style="width: 100%; justify-content: center; padding: 0.6rem; font-size: 0.875rem; background: linear-gradient(135deg, #0F2C59 0%, #1E3E62 100%); border: 1px solid #D4AF37; font-weight: 700; margin-bottom: 0.5rem;">
+          <i class="fas fa-user-circle" style="color: #FFD700;"></i> ${badgeLabel}
+        </button>
+        <button type="button" class="btnUserSignOut btn-secondary" style="width: 100%; justify-content: center; padding: 0.6rem; font-size: 0.875rem; color: #EF4444; border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.1); font-weight: 700;">
+          <i class="fas fa-sign-out-alt"></i> Sign Out Account
+        </button>
+      `;
     }
 
-    if (drawerContainer) {
-      drawerContainer.innerHTML = html;
-    }
+    if (desktopContainer) desktopContainer.innerHTML = desktopHtml;
+    if (drawerContainer) drawerContainer.innerHTML = drawerHtml;
 
     // Bind click events on auth buttons
     document.querySelectorAll('.btnNavSignOut').forEach(btn => {
-      btn.addEventListener('click', () => this.handleSignOut());
+      btn.onclick = () => this.handleSignOut();
+    });
+
+    document.querySelectorAll('.btnHeaderUserProfile').forEach(btn => {
+      btn.onclick = () => {
+        const activeSession = this.store.getApplicantSession();
+        if (activeSession && activeSession.email) {
+          const memberApp = this.store.getApplicationByEmail(activeSession.email);
+          this.showApplicantProfileModal(activeSession, memberApp);
+        } else {
+          this.renderView('membership');
+        }
+      };
     });
 
     document.querySelectorAll('#navAuthContainer [data-view-nav], #mobileDrawerAuthContainer [data-view-nav]').forEach(el => {
-      el.addEventListener('click', (e) => {
+      el.onclick = (e) => {
         e.preventDefault();
         this.closeMobileDrawer();
         this.renderView(el.getAttribute('data-view-nav'));
-      });
+      };
     });
   }
 
