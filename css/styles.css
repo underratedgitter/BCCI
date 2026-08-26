@@ -585,8 +585,10 @@ small, .mono {
 .section-dark .section-tag { color: var(--gold); border-bottom-color: var(--gold); }
 
 .section-header {
-  text-align: left;
-  max-width: 640px;
+  text-align: center;
+  max-width: 680px;
+  margin-left: auto;
+  margin-right: auto;
   margin-bottom: var(--space-3xl);
 }
 
