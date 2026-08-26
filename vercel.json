@@ -3,12 +3,6 @@
   "name": "bcci-bharuch-portal",
   "buildCommand": "",
   "outputDirectory": ".",
-  "crons": [
-    {
-      "path": "/api/renewal-check",
-      "schedule": "0 9 * * *"
-    }
-  ],
   "functions": {
     "api/send-otp.js": {
       "memory": 256,
