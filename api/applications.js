@@ -17,7 +17,8 @@ const ADMIN_SESSIONS_KEY = 'bcci:admin_sessions';
 const RATE_LIMIT_KEY_PREFIX = 'bcci:ratelimit:application:';
 
 function corsHeaders(res) {
-  res.setHeader('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || '*');
+  const origin = process.env.ALLOWED_ORIGIN || 'https://bccibharuch.in';
+  res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -66,6 +67,7 @@ export default async function handler(req, res) {
       }
 
       // Public gets limited data (no payment proofs, no sensitive info)
+      res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300'); // 5 min cache
       const publicApps = applications.map(app => ({
         id: app.id,
         company: app.company,

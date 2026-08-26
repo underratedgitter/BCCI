@@ -13,7 +13,8 @@ const MAX_ATTEMPTS = 5; // lockout after 5 wrong attempts
 
 export default async function handler(req, res) {
   // ── CORS Headers ────────────────────────────────────────────────────
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const origin = process.env.ALLOWED_ORIGIN || 'https://bccibharuch.in';
+  res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 

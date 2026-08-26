@@ -14,7 +14,8 @@ const ENQUIRIES_KEY = 'bcci:enquiries';
 const RATE_LIMIT_KEY_PREFIX = 'bcci:ratelimit:enquiry:';
 
 function corsHeaders(res) {
-  res.setHeader('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || '*');
+  const origin = process.env.ALLOWED_ORIGIN || 'https://bccibharuch.in';
+  res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Credentials', 'true');

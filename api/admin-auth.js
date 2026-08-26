@@ -16,19 +16,18 @@ const ADMIN_RATE_LIMIT_KEY = 'bcci:ratelimit:admin_login';
 const SESSION_DURATION_MS = 8 * 60 * 60 * 1000; // 8 hours
 
 function corsHeaders(res) {
-  res.setHeader('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || '*');
+  const origin = process.env.ALLOWED_ORIGIN || 'https://bccibharuch.in';
+  res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Methods', 'POST, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
 }
 
 function generateSessionToken() {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let token = '';
-  for (let i = 0; i < 64; i++) {
-    token += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return token;
+  // Use crypto API for secure random tokens
+  const array = new Uint8Array(48);
+  globalThis.crypto.getRandomValues(array);
+  return Array.from(array, b => b.toString(16).padStart(2, '0')).join('');
 }
 
 export default async function handler(req, res) {

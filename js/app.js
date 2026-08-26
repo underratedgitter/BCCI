@@ -6,6 +6,21 @@
 
 import { Store } from './store.js?v=4.0.0';
 
+// ── Configuration ──────────────────────────────────────────────
+const CONFIG = {
+  ADMIN_EMAIL: 'admin@bccibharuch.in',
+  SUPPORT_PHONE: '+91 7861906384',
+  UPI_ID: '7861906384.eazypay@icici',
+};
+
+// ── XSS Sanitization ──────────────────────────────────────────
+function escapeHtml(str) {
+  if (!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
 class App {
   constructor() {
     this.store = new Store();
@@ -995,22 +1010,32 @@ class App {
     const faqContainer = document.getElementById('faqAccordion');
     if (faqContainer) {
       const faqs = this.store.getFaqs();
-      faqContainer.innerHTML = faqs.map((f, i) => `
-        <div class="faq-item ${i === 0 ? 'active' : ''}">
-          <button class="faq-question">
-            <span>${f.q}</span>
-            <i class="fas fa-chevron-down"></i>
+      faqContainer.innerHTML = faqs.map((f, i) => {
+        const faqId = `faq-${i}`;
+        const isActive = i === 0;
+        return `
+        <div class="faq-item ${isActive ? 'active' : ''}">
+          <button class="faq-question" aria-expanded="${isActive}" aria-controls="${faqId}">
+            <span>${escapeHtml(f.q)}</span>
+            <i class="fas fa-chevron-down" aria-hidden="true"></i>
           </button>
-          <div class="faq-answer"><p>${f.a}</p></div>
+          <div class="faq-answer" id="faqId" role="region"><p>${escapeHtml(f.a)}</p></div>
         </div>
-      `).join('');
+      `;
+      }).join('');
 
       faqContainer.querySelectorAll('.faq-question').forEach(btn => {
         btn.addEventListener('click', () => {
           const item = btn.parentElement;
           const isActive = item.classList.contains('active');
-          faqContainer.querySelectorAll('.faq-item').forEach(el => el.classList.remove('active'));
-          if (!isActive) item.classList.add('active');
+          faqContainer.querySelectorAll('.faq-item').forEach(el => {
+            el.classList.remove('active');
+            el.querySelector('.faq-question')?.setAttribute('aria-expanded', 'false');
+          });
+          if (!isActive) {
+            item.classList.add('active');
+            btn.setAttribute('aria-expanded', 'true');
+          }
         });
       });
     }
@@ -1323,7 +1348,7 @@ class App {
           }
 
           // 2. Admin receives: "New Application" alert with full details
-          this.store.sendEmail('admin_new_application', 'sp9023156004@gmail.com', {
+          this.store.sendEmail('admin_new_application', CONFIG.ADMIN_EMAIL, {
             appId: newApp.id,
             company: newApp.company,
             repName: newApp.repName,
@@ -1820,7 +1845,7 @@ class App {
   }
 
   sendEmailNotification(subject, payload) {
-    const targetEmail = 'sp9023156004@gmail.com';
+    const targetEmail = CONFIG.ADMIN_EMAIL;
     const formData = new FormData();
     formData.append('_subject', subject);
     formData.append('_template', 'table');

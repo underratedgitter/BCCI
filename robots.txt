@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /#admin
+Disallow: /#signin
+
+Sitemap: https://bccibharuch.in/sitemap.xml

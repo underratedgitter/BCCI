@@ -12,7 +12,7 @@ const redis = new Redis({
 });
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
+  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://bccibharuch.in',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
