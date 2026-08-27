@@ -48,6 +48,14 @@
   --danger: #9B2C2C;
   --danger-bg: #FFF5F5;
 
+  --primary: #0F2C59;
+  --accent-gold-dark: #A38038;
+  --accent-blue: #0284C7;
+  --border-color: #E2E8F0;
+  --text-main: #0F172A;
+  --text-muted: #475569;
+  --secondary: #1B2A4A;
+
   --accent: var(--navy);
   --accent-light: var(--navy-bg);
 
