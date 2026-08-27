@@ -2043,14 +2043,14 @@ footer h4 {
   .president-quote { font-size: 0.9rem; line-height: 1.7; }
 
   /* ── Grids ─────────────────────────────────────────────────── */
-  .team-grid { grid-template-columns: 1fr; gap: 1px; }
-  .team-card { padding: var(--space-md); display: flex; flex-direction: row; align-items: center; gap: 1rem; text-align: left; }
-  .team-avatar { width: 64px; height: 64px; font-size: 1.1rem; margin-bottom: 0; flex-shrink: 0; }
-  .team-avatar-img-wrap { width: 72px; height: 72px; margin-bottom: 0; flex-shrink: 0; }
-  .team-name { font-size: 0.82rem; margin-bottom: 0.15rem; }
-  .team-title { font-size: 0.58rem; margin-bottom: 0.4rem; }
-  .team-badge { font-size: 0.55rem; padding: 0.12rem 0.45rem; }
-  .team-linkedin-btn { font-size: 0.58rem; padding: 0.25rem 0.6rem; margin-top: 0.4rem; }
+  .team-grid { grid-template-columns: 1fr 1fr; gap: 1px; }
+  .team-card { padding: var(--space-lg) var(--space-md); }
+  .team-avatar { width: 80px; height: 80px; font-size: 1.3rem; }
+  .team-avatar-img-wrap { width: 100px; height: 100px; }
+  .team-name { font-size: 0.85rem; }
+  .team-title { font-size: 0.6rem; }
+  .team-badge { font-size: 0.58rem; padding: 0.15rem 0.5rem; }
+  .team-linkedin-btn { font-size: 0.62rem; padding: 0.3rem 0.7rem; }
 
   /* ── About Us cards ────────────────────────────────────────── */
   .about-info-grid > div { padding: 1.25rem !important; }
