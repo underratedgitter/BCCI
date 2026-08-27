@@ -261,8 +261,11 @@ const TEMPLATES = {
 // ── Email Sending Logic ──────────────────────────────────────────
 
 async function sendViaResend({ to, subject, html }) {
-  const apiKey = process.env.RESEND_API_KEY || localStorage?.getItem?.('bcci_resend_api_key') || '';
-  if (!apiKey) return false;
+  const apiKey = process.env.RESEND_API_KEY || '';
+  if (!apiKey) {
+    console.warn('[Resend] No API key configured — skipping');
+    return false;
+  }
 
   try {
     const response = await fetch('https://api.resend.com/emails', {
@@ -285,8 +288,10 @@ async function sendViaResend({ to, subject, html }) {
       return true;
     }
 
-    const err = await response.json();
-    console.warn('[Resend] Failed:', err);
+    // Safely parse error response (might not be JSON)
+    let errBody;
+    try { errBody = await response.json(); } catch { errBody = await response.text(); }
+    console.warn(`[Resend] Failed (${response.status}):`, errBody);
     return false;
   } catch (err) {
     console.warn('[Resend] Network error:', err.message);

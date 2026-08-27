@@ -63,19 +63,7 @@ export default async function handler(req, res) {
   await redis.set(rateLimitKey, '1', { ex: RATE_LIMIT_SECONDS });
   await redis.del(attemptsKey); // reset any previous failed attempts
 
-  // ── Send Email via Gmail SMTP ────────────────────────────────────────
-  const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true, // SSL
-    auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_PASS,
-    },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-  });
-
+  // ── Email HTML Template ──────────────────────────────────────────────
   const htmlBody = `
 <!DOCTYPE html>
 <html lang="en">
@@ -133,29 +121,86 @@ export default async function handler(req, res) {
 </body>
 </html>`;
 
-  try {
-    await transporter.sendMail({
-      from: `"BCCI Bharuch Portal" <${process.env.GMAIL_USER}>`,
-      to: normalizedEmail,
-      subject: `Your BCCI Bharuch Verification Code: ${otp}`,
-      html: htmlBody,
-      text: `Your BCCI Bharuch verification code is: ${otp}\nThis code expires in 10 minutes. Do not share it with anyone.`,
-    });
+  // ── Try Resend first, fallback to Gmail SMTP ─────────────────────────
+  let emailSent = false;
+  let provider = 'none';
 
-    console.log(`[BCCI OTP] Sent to ${normalizedEmail}`);
+  // 1. Try Resend API
+  const resendApiKey = process.env.RESEND_API_KEY || '';
+  if (resendApiKey) {
+    try {
+      const resendResp = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: process.env.EMAIL_FROM || 'BCCI Bharuch <onboarding@resend.dev>',
+          to: normalizedEmail,
+          subject: `Your BCCI Bharuch Verification Code: ${otp}`,
+          html: htmlBody,
+        }),
+      });
+      if (resendResp.ok) {
+        const resendData = await resendResp.json();
+        console.log(`[Resend OTP] Sent to ${normalizedEmail}:`, resendData.id);
+        emailSent = true;
+        provider = 'resend';
+      } else {
+        let errBody;
+        try { errBody = await resendResp.json(); } catch { errBody = await resendResp.text(); }
+        console.warn(`[Resend OTP] Failed (${resendResp.status}):`, errBody);
+      }
+    } catch (err) {
+      console.warn('[Resend OTP] Network error:', err.message);
+    }
+  }
+
+  // 2. Fallback: Gmail SMTP
+  if (!emailSent && process.env.GMAIL_USER && process.env.GMAIL_PASS) {
+    try {
+      const transporter = nodemailer.createTransport({
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,
+        auth: {
+          user: process.env.GMAIL_USER,
+          pass: process.env.GMAIL_PASS,
+        },
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+      });
+
+      await transporter.sendMail({
+        from: `"BCCI Bharuch Portal" <${process.env.GMAIL_USER}>`,
+        to: normalizedEmail,
+        subject: `Your BCCI Bharuch Verification Code: ${otp}`,
+        html: htmlBody,
+        text: `Your BCCI Bharuch verification code is: ${otp}\nThis code expires in 10 minutes. Do not share it with anyone.`,
+      });
+
+      console.log(`[SMTP OTP] Sent to ${normalizedEmail}`);
+      emailSent = true;
+      provider = 'smtp';
+    } catch (err) {
+      console.error('[SMTP OTP] Error:', err.message);
+    }
+  }
+
+  if (emailSent) {
     return res.status(200).json({
       success: true,
-      message: `Verification code sent to ${normalizedEmail}. Check your inbox.`
+      message: `Verification code sent to ${normalizedEmail}. Check your inbox.`,
+      provider,
     });
-
-  } catch (err) {
-    console.error('[BCCI OTP Send Error]', err.message);
+  } else {
     // Clean up KV so user can retry immediately
     await redis.del(otpKey);
     await redis.del(rateLimitKey);
     return res.status(500).json({
       success: false,
-      error: 'Failed to send email. Please try again in a moment.'
+      error: 'Failed to send email. All providers unavailable. Please try again later.'
     });
   }
 }
