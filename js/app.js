@@ -631,18 +631,13 @@ class App {
     let drawerHtml = '';
 
     if (this.adminAuthed) {
+      // Admin Portal button hidden — access via Ctrl+Shift+A or #admin hash only
       desktopHtml = `
-        <button class="btn-admin-access" data-view-nav="admin" title="Admin Portal Active">
-          <i class="fas fa-user-shield"></i> Admin Portal
-        </button>
         <button class="btn-signout-nav btnNavSignOut" title="Sign Out Admin Session">
           <i class="fas fa-sign-out-alt"></i> Sign Out
         </button>
       `;
       drawerHtml = `
-        <button class="btn-admin-access" data-view-nav="admin" title="Admin Portal Active" style="width: 100%; justify-content: center;">
-          <i class="fas fa-user-shield"></i> Admin Portal
-        </button>
         <button class="btn-signout-nav btnNavSignOut" title="Sign Out Admin Session" style="width: 100%; justify-content: center; margin-top: 0.5rem;">
           <i class="fas fa-sign-out-alt"></i> Sign Out
         </button>
