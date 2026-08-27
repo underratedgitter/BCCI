@@ -329,6 +329,8 @@ class App {
     const gate = document.getElementById('applicantAuthGate');
     const banner = document.getElementById('applicantAuthBanner');
     const wrapper = document.getElementById('membershipFormWrapper');
+    const signInReminder = document.getElementById('signInReminder');
+    const membershipSubmitBtn = document.querySelector('#membershipForm button[type="submit"]');
     const emailDisplay = document.getElementById('applicantEmailDisplay');
     const avatarInitial = document.getElementById('applicantAvatarInitial');
     const profileBtnText = document.getElementById('userProfileBtnText');
@@ -338,6 +340,13 @@ class App {
     if (session && session.email) {
       if (gate) gate.style.display = 'none';
       if (banner) banner.style.display = 'flex';
+      if (signInReminder) signInReminder.style.display = 'none';
+      if (membershipSubmitBtn) {
+        membershipSubmitBtn.disabled = false;
+        membershipSubmitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit Application';
+        membershipSubmitBtn.style.opacity = '1';
+        membershipSubmitBtn.style.cursor = 'pointer';
+      }
       if (headerSignOutBtn) headerSignOutBtn.style.display = 'inline-flex';
 
       const memberApp = await this.store.getApplicationByEmail(session.email);
@@ -418,7 +427,14 @@ class App {
     } else {
       if (gate) gate.style.display = 'block';
       if (banner) banner.style.display = 'none';
-      if (wrapper) wrapper.style.display = 'none';
+      if (wrapper) wrapper.style.display = 'grid';
+      if (signInReminder) signInReminder.style.display = 'flex';
+      if (membershipSubmitBtn) {
+        membershipSubmitBtn.disabled = true;
+        membershipSubmitBtn.innerHTML = '<i class="fas fa-lock"></i> Sign In to Submit';
+        membershipSubmitBtn.style.opacity = '0.65';
+        membershipSubmitBtn.style.cursor = 'not-allowed';
+      }
       this.updateHeaderMemberBadge(null, null);
       if (profileBtnText) profileBtnText.textContent = 'My Profile / Sign In';
       if (headerSignOutBtn) headerSignOutBtn.style.display = 'none';
@@ -1304,6 +1320,15 @@ class App {
     if (membershipForm) {
       membershipForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+
+        // Check if user is authenticated before allowing submission
+        const session = this.store.getApplicantSession();
+        if (!session || !session.email) {
+          this.showToast('Please sign in with your email to submit the application.', 'warning');
+          const authGate = document.getElementById('applicantAuthGate');
+          if (authGate) authGate.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return;
+        }
 
         let firstInvalidInput = null;
         let isFormValid = true;

@@ -758,6 +758,19 @@
         </div>
 
         <div id="membershipFormWrapper" style="display: none; max-width: 1200px; margin: 0 auto;">
+          <!-- Sign-in Required Reminder (hidden when authenticated) -->
+          <div id="signInReminder" style="background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%); border: 1px solid #F59E0B; border-left: 4px solid #D97706; border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+            <div style="width: 36px; height: 36px; background: #D97706; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              <i class="fas fa-lock" style="color: #FFFFFF; font-size: 0.85rem;"></i>
+            </div>
+            <div style="flex: 1; min-width: 200px;">
+              <div style="font-weight: 700; color: #92400E; font-size: 0.95rem;">Sign In Required to Submit</div>
+              <div style="color: #A16207; font-size: 0.82rem; margin-top: 2px;">You can preview the form below. Complete the <strong>Applicant Authentication Gate</strong> above to enable submission.</div>
+            </div>
+            <button type="button" onclick="document.getElementById('applicantAuthGate').scrollIntoView({behavior:'smooth',block:'center'})" style="background: #D97706; color: #FFFFFF; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 700; font-size: 0.82rem; cursor: pointer; white-space: nowrap;">
+              <i class="fas fa-arrow-up"></i> Sign In Now
+            </button>
+          </div>
           <div class="membership-layout-grid" style="display: grid; grid-template-columns: 1fr 340px; gap: 2rem; align-items: start;">
             <!-- Left Column: Membership Form -->
             <div class="form-container" style="max-width: 100%; margin: 0;">
