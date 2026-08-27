@@ -70,6 +70,7 @@ export default async function handler(req, res) {
       res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300'); // 5 min cache
       const publicApps = applications.map(app => ({
         id: app.id,
+        email: app.email,
         company: app.company,
         status: app.status,
         submittedAt: app.submittedAt,

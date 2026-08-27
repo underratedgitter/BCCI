@@ -35,6 +35,7 @@ class App {
     this.bindNavigation();
     this.updateNavAuthUI();
     this.renderView('home');
+    this.updateApplicantAuthUI();
     this.setupSecretAccessHandlers();
     this.setupApplicantAuthHandlers();
     this.setupFileUploadHandlers();

@@ -610,6 +610,10 @@ small, .mono {
 }
 
 .profile-dropdown-actions button:hover { background: var(--gray-50); }
+.profile-dropdown-actions .pd-btn-primary { color: var(--primary); }
+.profile-dropdown-actions .pd-btn-primary:hover { background: var(--navy-light); color: var(--primary); }
+.profile-dropdown-actions .pd-btn-gold { color: #B8860B; }
+.profile-dropdown-actions .pd-btn-gold:hover { background: var(--gold-bg); color: #8B6914; }
 .profile-dropdown-actions .pd-btn-danger { color: var(--danger); }
 .profile-dropdown-actions .pd-btn-danger:hover { background: var(--danger-bg); }
 
