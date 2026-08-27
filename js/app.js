@@ -1269,46 +1269,8 @@ class App {
   }
 
   /* ════════════════════════════════════════════════════════════════════
-     EMAIL DISPATCH — Resend API + FormSubmit fallback
+     EMAIL DISPATCH — Via Vercel Serverless API
      ════════════════════════════════════════════════════════════════════ */
-
-  async sendResendEmail({ to, subject, html, text, from = 'BCCI Bharuch <onboarding@resend.dev>' }) {
-    const apiKey = localStorage.getItem('bcci_resend_api_key') || window.BCCI_RESEND_API_KEY || '';
-    if (apiKey) {
-      try {
-        const response = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            from, to: Array.isArray(to) ? to : [to], subject,
-            html: html || `<pre style="white-space:pre-wrap;font-family:Arial,sans-serif;">${text}</pre>`,
-            text
-          })
-        });
-        const resData = await response.json();
-        if (response.ok) { console.log('[Resend] Sent:', resData); return resData; }
-      } catch (err) { console.warn('[Resend] Fallback to FormSubmit:', err); }
-    }
-
-    return this.sendFormSubmitEmail({ to, subject, text });
-  }
-
-  async sendFormSubmitEmail({ to, subject, text }) {
-    const recipients = Array.isArray(to) ? to : [to];
-    let successCount = 0;
-    for (const recipient of recipients) {
-      if (!recipient || !recipient.includes('@')) continue;
-      try {
-        const response = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(recipient.trim())}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify({ _subject: subject, _captcha: "false", _template: "table", "Message": text })
-        });
-        if (response.ok) successCount++;
-      } catch (err) { console.error(`[FormSubmit] Error for ${recipient}:`, err); }
-    }
-    return successCount > 0;
-  }
 
   /* ════════════════════════════════════════════════════════════════════
      FORM HANDLERS — Membership & Enquiry Submission
@@ -1458,10 +1420,22 @@ class App {
           const data = Object.fromEntries(formData.entries());
           const newEnq = await this.store.addEnquiry(data);
 
-          this.sendEmailNotification(`New BCCI General Enquiry: ${data.subject || newEnq.id}`, {
-            'Enquiry Ref ID': newEnq.id, 'Sender Name': data.name, 'Company': data.company || 'N/A',
-            'Email': data.email, 'Phone': data.phone, 'Subject': data.subject, 'Message': data.message
-          });
+          // Notify admin via Vercel API
+          this.store.sendEmail('admin_new_application', CONFIG.ADMIN_EMAIL, {
+            appId: newEnq.id,
+            company: data.company || 'N/A',
+            repName: data.name,
+            repDesignation: 'Enquiry Sender',
+            email: data.email,
+            phone: data.phone,
+            sector: data.subject || 'General Enquiry',
+            enterpriseType: 'N/A',
+            legalStatus: 'N/A',
+            gstNo: 'N/A',
+            panNo: 'N/A',
+            paymentRef: '',
+            date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
+          }).catch(err => console.warn('[Email] enquiry notification failed:', err));
 
           enquiryForm.reset();
           enquiryForm.querySelectorAll('input, select, textarea').forEach(input => {
@@ -1864,19 +1838,7 @@ class App {
     this.showToast('CSV exported successfully!', 'success');
   }
 
-  sendEmailNotification(subject, payload) {
-    const targetEmail = CONFIG.ADMIN_EMAIL;
-    const formData = new FormData();
-    formData.append('_subject', subject);
-    formData.append('_template', 'table');
-    formData.append('_captcha', 'false');
-    for (const [key, value] of Object.entries(payload)) formData.append(key, value);
 
-    fetch(`https://formsubmit.co/ajax/${targetEmail}`, { method: 'POST', body: formData })
-      .then(res => res.json())
-      .then(data => console.log('[FormSubmit] Admin notified:', data))
-      .catch(err => console.warn('[FormSubmit] Error:', err));
-  }
 
   /* ════════════════════════════════════════════════════════════════════
      MODAL, TOAST, LIGHTBOX — UI Utilities
