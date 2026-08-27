@@ -78,12 +78,7 @@ class App {
     btn.title = 'Scroll to top';
     btn.setAttribute('aria-label', 'Scroll to top');
     btn.style.cssText = `
-      position: fixed; bottom: 2rem; right: 1.5rem; width: 44px; height: 44px;
-      border-radius: 50%; background: var(--primary, #0F2C59); color: #FFFFFF;
-      border: 2px solid #D4AF37; font-size: 1rem; cursor: pointer;
-      box-shadow: 0 4px 14px rgba(15,44,89,0.3); z-index: 2500;
       opacity: 0; visibility: hidden; transform: translateY(10px);
-      transition: all 0.3s ease; display: flex; align-items: center; justify-content: center;
     `;
     btn.onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
     document.body.appendChild(btn);

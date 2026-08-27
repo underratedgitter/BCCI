@@ -56,6 +56,13 @@
   --text-muted: #475569;
   --secondary: #1B2A4A;
 
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+  --shadow-lg: 0 12px 32px rgba(0,0,0,0.1);
+
   --accent: var(--navy);
   --accent-light: var(--navy-bg);
 
@@ -229,7 +236,7 @@ small, .mono {
    ========================================================================== */
 .top-bar {
   background: var(--navy);
-  color: rgba(255,255,255,0.6);
+  color: rgba(255,255,255,0.75);
   padding: 0.55rem 0;
   font-family: var(--font-mono);
   font-size: 0.68rem;
@@ -1554,8 +1561,8 @@ footer h4 {
 
 .footer-links { list-style: none; }
 .footer-links li { margin-bottom: 0.6rem; font-size: 0.88rem; display: flex; align-items: center; gap: 0.5rem; }
-.footer-links a { color: rgba(255,255,255,0.5); transition: var(--transition); text-decoration: none; }
-.footer-links a:hover { color: var(--gold); opacity: 1; }
+.footer-links a { color: rgba(255,255,255,0.7); transition: var(--transition); text-decoration: none; }
+.footer-links a:hover { color: var(--gold); opacity: 1; text-decoration: underline; }
 
 .footer-bottom {
   border-top: 1px solid rgba(255,255,255,0.1);
@@ -1563,7 +1570,7 @@ footer h4 {
   text-align: center;
   font-family: var(--font-mono);
   font-size: 0.68rem;
-  color: rgba(255,255,255,0.35);
+  color: rgba(255,255,255,0.55);
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -1742,23 +1749,26 @@ footer h4 {
   position: fixed;
   bottom: 2rem;
   right: 1.5rem;
-  width: 40px;
-  height: 40px;
-  background: var(--white);
-  color: var(--black);
-  border: var(--rule);
-  font-size: 0.9rem;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--white);
+  border: 2px solid var(--gold);
+  font-size: 1rem;
   cursor: pointer;
   z-index: 2500;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: var(--transition);
+  box-shadow: 0 4px 14px rgba(15,44,89,0.3);
+  transition: all 0.3s ease;
   opacity: 0;
   visibility: hidden;
+  transform: translateY(10px);
 }
 
-#scrollToTopBtn:hover { background: var(--black); color: var(--white); border-color: var(--black); }
+#scrollToTopBtn:hover { background: var(--navy-light); color: var(--white); border-color: var(--gold); transform: translateY(0); }
 
 /* ==========================================================================
    SIGN-IN PAGE
@@ -1851,6 +1861,8 @@ footer h4 {
   .admin-menu-item { white-space: nowrap; border-bottom: none; border-right: var(--rule); }
   .admin-metrics-grid { grid-template-columns: repeat(2, 1fr); }
   .footer-grid { grid-template-columns: 1fr 1fr; gap: var(--space-xl); }
+  .services-grid { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+  .blogs-grid { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
 }
 
 /* ==========================================================================
