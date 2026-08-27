@@ -1680,6 +1680,10 @@ footer h4 {
 
 .mobile-drawer-actions { margin-bottom: var(--space-xl); }
 
+.mobile-drawer-signin-item { border-top: var(--rule); padding-top: 0.5rem; margin-top: 0.25rem; }
+.mobile-drawer-signin-item .mobile-drawer-link { color: var(--navy); font-weight: 600; }
+.mobile-drawer-signin-item .mobile-drawer-link i { color: var(--gold); }
+
 .mobile-drawer-contact {
   border-top: var(--rule);
   padding-top: var(--space-lg);
@@ -1835,52 +1839,319 @@ footer h4 {
 @media (max-width: 1024px) {
   .admin-layout { grid-template-columns: 1fr; }
   .admin-sidebar { position: static; }
-  .admin-menu { display: flex; overflow-x: auto; }
+  .admin-menu { display: flex; overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .admin-menu-item { white-space: nowrap; border-bottom: none; border-right: var(--rule); }
   .admin-metrics-grid { grid-template-columns: repeat(2, 1fr); }
+  .footer-grid { grid-template-columns: 1fr 1fr; gap: var(--space-xl); }
 }
 
+/* ==========================================================================
+   TABLET & LARGE PHONE (≤ 768px)
+   ========================================================================== */
 @media (max-width: 768px) {
-  :root { --space-xl: 1.5rem; --space-2xl: 2.5rem; --space-3xl: 3.5rem; --space-4xl: 4.5rem; }
+  :root {
+    --space-xl: 1.5rem;
+    --space-2xl: 2.5rem;
+    --space-3xl: 3.5rem;
+    --space-4xl: 4rem;
+  }
 
+  /* ── Navigation ────────────────────────────────────────────── */
   .top-bar { display: none; }
   .nav-links { display: none; }
-  .nav-actions .btn-nav-cta, .nav-actions .btn-admin-access, .nav-actions .btn-signout-nav { display: none; }
+  .nav-actions .btn-nav-cta,
+  .nav-actions .btn-admin-access,
+  .nav-actions .btn-signout-nav { display: none; }
+  .nav-actions .btn-signin-nav { display: none; }
   .mobile-menu-btn { display: flex; align-items: center; justify-content: center; }
+  .navbar-inner { padding: 0.75rem 1.25rem; }
+  .nav-logo { height: 30px; }
 
+  /* ── Hero ──────────────────────────────────────────────────── */
+  .hero { padding: var(--space-3xl) 0; }
   .hero-grid { grid-template-columns: 1fr; gap: var(--space-2xl); }
-  .hero-title { font-size: clamp(2.2rem, 8vw, 3rem); }
-  .hero-stats-card { order: -1; }
+  .hero-title { font-size: clamp(2rem, 7vw, 3rem); line-height: 1.1; }
+  .hero-subtitle { font-size: 1rem; }
+  .hero-stats-card { padding: var(--space-xl); }
+  .hero-actions { flex-wrap: wrap; }
+  .hero-actions .btn-primary,
+  .hero-actions .btn-secondary { flex: 1; min-width: 160px; justify-content: center; }
 
-  .president-card { grid-template-columns: 1fr; padding: var(--space-xl); }
+  /* ── Sections ──────────────────────────────────────────────── */
+  .section-header { margin-bottom: var(--space-2xl); }
+  .section-desc { font-size: 0.95rem; }
 
-  .form-grid { grid-template-columns: 1fr; }
+  /* ── President Card ────────────────────────────────────────── */
+  .president-card { grid-template-columns: 1fr; padding: var(--space-xl); gap: var(--space-xl); }
+  .president-img { max-width: 180px; }
+  .president-quote { border-left: none; padding-left: 0; border-top: 2px solid var(--gold); padding-top: var(--space-xl); }
+
+  /* ── Grids ─────────────────────────────────────────────────── */
+  .services-grid { grid-template-columns: 1fr; }
+  .blogs-grid { grid-template-columns: 1fr; }
+  .team-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+
+  /* ── Forms ─────────────────────────────────────────────────── */
+  .form-grid { grid-template-columns: 1fr; gap: var(--space-lg); }
   .form-container { padding: var(--space-xl); }
   .form-qr-grid { grid-template-columns: 1fr; }
+  .form-control, .form-select {
+    padding: 0.85rem 0;
+    font-size: 1rem;
+  }
+  .form-label { font-size: 0.75rem; }
 
-  .qrcode-hero-container { grid-template-columns: 1fr; }
+  /* ── QR Code & Payments ────────────────────────────────────── */
+  .qrcode-hero-container { grid-template-columns: 1fr; gap: var(--space-xl); }
+  .qrcode-actions { flex-direction: column; }
+  .qrcode-actions .btn-primary,
+  .qrcode-actions .btn-secondary { width: 100%; justify-content: center; }
+
+  /* ── Buttons (touch targets) ───────────────────────────────── */
+  .btn-primary, .btn-nav-cta {
+    padding: 0.75rem 1.5rem;
+    font-size: 0.88rem;
+    min-height: 44px;
+  }
+  .btn-secondary {
+    padding: 0.7rem 1.4rem;
+    min-height: 44px;
+  }
+
+  /* ── FAQ ───────────────────────────────────────────────────── */
+  .faq-question {
+    padding: 1.1rem 1.25rem;
+    font-size: 0.95rem;
+    min-height: 48px;
+  }
+  .faq-answer { padding: 0 1.25rem 1.25rem; }
+
+  /* ── Blog Cards ────────────────────────────────────────────── */
+  .blog-img-wrap { height: 200px; }
+  .blog-body { padding: var(--space-lg); }
+  .blog-title { font-size: 1.05rem; }
+
+  /* ── Mobile Bottom Nav ─────────────────────────────────────── */
+  .mobile-bottom-nav {
+    display: flex;
+    justify-content: space-around;
+    padding: 0.4rem 0;
+    padding-bottom: max(0.4rem, env(safe-area-inset-bottom));
+  }
+  .mobile-bottom-tab {
+    padding: 0.45rem 0.6rem;
+    min-height: 44px;
+  }
+  .mobile-bottom-tab i { font-size: 1.2rem; }
+  .mobile-bottom-tab span { font-size: 0.58rem; }
+
+  /* ── Footer ────────────────────────────────────────────────── */
   .footer-grid { grid-template-columns: 1fr 1fr; gap: var(--space-xl); }
-  .mobile-bottom-nav { display: flex; justify-content: space-around; }
+  footer { padding: var(--space-2xl) 0 var(--space-lg); }
 
-  .blogs-grid { grid-template-columns: 1fr; }
-  .services-grid { grid-template-columns: 1fr; }
+  /* ── Scroll to top ─────────────────────────────────────────── */
+  #scrollToTopBtn {
+    bottom: 5.5rem;
+    right: 1rem;
+    width: 42px;
+    height: 42px;
+  }
 
+  /* ── Admin ─────────────────────────────────────────────────── */
   .data-table { display: none; }
   .admin-mobile-cards { display: block; }
   .admin-metrics-grid { grid-template-columns: 1fr 1fr; }
+  .admin-layout { gap: var(--space-lg); }
 
-  .modal-box { margin: 1rem; padding: var(--space-xl); }
+  /* ── Modals ────────────────────────────────────────────────── */
+  .modal-backdrop { padding: 1rem; }
+  .modal-box { margin: 0; padding: var(--space-xl); max-height: 80vh; }
+  .modal-title { font-size: 1.15rem; }
+
+  /* ── Membership layout grid ────────────────────────────────── */
+  .membership-layout-grid { grid-template-columns: 1fr !important; }
+  .membership-layout-grid aside { position: static !important; }
+
+  /* ── Sign-in ───────────────────────────────────────────────── */
+  .signin-container { padding: var(--space-2xl) var(--space-xl); }
 }
 
+/* ==========================================================================
+   SMALL PHONES (≤ 480px)
+   ========================================================================== */
 @media (max-width: 480px) {
-  .hero-title { font-size: 2rem; }
-  .hero-actions { flex-direction: column; }
-  .hero-actions .btn-primary, .hero-actions .btn-secondary { width: 100%; justify-content: center; }
-  .footer-grid { grid-template-columns: 1fr; }
-  .stats-grid { grid-template-columns: 1fr; }
-  .admin-metrics-grid { grid-template-columns: 1fr; }
+  :root {
+    --space-xl: 1.25rem;
+    --space-2xl: 2rem;
+    --space-3xl: 2.75rem;
+    --space-4xl: 3rem;
+  }
+
+  body { font-size: 0.9rem; }
+
+  /* ── Hero ──────────────────────────────────────────────────── */
+  .hero { padding: var(--space-2xl) 0; }
+  .hero-title { font-size: 1.85rem; line-height: 1.12; }
+  .hero-subtitle { font-size: 0.92rem; line-height: 1.65; margin-bottom: var(--space-xl); }
+  .hero-badge { font-size: 0.62rem; margin-bottom: var(--space-lg); }
+  .hero-actions { flex-direction: column; gap: 0.75rem; }
+  .hero-actions .btn-primary,
+  .hero-actions .btn-secondary { width: 100%; min-width: 0; }
+  .hero-stats-card { padding: var(--space-lg); }
+  .hero-stats-card h3 { font-size: 0.9rem; margin-bottom: var(--space-lg); }
+  .stat-number { font-size: 1.7rem; }
+  .stat-label { font-size: 0.62rem; }
+  .stat-item { padding: var(--space-md); }
+
+  /* ── Sections ──────────────────────────────────────────────── */
+  .section-tag { font-size: 0.62rem; letter-spacing: 0.1em; }
+  .section-title { font-size: 1.6rem; margin-bottom: var(--space-md); }
+  .section-desc { font-size: 0.88rem; }
+
+  /* ── President Card ────────────────────────────────────────── */
+  .president-card { padding: var(--space-lg); }
+  .president-name { font-size: 0.95rem; }
+  .president-role { font-size: 0.62rem; }
+  .president-quote { font-size: 0.9rem; line-height: 1.7; }
+
+  /* ── Grids ─────────────────────────────────────────────────── */
+  .team-grid { grid-template-columns: 1fr 1fr; gap: 1px; }
+  .team-card { padding: var(--space-lg) var(--space-md); }
+  .team-avatar { width: 80px; height: 80px; font-size: 1.3rem; }
+  .team-avatar-img-wrap { width: 100px; height: 100px; }
+  .team-name { font-size: 0.85rem; }
+  .team-title { font-size: 0.6rem; }
+  .team-badge { font-size: 0.58rem; padding: 0.15rem 0.5rem; }
+  .team-linkedin-btn { font-size: 0.62rem; padding: 0.3rem 0.7rem; }
+
+  /* ── Services ──────────────────────────────────────────────── */
+  .service-card { padding: var(--space-lg); }
+  .service-icon { width: 36px; height: 36px; font-size: 1rem; margin-bottom: var(--space-md); }
+  .service-title { font-size: 1rem; margin-bottom: 0.5rem; }
+  .service-desc { font-size: 0.85rem; }
+
+  /* ── FAQ ───────────────────────────────────────────────────── */
+  .faq-question {
+    padding: 1rem;
+    font-size: 0.88rem;
+    gap: 0.75rem;
+  }
+  .faq-answer { padding: 0 1rem 1rem; font-size: 0.88rem; }
+  .faq-grid { margin-bottom: var(--space-xl); }
+
+  /* ── Blog Cards ────────────────────────────────────────────── */
+  .blog-img-wrap { height: 175px; }
+  .blog-body { padding: var(--space-md); }
+  .blog-title { font-size: 0.95rem; }
+  .blog-desc { font-size: 0.82rem; line-height: 1.6; }
+  .blog-meta { gap: 0.75rem; font-size: 0.62rem; }
+  .btn-blog-read { font-size: 0.65rem; }
+
+  /* ── Forms ─────────────────────────────────────────────────── */
+  .form-container { padding: var(--space-lg); }
+  .form-control, .form-select {
+    padding: 0.8rem 0;
+    font-size: 1rem;
+    min-height: 44px;
+  }
+  .form-label { font-size: 0.7rem; margin-bottom: 0.4rem; }
+  .form-hint { font-size: 0.65rem; }
+  .form-qr-payment-container { padding: var(--space-md); }
+
+  /* ── Buttons ───────────────────────────────────────────────── */
+  .btn-primary, .btn-nav-cta {
+    padding: 0.8rem 1.5rem;
+    font-size: 0.9rem;
+    min-height: 48px;
+  }
+  .btn-secondary {
+    padding: 0.75rem 1.4rem;
+    min-height: 48px;
+    font-size: 0.88rem;
+  }
+
+  /* ── QR Code Page ──────────────────────────────────────────── */
+  .qrcode-card { padding: var(--space-lg); }
+  .qrcode-details-pane { gap: var(--space-lg); }
+  .payment-info-box { padding: var(--space-lg); }
+  .payment-details-list li { font-size: 0.85rem; }
+  .pay-apps-badges { gap: 0.3rem; }
+  .app-chip { padding: 0.2rem 0.5rem; font-size: 0.62rem; }
+
+  /* ── Footer ────────────────────────────────────────────────── */
+  .footer-grid { grid-template-columns: 1fr; gap: var(--space-xl); }
+  footer { padding: var(--space-xl) 0 var(--space-md); }
+  footer h4 { font-size: 0.62rem; margin-bottom: var(--space-md); }
+  .footer-links li { font-size: 0.82rem; margin-bottom: 0.5rem; }
+  .footer-bottom { font-size: 0.62rem; }
+
+  /* ── Mobile Bottom Nav ─────────────────────────────────────── */
+  .mobile-bottom-nav {
+    padding: 0.35rem 0;
+    padding-bottom: max(0.35rem, env(safe-area-inset-bottom));
+  }
+  .mobile-bottom-tab {
+    padding: 0.4rem 0.45rem;
+    min-height: 44px;
+  }
+  .mobile-bottom-tab i { font-size: 1.15rem; }
+  .mobile-bottom-tab span { font-size: 0.55rem; letter-spacing: 0.04em; }
+
+  /* ── Mobile Drawer ─────────────────────────────────────────── */
+  .mobile-drawer { width: 280px; }
+  .mobile-drawer-header { padding: 1rem 1.25rem; }
+  .mobile-drawer-body { padding: var(--space-md) 1.25rem; }
+  .mobile-drawer-link {
+    padding: 0.75rem 0;
+    font-size: 0.88rem;
+    min-height: 44px;
+    align-items: center;
+  }
+  .mobile-drawer-link i { font-size: 1rem; width: 20px; text-align: center; }
+  .mobile-contact-item { font-size: 0.8rem; }
+  .mobile-whatsapp-btn { padding: 0.85rem; font-size: 0.7rem; min-height: 48px; }
+
+  /* ── Scroll to top ─────────────────────────────────────────── */
+  #scrollToTopBtn {
+    bottom: 5rem;
+    right: 0.75rem;
+    width: 40px;
+    height: 40px;
+  }
+
+  /* ── Admin ─────────────────────────────────────────────────── */
+  .admin-metrics-grid { grid-template-columns: 1fr 1fr; }
+  .metric-card { padding: var(--space-md); }
+  .metric-val { font-size: 1.6rem; }
+  .metric-title { font-size: 0.6rem; }
+  .admin-mobile-card { padding: var(--space-md); }
+  .admin-card-meta { grid-template-columns: 1fr; gap: 0.35rem; font-size: 0.8rem; }
+  .admin-card-actions { flex-direction: column; }
+  .admin-card-actions .btn-action-approve,
+  .admin-card-actions .btn-action-reject { width: 100%; justify-content: center; }
+
+  /* ── Modals ────────────────────────────────────────────────── */
+  .modal-box { padding: var(--space-lg); }
+  .modal-close { top: 0.75rem; right: 0.75rem; }
+
+  /* ── Sign-in ───────────────────────────────────────────────── */
+  .signin-container { padding: var(--space-xl) var(--space-lg); }
+  .signin-title { font-size: 1.25rem; }
+  .signin-icon { width: 48px; height: 48px; font-size: 1.2rem; }
 }
 
+/* ==========================================================================
+   SAFARI & iOS SAFE AREAS
+   ========================================================================== */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .mobile-bottom-nav {
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
+}
+
+/* ==========================================================================
+   PRINT
+   ========================================================================== */
 @media print {
   .top-bar, .navbar, .mobile-bottom-nav, .mobile-drawer-backdrop, .mobile-drawer, #scrollToTopBtn { display: none !important; }
   body { background: white; }
