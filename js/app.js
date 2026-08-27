@@ -1131,6 +1131,13 @@ class App {
     }
 
     if (dropzone) {
+      // Click to open file picker
+      dropzone.addEventListener('click', (e) => {
+        // Don't trigger if clicking on the remove button or inside preview
+        if (e.target.closest('#removePaymentProofBtn') || e.target.closest('#paymentProofPreview')) return;
+        fileInput.click();
+      });
+
       ['dragenter', 'dragover'].forEach(ev => {
         dropzone.addEventListener(ev, (e) => { e.preventDefault(); e.stopPropagation(); dropzone.classList.add('dragover'); }, false);
       });
