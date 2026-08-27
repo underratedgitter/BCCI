@@ -672,7 +672,7 @@ small, .mono {
    HERO
    ========================================================================== */
 .hero {
-  padding: var(--space-4xl) 0;
+  padding: 2.5rem 0 4rem;
   border-bottom: var(--rule);
   background: var(--white);
 }
@@ -694,7 +694,7 @@ small, .mono {
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--gray-500);
-  margin-bottom: var(--space-xl);
+  margin-bottom: 1.25rem;
 }
 
 .hero-badge-dot {
@@ -706,7 +706,7 @@ small, .mono {
 
 .hero-title {
   font-size: clamp(3rem, 6vw, 4.5rem);
-  margin-bottom: var(--space-xl);
+  margin-bottom: 1.25rem;
   line-height: 1.05;
   letter-spacing: -0.03em;
 }
@@ -719,7 +719,7 @@ small, .mono {
 .hero-subtitle {
   font-size: 1.1rem;
   color: var(--gray-500);
-  margin-bottom: var(--space-2xl);
+  margin-bottom: 1.75rem;
   line-height: 1.75;
   max-width: 50ch;
 }
