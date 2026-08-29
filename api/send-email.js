@@ -260,63 +260,32 @@ const TEMPLATES = {
 
 // ── Email Sending Logic ──────────────────────────────────────────
 
-async function sendViaResend({ to, subject, html }) {
-  const apiKey = process.env.RESEND_API_KEY || '';
-  if (!apiKey) {
-    console.warn('[Resend] No API key configured — skipping');
-    return false;
-  }
-
-  try {
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: process.env.EMAIL_FROM || 'BCCI Bharuch <onboarding@resend.dev>',
-        to: Array.isArray(to) ? to : [to],
-        subject,
-        html,
-      }),
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      console.log(`[Resend] Email sent to ${to}:`, data.id);
-      return true;
-    }
-
-    // Safely parse error response (might not be JSON)
-    let errBody;
-    try { errBody = await response.json(); } catch { errBody = await response.text(); }
-    console.warn(`[Resend] Failed (${response.status}):`, errBody);
-    return false;
-  } catch (err) {
-    console.warn('[Resend] Network error:', err.message);
-    return false;
-  }
-}
-
 async function sendViaSMTP({ to, subject, html }) {
-  if (!process.env.GMAIL_USER || !process.env.GMAIL_PASS) return false;
+  const smtpUser = process.env.SMTP_USER || process.env.GMAIL_USER;
+  const smtpPass = process.env.SMTP_PASS || process.env.GMAIL_PASS;
+  const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
+  const smtpPort = parseInt(process.env.SMTP_PORT || '465');
+  
+  if (!smtpUser || !smtpPass) {
+    console.warn('[SMTP] No SMTP credentials configured');
+    return false;
+  }
 
   try {
     const transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 465,
+      host: smtpHost,
+      port: smtpPort,
       secure: true,
       auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_PASS,
+        user: smtpUser,
+        pass: smtpPass,
       },
       connectionTimeout: 10000,
       greetingTimeout: 10000,
     });
 
     await transporter.sendMail({
-      from: `"BCCI Bharuch Portal" <${process.env.GMAIL_USER}>`,
+      from: process.env.SMTP_FROM || `"BCCI Bharuch Portal" <${smtpUser}>`,
       to: Array.isArray(to) ? to.join(', ') : to,
       subject,
       html,
@@ -331,10 +300,6 @@ async function sendViaSMTP({ to, subject, html }) {
 }
 
 async function dispatchEmail({ to, subject, html }) {
-  // Try Resend first, fallback to SMTP
-  const resendOk = await sendViaResend({ to, subject, html });
-  if (resendOk) return { provider: 'resend', success: true };
-
   const smtpOk = await sendViaSMTP({ to, subject, html });
   if (smtpOk) return { provider: 'smtp', success: true };
 
