@@ -1313,12 +1313,13 @@ class App {
 
               <div class="bcci-card-microprint"></div>
 
+              <div class="bcci-card-detail bcci-card-id-row">
+                <div class="bcci-card-detail-label">Member ID</div>
+                <div class="bcci-card-detail-value" title="${escapeAttr(app.id)}">${escapeHtml(app.id)}</div>
+              </div>
+
               <div class="bcci-card-footer">
                 <div class="bcci-card-details">
-                  <div class="bcci-card-detail">
-                    <div class="bcci-card-detail-label">Member ID</div>
-                    <div class="bcci-card-detail-value">${escapeHtml(app.id)}</div>
-                  </div>
                   <div class="bcci-card-detail">
                     <div class="bcci-card-detail-label">Since</div>
                     <div class="bcci-card-detail-value">${escapeHtml(validity.approvedDate)}</div>
@@ -1378,10 +1379,13 @@ class App {
           </div>
         </div>`;
 
-      // Store card data for download
+      // Everything downloadCardAsImage needs to redraw this card on a canvas.
       this.currentCardId = app.id;
       this.currentCardName = app.repName || 'Member';
       this.currentCardCompany = app.company || 'BCCI Member';
+      this.currentCardType = app.enterpriseType || 'Corporate';
+      this.currentCardSince = validity.approvedDate;
+      this.currentCardStatus = { text: validityText, tone: validityClass };
 
       // Generate QR code
       this.generateCardQR(app.id, app.repName, app.company);
@@ -1471,51 +1475,222 @@ class App {
     }
   }
 
+  /* Draws the membership card onto a canvas at print resolution.
+
+     This deliberately mirrors the layout in css/membership-card.css rather than
+     screenshotting the DOM node: it needs no extra dependency, and the download
+     stays identical whatever size the card happens to be rendered at on screen.
+     The geometry below is the CSS layout at its 420x265 reference size, so any
+     change to the card design needs mirroring here. */
   async downloadCardAsImage() {
+    const W = 420, H = 265, PAD_X = 26, PAD_Y = 22, R = 16;
+    const GOLD = '#d4af37';
     const card = document.querySelector('.bcci-membership-card');
     if (!card) return;
 
+    // Rounded rect path, used for the card body, the clip and the pills.
+    const roundRect = (ctx, x, y, w, h, r) => {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    };
+
+    // Free-text fields (names, companies) have no length limit, so they get
+    // ellipsised exactly as the CSS does rather than running off the card.
+    const fit = (ctx, text, maxWidth) => {
+      if (ctx.measureText(text).width <= maxWidth) return text;
+      let t = text;
+      while (t.length > 1 && ctx.measureText(t + '…').width > maxWidth) t = t.slice(0, -1);
+      return t + '…';
+    };
+
+    const loadImage = (src) => new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = src;
+    });
+
     try {
-      // Create a canvas to render the card
+      // The card is set in Inter / DM Serif / JetBrains Mono. Without this the
+      // canvas silently falls back to a system face mid-draw.
+      if (document.fonts && document.fonts.ready) {
+        await document.fonts.ready;
+      }
+
+      const scale = 3;
       const canvas = document.createElement('canvas');
-      const scale = 2; // High resolution
-      canvas.width = 420 * scale;
-      canvas.height = 265 * scale;
+      canvas.width = W * scale;
+      canvas.height = H * scale;
       const ctx = canvas.getContext('2d');
       ctx.scale(scale, scale);
+      ctx.textBaseline = 'alphabetic';
 
-      // Draw background
-      const gradient = ctx.createLinearGradient(0, 0, 420, 265);
-      gradient.addColorStop(0, '#0a1628');
-      gradient.addColorStop(0.3, '#1a2d4a');
-      gradient.addColorStop(0.7, '#0d1f3c');
-      gradient.addColorStop(1, '#0a1628');
+      // ── Body, gradient and gold border ───────────────────────────────
+      roundRect(ctx, 0, 0, W, H, R);
+      ctx.save();
+      ctx.clip();
+
+      const gradient = ctx.createLinearGradient(0, 0, W, H);
+      gradient.addColorStop(0, '#0c1829');
+      gradient.addColorStop(0.4, '#162a48');
+      gradient.addColorStop(1, '#0e1d35');
       ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, 420, 265);
+      ctx.fillRect(0, 0, W, H);
 
-      // Draw border
-      ctx.strokeStyle = '#d4af37';
-      ctx.lineWidth = 3;
-      ctx.strokeRect(2, 2, 416, 261);
+      // Security dot pattern, matching .bcci-card-pattern.
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.02)';
+      const dot = (x, y) => {
+        if (x + 1 > W || y + 1 > H) return;
+        ctx.beginPath(); ctx.arc(x, y, 1, 0, Math.PI * 2); ctx.fill();
+      };
+      for (let y = 0; y < H; y += 20) {
+        for (let x = 0; x < W; x += 20) {
+          dot(x + 5, y + 5);
+          dot(x + 15, y + 15);
+        }
+      }
+      ctx.restore();
 
-      // Draw text
+      roundRect(ctx, 0.75, 0.75, W - 1.5, H - 1.5, R);
+      ctx.strokeStyle = 'rgba(212, 175, 55, 0.4)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // ── Header: logo, organisation, membership type ──────────────────
+      const logo = await loadImage('assets/BCCIBHARUCH.webp');
+      const logoR = 24, logoCx = PAD_X + logoR, logoCy = PAD_Y + logoR;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(logoCx, logoCy, logoR, 0, Math.PI * 2);
+      const logoFill = ctx.createLinearGradient(PAD_X, PAD_Y, PAD_X + 48, PAD_Y + 48);
+      logoFill.addColorStop(0, '#c9a227');
+      logoFill.addColorStop(1, '#e8c84a');
+      ctx.fillStyle = logoFill;
+      ctx.fill();
+      ctx.clip();
+      if (logo) ctx.drawImage(logo, logoCx - 21, logoCy - 21, 42, 42);
+      ctx.restore();
+
+      const orgX = PAD_X + 48 + 12;
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 12px Inter, sans-serif';
-      ctx.fillText('BHARUCH CHAMBER OF COMMERCE & INDUSTRY', 80, 40);
+      ctx.font = '400 14px "DM Serif Display", Georgia, serif';
+      ctx.fillText('Bharuch Chamber', orgX, logoCy + 1);
 
-      ctx.fillStyle = '#d4af37';
-      ctx.font = 'bold 18px Inter, sans-serif';
-      ctx.fillText(this.currentCardName || 'MEMBER', 30, 150);
+      ctx.fillStyle = 'rgba(212, 175, 55, 0.7)';
+      ctx.font = '8px "JetBrains Mono", monospace';
+      ctx.fillText('OF COMMERCE & INDUSTRY', orgX, logoCy + 14);
 
-      ctx.fillStyle = 'rgba(255,255,255,0.7)';
-      ctx.font = '11px Inter, sans-serif';
-      ctx.fillText(this.currentCardCompany || '', 30, 170);
+      // "MEMBER" pill, top right.
+      ctx.font = '700 8px "JetBrains Mono", monospace';
+      const pillText = 'MEMBER';
+      const pillW = ctx.measureText(pillText).width + 24;
+      const pillX = W - 14 - pillW;
+      roundRect(ctx, pillX, 14, pillW, 18, 3);
+      const pillFill = ctx.createLinearGradient(pillX, 14, pillX + pillW, 32);
+      pillFill.addColorStop(0, '#c9a227');
+      pillFill.addColorStop(1, '#e8c84a');
+      ctx.fillStyle = pillFill;
+      ctx.fill();
+      ctx.fillStyle = '#0c1829';
+      ctx.fillText(pillText, pillX + 12, 27);
 
-      ctx.fillStyle = '#d4af37';
-      ctx.font = '10px JetBrains Mono, monospace';
-      ctx.fillText(`ID: ${this.currentCardId || ''}`, 30, 230);
+      // Membership type, right aligned and clear of the pill above it.
+      ctx.textAlign = 'right';
+      ctx.fillStyle = 'rgba(212, 175, 55, 0.5)';
+      ctx.font = '8px "JetBrains Mono", monospace';
+      ctx.fillText('MEMBERSHIP', W - PAD_X, 52);
 
-      // Create download link
+      ctx.fillStyle = GOLD;
+      ctx.font = '15px "DM Serif Display", Georgia, serif';
+      ctx.fillText(fit(ctx, this.currentCardType || 'Corporate', 150), W - PAD_X, 68);
+      ctx.textAlign = 'left';
+
+      // ── Cardholder block, with the QR to its right ───────────────────
+      const qrSize = 64, qrX = W - PAD_X - qrSize, qrY = 92;
+      const textMax = qrX - PAD_X - 14;
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+      ctx.font = '8px "JetBrains Mono", monospace';
+      ctx.fillText('CARDHOLDER', PAD_X, 105);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '600 18px Inter, sans-serif';
+      ctx.fillText(fit(ctx, (this.currentCardName || 'Member').toUpperCase(), textMax), PAD_X, 128);
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.font = '12px Inter, sans-serif';
+      ctx.fillText(fit(ctx, this.currentCardCompany || 'BCCI Member', textMax), PAD_X, 146);
+
+      // Reuse the QR already rendered into the card, so the download carries the
+      // same code rather than a second, possibly divergent one.
+      const qrNode = document.querySelector('#cardQRCode canvas, #cardQRCode img');
+      if (qrNode && (qrNode.complete !== false)) {
+        roundRect(ctx, qrX, qrY, qrSize, qrSize, 8);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        try { ctx.drawImage(qrNode, qrX + 4, qrY + 4, qrSize - 8, qrSize - 8); } catch (_) {}
+      }
+
+      // ── Microprint rule ──────────────────────────────────────────────
+      const rule = ctx.createLinearGradient(PAD_X, 0, W - PAD_X, 0);
+      rule.addColorStop(0, 'rgba(212, 175, 55, 0)');
+      rule.addColorStop(0.2, 'rgba(212, 175, 55, 0.25)');
+      rule.addColorStop(0.8, 'rgba(212, 175, 55, 0.25)');
+      rule.addColorStop(1, 'rgba(212, 175, 55, 0)');
+      ctx.fillStyle = rule;
+      ctx.fillRect(PAD_X, 172, W - PAD_X * 2, 1);
+
+      // ── Member ID, on its own row: it is a fixed 27 characters ───────
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.font = '7px "JetBrains Mono", monospace';
+      ctx.fillText('MEMBER ID', PAD_X, 190);
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+      ctx.font = '11px "JetBrains Mono", monospace';
+      ctx.fillText(this.currentCardId || '', PAD_X, 204);
+
+      // ── Footer: since, and the status pill ───────────────────────────
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.font = '7px "JetBrains Mono", monospace';
+      ctx.fillText('SINCE', PAD_X, 224);
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+      ctx.font = '11px "JetBrains Mono", monospace';
+      ctx.fillText(this.currentCardSince || 'N/A', PAD_X, 238);
+
+      const status = this.currentCardStatus || { text: 'ACTIVE MEMBER', tone: 'active' };
+      const tones = {
+        active:   { bg: 'rgba(34, 197, 94, 0.15)',  fg: '#4ade80', br: 'rgba(34, 197, 94, 0.25)' },
+        expiring: { bg: 'rgba(251, 191, 36, 0.15)', fg: '#fbbf24', br: 'rgba(251, 191, 36, 0.25)' },
+        expired:  { bg: 'rgba(239, 68, 68, 0.15)',  fg: '#f87171', br: 'rgba(239, 68, 68, 0.25)' },
+      };
+      const tone = tones[status.tone] || tones.active;
+
+      ctx.textAlign = 'right';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.font = '7px "JetBrains Mono", monospace';
+      ctx.fillText('STATUS', W - PAD_X, 224);
+
+      ctx.font = '600 10px Inter, sans-serif';
+      const stW = ctx.measureText(status.text).width + 20;
+      const stX = W - PAD_X - stW;
+      roundRect(ctx, stX, 226, stW, 18, 4);
+      ctx.fillStyle = tone.bg;
+      ctx.fill();
+      ctx.strokeStyle = tone.br;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.fillStyle = tone.fg;
+      ctx.textAlign = 'center';
+      ctx.fillText(status.text, stX + stW / 2, 239);
+      ctx.textAlign = 'left';
+
       const link = document.createElement('a');
       link.download = `BCCI_Membership_${this.currentCardId || 'Card'}.png`;
       link.href = canvas.toDataURL('image/png');
