@@ -212,6 +212,31 @@ export const TEMPLATES = {
 
 let cachedTransport = null;
 
+/**
+ * Resolves the SMTP settings from the environment. Exported so the
+ * `mail:test` script reports exactly what the app will use, rather than
+ * duplicating this logic and drifting from it.
+ */
+export function resolveSmtpConfig(env = process.env) {
+  const user = env.SMTP_USER || env.GMAIL_USER || '';
+  const pass = env.SMTP_PASS || env.GMAIL_PASS || '';
+  const host = env.SMTP_HOST || 'smtp.gmail.com';
+  const port = parseInt(env.SMTP_PORT || '465', 10);
+
+  // Port 465 is implicit TLS; 587 and 25 start plaintext and upgrade via
+  // STARTTLS. Hardcoding secure:true worked for Gmail on 465 but fails
+  // against a relay on 587 or a local MTA.
+  const secure = env.SMTP_SECURE ? env.SMTP_SECURE === 'true' : port === 465;
+
+  // A local MTA on the same box needs no credentials.
+  const isLocal = host === 'localhost' || host === '127.0.0.1';
+
+  // EMAIL_FROM is preferred, then SMTP_FROM, then the authenticated account.
+  const from = env.EMAIL_FROM || env.SMTP_FROM || `"BCCI Bharuch Portal" <${user}>`;
+
+  return { host, port, secure, user, pass, from, isLocal, configured: Boolean((user && pass) || isLocal) };
+}
+
 function getTransport() {
   // Local development / tests: capture messages instead of sending them.
   if (process.env.SMTP_TRANSPORT === 'json') {
@@ -219,30 +244,17 @@ function getTransport() {
     return cachedTransport;
   }
 
-  const user = process.env.SMTP_USER || process.env.GMAIL_USER;
-  const pass = process.env.SMTP_PASS || process.env.GMAIL_PASS;
-  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
-  const port = parseInt(process.env.SMTP_PORT || '465', 10);
-
-  // Port 465 is implicit TLS; 587 and 25 start plaintext and upgrade with
-  // STARTTLS. Hardcoding secure:true worked for Gmail on 465 but breaks
-  // against a relay on 587 or a local MTA on a VPS.
-  const secure = process.env.SMTP_SECURE
-    ? process.env.SMTP_SECURE === 'true'
-    : port === 465;
-
-  // A local MTA on the same box needs no credentials.
-  const isLocal = host === 'localhost' || host === '127.0.0.1';
-  if ((!user || !pass) && !isLocal) return null;
+  const cfg = resolveSmtpConfig();
+  if (!cfg.configured) return null;
 
   if (!cachedTransport) {
     cachedTransport = nodemailer.createTransport({
-      host,
-      port,
-      secure,
-      ...(user && pass ? { auth: { user, pass } } : {}),
+      host: cfg.host,
+      port: cfg.port,
+      secure: cfg.secure,
+      ...(cfg.user && cfg.pass ? { auth: { user: cfg.user, pass: cfg.pass } } : {}),
       // Allow a self-signed cert only when explicitly opted in, for a local
-      // relay on a VPS. Never relax this for a public provider.
+      // relay. Never relax this for a public provider.
       ...(process.env.SMTP_ALLOW_SELF_SIGNED === 'true'
         ? { tls: { rejectUnauthorized: false } }
         : {}),
@@ -280,10 +292,9 @@ async function deliver({ to, subject, html }) {
     return { success: false, provider: 'none', error: 'SMTP not configured' };
   }
 
-  const user = process.env.SMTP_USER || process.env.GMAIL_USER;
   try {
     await transport.sendMail({
-      from: process.env.EMAIL_FROM || process.env.SMTP_FROM || `"BCCI Bharuch Portal" <${user}>`,
+      from: resolveSmtpConfig().from,
       to: Array.isArray(to) ? to.join(', ') : to,
       subject,
       html,
