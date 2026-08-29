@@ -1237,6 +1237,15 @@ class App {
       return;
     }
 
+    // The card needs a round-trip before it can render anything.
+    container.innerHTML = `
+      <div class="card-skeleton" aria-hidden="true">
+        <span class="skeleton-bar" style="height:200px;border-radius:16px;"></span>
+        <span class="skeleton-bar" style="width:55%;margin-top:1rem;"></span>
+        <span class="skeleton-bar" style="width:35%;"></span>
+      </div>
+      <p class="visually-hidden" role="status">Loading your membership card…</p>`;
+
     try {
       const app = await this.store.getApplicationByEmail(session.email);
       if (!app || app.status !== 'Approved') {
@@ -1569,6 +1578,7 @@ class App {
 
           this.currentPaymentProofBase64 = encoded;
           imgEl.src = this.currentPaymentProofBase64;
+          this._updateFormProgress(document.getElementById('membershipForm'));
           imgEl.setAttribute('data-lightbox', 'true');
           fileNameEl.textContent = file.name;
           preview.style.display = 'block';
@@ -1604,6 +1614,7 @@ class App {
         fileInput.value = '';
         this.currentPaymentProofBase64 = null;
         this.currentPaymentProofFile = null;
+        this._updateFormProgress(document.getElementById('membershipForm'));
         imgEl.src = ''; fileNameEl.textContent = '';
         preview.style.display = 'none'; placeholder.style.display = 'block';
         if (dropzone) dropzone.classList.remove('is-valid', 'is-invalid');
@@ -1829,6 +1840,7 @@ class App {
           if (preview) preview.style.display = 'none';
           if (placeholder) placeholder.style.display = 'block';
           if (dropzone) dropzone.classList.remove('is-valid', 'is-invalid');
+          this._updateFormProgress(membershipForm);
           membershipForm.querySelectorAll('input, select, textarea').forEach(input => {
             input.classList.remove('is-valid', 'is-invalid');
             const errDiv = input.closest('.form-group')?.querySelector('.error-msg');
@@ -1970,11 +1982,44 @@ class App {
      ADMIN PORTAL — Server-backed data
      ════════════════════════════════════════════════════════════════════ */
 
+  /** Placeholder rows shown while data is in flight. */
+  _skeletonRows(rows, cols) {
+    return Array.from({ length: rows }, () =>
+      `<tr>${Array.from({ length: cols }, () => '<td><span class="skeleton-bar"></span></td>').join('')}</tr>`
+    ).join('');
+  }
+
+  _showAdminLoading() {
+    const specs = [
+      ['pendingAppsBody', 'pendingAppsCards', 7],
+      ['approvedAppsBody', 'approvedAppsCards', 6],
+      ['enquiriesBody', 'enquiriesCards', 5],
+    ];
+    specs.forEach(([bodyId, cardsId, cols]) => {
+      const body = document.getElementById(bodyId);
+      if (body) body.innerHTML = this._skeletonRows(3, cols);
+      const cards = document.getElementById(cardsId);
+      if (cards) {
+        cards.innerHTML = Array.from({ length: 2 }, () =>
+          `<div class="admin-mobile-card"><span class="skeleton-bar" style="width:60%"></span><span class="skeleton-bar"></span><span class="skeleton-bar" style="width:40%"></span></div>`
+        ).join('');
+      }
+    });
+    ['metricTotal', 'metricPending', 'metricApproved', 'metricRejected'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = '—';
+    });
+  }
+
   async renderAdminPortal() {
     const setMetric = (id, value) => {
       const el = document.getElementById(id);
       if (el) el.textContent = value;
     };
+
+    // Two API calls have to land before anything can render. Without this the
+    // panel sat on stale rows and zeroed counters until they did.
+    this._showAdminLoading();
 
     let apps = [];
     let enquiries = [];
@@ -1993,6 +2038,23 @@ class App {
         this.renderView('signin');
         return;
       }
+      // Replace the skeletons with something actionable, not a frozen shimmer.
+      const failure = `<div style="text-align:center;padding:2rem;color:#94A3B8;">
+        <i class="fas fa-triangle-exclamation" style="font-size:1.8rem;display:block;margin-bottom:0.5rem;color:#DC2626;"></i>
+        Could not load this data.
+        <button type="button" class="btn-secondary" id="adminRetryBtn" style="margin-top:0.75rem;">
+          <i class="fas fa-rotate-right"></i> Retry
+        </button>
+      </div>`;
+      [['pendingAppsBody', 7], ['approvedAppsBody', 6], ['enquiriesBody', 5]].forEach(([id, cols]) => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = `<tr><td colspan="${cols}" style="padding:0;">${failure}</td></tr>`;
+      });
+      ['pendingAppsCards', 'approvedAppsCards', 'enquiriesCards'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = failure;
+      });
+      document.getElementById('adminRetryBtn')?.addEventListener('click', () => this.renderAdminPortal());
       this.showToast(err.message || 'Could not load the admin dashboard.', 'error');
       return;
     }
@@ -2530,16 +2592,48 @@ class App {
     this.announce(`${restored} fields restored from your unfinished application.`);
   }
 
+  /**
+   * Thirteen required fields spread over three sections is enough that people
+   * lose track of how much is left. This says so.
+   */
+  _updateFormProgress(form) {
+    let bar = document.getElementById('formProgress');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'formProgress';
+      bar.className = 'form-progress';
+      bar.innerHTML = `
+        <div class="form-progress-track"><div class="form-progress-fill"></div></div>
+        <span class="form-progress-label"></span>`;
+      form.prepend(bar);
+    }
+
+    const required = [...form.querySelectorAll('[required]')];
+    const done = required.filter((el) =>
+      el.type === 'file' ? !!this.currentPaymentProofBase64 : !!(el.value || '').trim()
+    ).length;
+    const pct = required.length ? Math.round((done / required.length) * 100) : 0;
+
+    bar.querySelector('.form-progress-fill').style.width = `${pct}%`;
+    bar.querySelector('.form-progress-label').textContent =
+      done === required.length
+        ? 'All required fields complete'
+        : `${done} of ${required.length} required fields complete`;
+    bar.classList.toggle('is-complete', done === required.length);
+  }
+
   setupDraftPersistence() {
     const form = document.getElementById('membershipForm');
     if (!form) return;
 
     this._restoreDraft(form);
+    this._updateFormProgress(form);
 
     let timer = null;
     const queueSave = () => {
       clearTimeout(timer);
       timer = setTimeout(() => this._saveDraft(form), 500);
+      this._updateFormProgress(form);
     };
     form.addEventListener('input', queueSave);
     form.addEventListener('change', queueSave);

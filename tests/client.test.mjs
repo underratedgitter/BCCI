@@ -114,5 +114,23 @@ ck('restoring a draft is disclosed, not silent', SRC.includes('draftRestoredNoti
 ck('offline is surfaced', SRC.includes('setupConnectivityWatch') && SRC.includes('offlineBanner'));
 ck('coming back online does not blanket-enable submit', SRC.includes('Never blanket-enable'));
 
+console.log('\nLoading, error and progress states');
+console.log('──────────────────────────────────');
+ck('admin panel shows skeletons while fetching', SRC.includes('_showAdminLoading') && SRC.includes('skeleton-bar'));
+ck('skeletons appear BEFORE the await', /_showAdminLoading\(\);[\s\S]{0,300}await Promise.all/.test(SRC));
+ck('a failed load offers a retry, not a frozen shimmer', SRC.includes('adminRetryBtn'));
+ck('the card page has a loading state', SRC.includes('card-skeleton'));
+ck('metrics show a placeholder, not a misleading 0', /metricTotal[\s\S]{0,160}textContent = '—'/.test(SRC));
+
+ck('the long form reports progress', SRC.includes('_updateFormProgress') && SRC.includes('required fields complete'));
+ck('progress counts the payment receipt too', /type === 'file' \? !!this.currentPaymentProofBase64/.test(SRC));
+ck('progress updates on upload and removal', (SRC.match(/_updateFormProgress\(/g) || []).length >= 5);
+ck('progress resets after a successful submit', /_updateFormProgress\(membershipForm\)/.test(SRC));
+
+const CSS = fs.readFileSync(new URL('../css/styles.css', import.meta.url), 'utf8');
+ck('skeleton shimmer is disabled under reduced motion', /prefers-reduced-motion[\s\S]{0,200}\.skeleton-bar[\s\S]{0,60}animation: none/.test(CSS));
+ck('progress bar has a complete state', CSS.includes('.form-progress.is-complete'));
+ck('progress bar stacks on narrow screens', /max-width: 560px[\s\S]{0,140}flex-direction: column/.test(CSS));
+
 console.log(`\n${'═'.repeat(52)}\n  ${pass} passed, ${fail} failed\n${'═'.repeat(52)}`);
 process.exit(fail?1:0);
