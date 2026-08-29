@@ -1,70 +1,17 @@
 {
-  "version": 2,
-  "name": "bcci-bharuch-portal",
-  "buildCommand": "",
-  "outputDirectory": ".",
-  "functions": {
-    "api/send-otp.js": {
-      "memory": 256,
-      "maxDuration": 15
-    },
-    "api/verify-otp.js": {
-      "memory": 128,
-      "maxDuration": 10
-    },
-    "api/applications.js": {
-      "memory": 256,
-      "maxDuration": 15
-    },
-    "api/enquiries.js": {
-      "memory": 128,
-      "maxDuration": 10
-    },
-    "api/admin-auth.js": {
-      "memory": 128,
-      "maxDuration": 10
-    },
-    "api/admin-stats.js": {
-      "memory": 128,
-      "maxDuration": 10
-    },
-    "api/send-email.js": {
-      "memory": 256,
-      "maxDuration": 30
-    },
-    "api/renewal-check.js": {
-      "memory": 256,
-      "maxDuration": 60
-    }
-  },
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/$1"
-    }
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
     {
-      "source": "/api/(.*)",
-      "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, PATCH, DELETE, OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization" },
-        { "key": "Access-Control-Allow-Credentials", "value": "true" },
-        { "key": "Access-Control-Max-Age", "value": "86400" }
-      ]
-    },
-    {
       "source": "/(.*)",
       "headers": [
+        { "key": "X-Frame-Options", "value": "DENY" },
         { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
         { "key": "X-XSS-Protection", "value": "1; mode=block" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" },
+        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://script.google.com; connect-src 'self' https://script.google.com; frame-src https://www.google.com" }
       ]
     }
   ]

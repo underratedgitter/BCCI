@@ -1,0 +1,562 @@
+/* ==========================================================================
+   BCCI MEMBERSHIP CARD — Premium Digital Card Design
+   Luxury aesthetic with holographic accents and gold details
+   ========================================================================== */
+
+/* ── Card Container ─────────────────────────────────────────────── */
+.bcci-membership-card-wrapper {
+  perspective: 1000px;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+.bcci-membership-card {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1.586 / 1; /* Standard credit card ratio */
+  background: linear-gradient(145deg, #0a1628 0%, #1a2d4a 30%, #0d1f3c 70%, #0a1628 100%);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 
+    0 25px 50px -12px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(212, 175, 55, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transform-style: preserve-3d;
+  transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.bcci-membership-card:hover {
+  transform: rotateY(-5deg) rotateX(3deg);
+}
+
+/* ── Holographic Overlay ────────────────────────────────────────── */
+.bcci-card-hologram {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(212, 175, 55, 0.15) 45%,
+    rgba(212, 175, 55, 0.05) 50%,
+    transparent 55%
+  );
+  pointer-events: none;
+  z-index: 10;
+}
+
+.bcci-card-hologram::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    125deg,
+    transparent 30%,
+    rgba(255, 215, 0, 0.08) 35%,
+    rgba(255, 215, 0, 0.02) 40%,
+    transparent 45%
+  );
+  animation: hologramShimmer 4s ease-in-out infinite;
+}
+
+@keyframes hologramShimmer {
+  0%, 100% { opacity: 0.5; transform: translateX(-10%); }
+  50% { opacity: 1; transform: translateX(10%); }
+}
+
+/* ── Gold Border Accent ─────────────────────────────────────────── */
+.bcci-card-border {
+  position: absolute;
+  inset: 0;
+  border: 2px solid transparent;
+  border-image: linear-gradient(
+    135deg,
+    #d4af37 0%,
+    #f4d03f 25%,
+    #d4af37 50%,
+    #a67c00 75%,
+    #d4af37 100%
+  ) 1;
+  border-radius: 16px;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* Fix for border-radius with border-image */
+.bcci-card-border::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border: 2px solid rgba(212, 175, 55, 0.4);
+  border-radius: 16px;
+  pointer-events: none;
+}
+
+/* ── Card Content Layout ────────────────────────────────────────── */
+.bcci-card-content {
+  position: relative;
+  padding: 24px 28px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  z-index: 2;
+}
+
+/* ── Header Section ─────────────────────────────────────────────── */
+.bcci-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.bcci-card-logo-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.bcci-card-logo {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, #d4af37 0%, #f4d03f 50%, #d4af37 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 
+    0 4px 12px rgba(212, 175, 55, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.bcci-card-logo img {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: contain;
+}
+
+.bcci-card-org {
+  display: flex;
+  flex-direction: column;
+}
+
+.bcci-card-org-name {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 14px;
+  font-weight: 400;
+  color: #ffffff;
+  letter-spacing: 0.5px;
+  line-height: 1.2;
+}
+
+.bcci-card-org-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  color: rgba(212, 175, 55, 0.8);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-top: 2px;
+}
+
+.bcci-card-type {
+  text-align: right;
+}
+
+.bcci-card-type-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: rgba(212, 175, 55, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+
+.bcci-card-type-value {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 16px;
+  color: #d4af37;
+  font-weight: 400;
+}
+
+/* ── Middle Section ─────────────────────────────────────────────── */
+.bcci-card-middle {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.bcci-card-member-info {
+  flex: 1;
+}
+
+.bcci-card-member-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 6px;
+}
+
+.bcci-card-member-name {
+  font-family: 'Inter', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: #ffffff;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.bcci-card-member-company {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 400;
+}
+
+.bcci-card-qr {
+  width: 64px;
+  height: 64px;
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.bcci-card-qr canvas {
+  width: 100%;
+  height: 100%;
+  border-radius: 4px;
+}
+
+/* ── Footer Section ─────────────────────────────────────────────── */
+.bcci-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.bcci-card-details {
+  display: flex;
+  gap: 24px;
+}
+
+.bcci-card-detail {
+  display: flex;
+  flex-direction: column;
+}
+
+.bcci-card-detail-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7px;
+  color: rgba(255, 255, 255, 0.35);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 3px;
+}
+
+.bcci-card-detail-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.8);
+  letter-spacing: 0.5px;
+}
+
+.bcci-card-validity {
+  text-align: right;
+}
+
+.bcci-card-validity-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7px;
+  color: rgba(255, 255, 255, 0.35);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 3px;
+}
+
+.bcci-card-validity-value {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.bcci-card-validity-value.active {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.1) 100%);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.bcci-card-validity-value.expiring {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(251, 191, 36, 0.1) 100%);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  animation: pulseWarning 2s ease-in-out infinite;
+}
+
+.bcci-card-validity-value.expired {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(239, 68, 68, 0.1) 100%);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+@keyframes pulseWarning {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* ── Security Pattern Background ────────────────────────────────── */
+.bcci-card-pattern {
+  position: absolute;
+  inset: 0;
+  opacity: 0.03;
+  background-image: 
+    radial-gradient(circle at 25% 25%, #ffffff 1px, transparent 1px),
+    radial-gradient(circle at 75% 75%, #ffffff 1px, transparent 1px);
+  background-size: 20px 20px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ── Microprint Line ────────────────────────────────────────────── */
+.bcci-card-microprint {
+  position: absolute;
+  bottom: 70px;
+  left: 28px;
+  right: 28px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(212, 175, 55, 0.3) 20%,
+    rgba(212, 175, 55, 0.3) 80%,
+    transparent 100%
+  );
+  z-index: 3;
+}
+
+/* ── Card Back Side ─────────────────────────────────────────────── */
+.bcci-card-back {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(145deg, #0a1628 0%, #1a2d4a 100%);
+  border-radius: 16px;
+  padding: 24px;
+  transform: rotateY(180deg);
+  backface-visibility: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.bcci-card-back .magnetic-strip {
+  height: 40px;
+  background: linear-gradient(90deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%);
+  margin: 0 -24px;
+  opacity: 0.8;
+}
+
+.bcci-card-back .signature-strip {
+  height: 36px;
+  background: linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+}
+
+.bcci-card-back .signature-strip span {
+  font-family: 'Dancing Script', cursive;
+  font-size: 14px;
+  color: #333;
+}
+
+.bcci-card-back .cvv-section {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.bcci-card-back .cvv-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.bcci-card-back .cvv-box {
+  background: #ffffff;
+  padding: 4px 12px;
+  border-radius: 4px;
+}
+
+.bcci-card-back .cvv-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: #333;
+  letter-spacing: 2px;
+}
+
+.bcci-card-back .card-terms {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7px;
+  color: rgba(255, 255, 255, 0.3);
+  text-align: center;
+  line-height: 1.6;
+}
+
+/* ── Card Actions ───────────────────────────────────────────────── */
+.bcci-card-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+  justify-content: center;
+}
+
+.bcci-card-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.bcci-card-action-btn.primary {
+  background: linear-gradient(135deg, #d4af37 0%, #a67c00 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3);
+}
+
+.bcci-card-action-btn.primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(212, 175, 55, 0.4);
+}
+
+.bcci-card-action-btn.secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.bcci-card-action-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* ── Premium Badge ──────────────────────────────────────────────── */
+.bcci-card-premium-badge {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: linear-gradient(135deg, #d4af37 0%, #f4d03f 50%, #d4af37 100%);
+  color: #0a1628;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(212, 175, 55, 0.4);
+}
+
+/* ── Flip Button ────────────────────────────────────────────────── */
+.bcci-card-flip-btn {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  z-index: 20;
+}
+
+.bcci-card-flip-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+/* ── Card Flip Animation ────────────────────────────────────────── */
+.bcci-card-flipped .bcci-membership-card {
+  transform: rotateY(180deg);
+}
+
+.bcci-card-flipped .bcci-card-front {
+  visibility: hidden;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .bcci-membership-card-wrapper {
+    max-width: 100%;
+  }
+  
+  .bcci-card-content {
+    padding: 16px 20px;
+  }
+  
+  .bcci-card-logo {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .bcci-card-logo img {
+    width: 36px;
+    height: 36px;
+  }
+  
+  .bcci-card-org-name {
+    font-size: 12px;
+  }
+  
+  .bcci-card-member-name {
+    font-size: 14px;
+  }
+  
+  .bcci-card-qr {
+    width: 56px;
+    height: 56px;
+  }
+  
+  .bcci-card-details {
+    gap: 16px;
+  }
+}
+
+/* ── Print Styles ───────────────────────────────────────────────── */
+@media print {
+  .bcci-membership-card-wrapper {
+    max-width: 100%;
+    box-shadow: none;
+  }
+  
+  .bcci-membership-card {
+    box-shadow: none;
+    border: 2px solid #d4af37;
+  }
+  
+  .bcci-card-hologram,
+  .bcci-card-flip-btn {
+    display: none;
+  }
+}

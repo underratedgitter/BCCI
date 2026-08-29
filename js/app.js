@@ -496,48 +496,79 @@ class App {
       title: `<i class="fas fa-id-card" style="color: var(--accent-gold-dark);"></i> Official BCCI Digital Membership Pass`,
       content: `
         <div style="padding: 0.5rem 0;">
-          <div style="background: linear-gradient(135deg, #0F2C59 0%, #1E3E62 100%); border-radius: 14px; padding: 1.5rem; color: #FFFFFF; box-shadow: 0 10px 25px rgba(15, 44, 89, 0.25); border: 2px solid #D4AF37; position: relative; overflow: hidden; margin-bottom: 1.5rem;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.25rem;">
-              <div>
-                <div style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px; color: #F3E8FF; opacity: 0.8;">Institutional Member</div>
-                <div style="font-size: 1.15rem; font-weight: 800; color: #FFD700; line-height: 1.2; margin-top: 2px;">BHARUCH CHAMBER OF COMMERCE &amp; INDUSTRY</div>
-              </div>
-              <div style="background: rgba(255,215,0,0.15); border: 1px solid #FFD700; color: #FFD700; padding: 3px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700;">
-                ⭐ OFFICIAL
-              </div>
-            </div>
-            <div style="margin-bottom: 1rem;">
-              <div style="font-size: 1.25rem; font-weight: 700; color: #FFFFFF;">${app.company}</div>
-              <div style="font-size: 0.85rem; color: #93C5FD;">Rep: ${app.repName} (${app.repDesignation || 'Delegate'})</div>
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; background: rgba(255,255,255,0.08); padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.8rem; border: 1px solid rgba(255,255,255,0.15);">
-              <div>
-                <div style="color: #94A3B8; font-size: 0.7rem; text-transform: uppercase;">Member ID</div>
-                <div style="font-weight: 700; font-family: monospace; color: #FFD700; font-size: 0.95rem;">${app.id}</div>
-              </div>
-              <div>
-                <div style="color: #94A3B8; font-size: 0.7rem; text-transform: uppercase;">Enterprise Scale</div>
-                <div style="font-weight: 600;">${app.enterpriseType || 'Corporate'}</div>
-              </div>
-              <div>
-                <div style="color: #94A3B8; font-size: 0.7rem; text-transform: uppercase;">Issued Date</div>
-                <div style="font-weight: 600;">${validity ? validity.approvedDate : 'N/A'}</div>
-              </div>
-              <div>
-                <div style="color: #94A3B8; font-size: 0.7rem; text-transform: uppercase;">Valid Until</div>
-                <div style="font-weight: 700; color: ${validity && validity.state === 'EXPIRED' ? '#FCA5A5' : '#6EE7B7'};">${validity ? validity.validUntilDate : 'N/A'}</div>
+          <div class="bcci-membership-card-wrapper" style="margin-bottom: 1.5rem;">
+            <div class="bcci-membership-card">
+              <div class="bcci-card-hologram"></div>
+              <div class="bcci-card-pattern"></div>
+              <div class="bcci-card-border"></div>
+              <div class="bcci-card-premium-badge">MEMBER</div>
+              
+              <div class="bcci-card-content">
+                <div class="bcci-card-header">
+                  <div class="bcci-card-logo-section">
+                    <div class="bcci-card-logo">
+                      <img src="assets/BCCIBHARUCH.webp" alt="BCCI" />
+                    </div>
+                    <div class="bcci-card-org">
+                      <div class="bcci-card-org-name">Bharuch Chamber</div>
+                      <div class="bcci-card-org-sub">of Commerce & Industry</div>
+                    </div>
+                  </div>
+                  <div class="bcci-card-type">
+                    <div class="bcci-card-type-label">Membership</div>
+                    <div class="bcci-card-type-value">${escapeHtml(app.enterpriseType || 'Corporate')}</div>
+                  </div>
+                </div>
+
+                <div class="bcci-card-middle">
+                  <div class="bcci-card-member-info">
+                    <div class="bcci-card-member-label">Cardholder</div>
+                    <div class="bcci-card-member-name">${escapeHtml(app.repName || 'Member')}</div>
+                    <div class="bcci-card-member-company">${escapeHtml(app.company || 'BCCI Member')}</div>
+                  </div>
+                </div>
+
+                <div class="bcci-card-microprint"></div>
+
+                <div class="bcci-card-footer">
+                  <div class="bcci-card-details">
+                    <div class="bcci-card-detail">
+                      <div class="bcci-card-detail-label">Member ID</div>
+                      <div class="bcci-card-detail-value">${escapeHtml(app.id)}</div>
+                    </div>
+                    <div class="bcci-card-detail">
+                      <div class="bcci-card-detail-label">Since</div>
+                      <div class="bcci-card-detail-value">${escapeHtml(validity ? validity.approvedDate : 'N/A')}</div>
+                    </div>
+                  </div>
+                  <div class="bcci-card-validity">
+                    <div class="bcci-card-validity-label">Status</div>
+                    <div class="bcci-card-validity-value ${validity && validity.state === 'ACTIVE' ? 'active' : validity && validity.state === 'RENEWAL_DUE' ? 'expiring' : 'expired'}">${validity ? (validity.state === 'ACTIVE' ? 'ACTIVE MEMBER' : validity.state === 'RENEWAL_DUE' ? 'RENEWAL DUE' : 'EXPIRED') : 'N/A'}</div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
           <div style="display: flex; gap: 0.75rem; justify-content: center;">
             <button type="button" class="btn-primary" onclick="window.print();" style="flex: 1; justify-content: center; font-size: 0.85rem;">
-              <i class="fas fa-print"></i> Print / Download Member Card
+              <i class="fas fa-print"></i> Print Card
+            </button>
+            <button type="button" class="btn-secondary" id="viewFullCardBtn" style="flex: 1; justify-content: center; font-size: 0.85rem;">
+              <i class="fas fa-expand-alt"></i> View Full Card
             </button>
             <button type="button" class="btn-secondary" id="modalCloseBtn" style="padding: 0.6rem 1.25rem;">Close</button>
           </div>
         </div>
       `
     });
+
+    // Bind view full card button
+    setTimeout(() => {
+      document.getElementById('viewFullCardBtn')?.addEventListener('click', () => {
+        this.closeModal();
+        this.renderView('card');
+      });
+    }, 100);
   }
 
   showRenewalModal(app) {
@@ -678,6 +709,21 @@ class App {
 
     if (desktopContainer) desktopContainer.innerHTML = desktopHtml;
     if (drawerContainer) drawerContainer.innerHTML = drawerHtml;
+
+    // Show/hide View Card button based on membership status
+    const viewCardBtn = document.getElementById('viewCardBtn');
+    if (viewCardBtn && session && session.email) {
+      this.store.getApplicationByEmail(session.email).then(app => {
+        if (app && app.status === 'Approved') {
+          viewCardBtn.style.display = 'inline-flex';
+          viewCardBtn.onclick = () => this.renderView('card');
+        } else {
+          viewCardBtn.style.display = 'none';
+        }
+      });
+    } else if (viewCardBtn) {
+      viewCardBtn.style.display = 'none';
+    }
 
     // Admin sign out
     document.querySelectorAll('.btnNavSignOut').forEach(btn => {
@@ -971,6 +1017,7 @@ class App {
     if (viewId === 'home' || viewId === 'about') this.renderLeadership();
     if (viewId === 'services') this.renderServicesAndFaqs();
     if (viewId === 'membership') this.updateApplicantAuthUI();
+    if (viewId === 'card') this.renderMembershipCard();
     if (viewId === 'admin') await this.renderAdminPortal();
   }
 
@@ -1046,6 +1093,174 @@ class App {
         });
       });
     }
+  }
+
+  /* ════════════════════════════════════════════════════════════════════
+     MEMBERSHIP CARD RENDERER
+     ════════════════════════════════════════════════════════════════════ */
+
+  async renderMembershipCard() {
+    const container = document.getElementById('membershipCardContainer');
+    if (!container) return;
+
+    const session = this.store.getApplicantSession();
+    if (!session || !session.email) {
+      container.innerHTML = `
+        <div style="text-align: center; padding: 60px 20px; background: var(--white); border: var(--rule);">
+          <i class="fas fa-id-card" style="font-size: 48px; color: var(--gray-300); margin-bottom: 16px;"></i>
+          <p style="color: var(--gray-500); font-size: 14px;">Sign in to view your membership card</p>
+          <button class="btn-primary" style="margin-top: 16px;" data-view-nav="membership">
+            <i class="fas fa-sign-in-alt"></i> Sign In
+          </button>
+        </div>`;
+      return;
+    }
+
+    try {
+      const app = await this.store.getApplicationByEmail(session.email);
+      if (!app || app.status !== 'Approved') {
+        container.innerHTML = `
+          <div style="text-align: center; padding: 60px 20px; background: var(--white); border: var(--rule);">
+            <i class="fas fa-clock" style="font-size: 48px; color: var(--warning); margin-bottom: 16px;"></i>
+            <p style="color: var(--gray-600); font-size: 16px; font-weight: 600; margin-bottom: 8px;">Membership Pending Approval</p>
+            <p style="color: var(--gray-500); font-size: 14px;">Your membership card will be available once your application is approved.</p>
+          </div>`;
+        return;
+      }
+
+      const validity = this.store.getMembershipValidity(app);
+      const validityClass = validity.state === 'ACTIVE' ? 'active' : validity.state === 'RENEWAL_DUE' ? 'expiring' : 'expired';
+      const validityText = validity.state === 'ACTIVE' ? `VALID TILL ${validity.validUntilDate.toUpperCase()}` : validity.state === 'RENEWAL_DUE' ? `EXPIRES IN ${validity.daysRemaining} DAYS` : 'EXPIRED';
+
+      container.innerHTML = `
+        <div class="bcci-membership-card-wrapper">
+          <div class="bcci-membership-card">
+            <div class="bcci-card-hologram"></div>
+            <div class="bcci-card-pattern"></div>
+            <div class="bcci-card-border"></div>
+            <div class="bcci-card-premium-badge">MEMBER</div>
+            
+            <div class="bcci-card-content">
+              <div class="bcci-card-header">
+                <div class="bcci-card-logo-section">
+                  <div class="bcci-card-logo">
+                    <img src="assets/BCCIBHARUCH.webp" alt="BCCI" />
+                  </div>
+                  <div class="bcci-card-org">
+                    <div class="bcci-card-org-name">Bharuch Chamber</div>
+                    <div class="bcci-card-org-sub">of Commerce & Industry</div>
+                  </div>
+                </div>
+                <div class="bcci-card-type">
+                  <div class="bcci-card-type-label">Membership</div>
+                  <div class="bcci-card-type-value">${escapeHtml(app.enterpriseType || 'Corporate')}</div>
+                </div>
+              </div>
+
+              <div class="bcci-card-middle">
+                <div class="bcci-card-member-info">
+                  <div class="bcci-card-member-label">Cardholder</div>
+                  <div class="bcci-card-member-name">${escapeHtml(app.repName || 'Member')}</div>
+                  <div class="bcci-card-member-company">${escapeHtml(app.company || 'BCCI Member')}</div>
+                </div>
+                <div class="bcci-card-qr" id="cardQRCode"></div>
+              </div>
+
+              <div class="bcci-card-microprint"></div>
+
+              <div class="bcci-card-footer">
+                <div class="bcci-card-details">
+                  <div class="bcci-card-detail">
+                    <div class="bcci-card-detail-label">Member ID</div>
+                    <div class="bcci-card-detail-value">${escapeHtml(app.id)}</div>
+                  </div>
+                  <div class="bcci-card-detail">
+                    <div class="bcci-card-detail-label">Since</div>
+                    <div class="bcci-card-detail-value">${escapeHtml(validity.approvedDate)}</div>
+                  </div>
+                </div>
+                <div class="bcci-card-validity">
+                  <div class="bcci-card-validity-label">Status</div>
+                  <div class="bcci-card-validity-value ${validityClass}">${validityText}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bcci-card-actions">
+          <button class="bcci-card-action-btn primary" onclick="window.print()">
+            <i class="fas fa-print"></i> Print Card
+          </button>
+          <button class="bcci-card-action-btn secondary" onclick="navigator.share?.({title: 'BCCI Membership Card', text: 'My BCCI Membership Card', url: window.location.href})">
+            <i class="fas fa-share-alt"></i> Share
+          </button>
+        </div>`;
+
+      // Generate QR code
+      this.generateCardQR(app.id, app.repName, app.company);
+
+    } catch (err) {
+      console.error('[Card] Failed to render:', err);
+      container.innerHTML = `
+        <div style="text-align: center; padding: 60px 20px; background: var(--white); border: var(--rule);">
+          <i class="fas fa-exclamation-triangle" style="font-size: 48px; color: var(--danger); margin-bottom: 16px;"></i>
+          <p style="color: var(--gray-600); font-size: 14px;">Failed to load membership card</p>
+          <button class="btn-primary" style="margin-top: 16px;" onclick="location.reload()">
+            <i class="fas fa-redo"></i> Retry
+          </button>
+        </div>`;
+    }
+  }
+
+  generateCardQR(memberId, name, company) {
+    const qrContainer = document.getElementById('cardQRCode');
+    if (!qrContainer) return;
+
+    // Simple QR code generation using canvas
+    const canvas = document.createElement('canvas');
+    canvas.width = 56;
+    canvas.height = 56;
+    const ctx = canvas.getContext('2d');
+
+    // Draw a simple QR-like pattern (placeholder for actual QR library)
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, 56, 56);
+    ctx.fillStyle = '#000000';
+
+    // Generate deterministic pattern from member ID
+    const data = `${memberId}|${name}|${company}`;
+    let hash = 0;
+    for (let i = 0; i < data.length; i++) {
+      hash = ((hash << 5) - hash) + data.charCodeAt(i);
+      hash = hash & hash;
+    }
+
+    // Draw QR-like pattern
+    for (let y = 0; y < 14; y++) {
+      for (let x = 0; x < 14; x++) {
+        const bit = (hash >> ((y * 14 + x) % 32)) & 1;
+        if (bit) {
+          ctx.fillRect(x * 4, y * 4, 4, 4);
+        }
+      }
+    }
+
+    // Add corner markers
+    ctx.fillRect(0, 0, 12, 4);
+    ctx.fillRect(0, 0, 4, 12);
+    ctx.fillRect(8, 0, 4, 4);
+    ctx.fillRect(0, 8, 4, 4);
+
+    ctx.fillRect(44, 0, 12, 4);
+    ctx.fillRect(48, 0, 4, 8);
+    ctx.fillRect(44, 4, 4, 4);
+
+    ctx.fillRect(0, 44, 4, 12);
+    ctx.fillRect(4, 48, 4, 4);
+    ctx.fillRect(0, 44, 4, 4);
+
+    qrContainer.appendChild(canvas);
   }
 
   /* ════════════════════════════════════════════════════════════════════

@@ -63,6 +63,8 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <!-- Custom Stylesheet -->
   <link rel="stylesheet" href="css/styles.css?v=2.4.0" />
+  <!-- Premium Membership Card Styles -->
+  <link rel="stylesheet" href="css/membership-card.css" />
 </head><body>
 
   <!-- Skip to Content (Accessibility) -->
@@ -100,6 +102,9 @@
       <div class="nav-actions">
         <button class="btn-nav-cta" data-view-nav="membership">
           <i class="fas fa-building"></i> Apply for Membership
+        </button>
+        <button class="btn-nav-cta" id="viewCardBtn" style="display: none; background: linear-gradient(135deg, #d4af37 0%, #a67c00 100%);">
+          <i class="fas fa-id-card"></i> View Card
         </button>
         <div id="navAuthContainer" style="display: flex; gap: 0.5rem; align-items: center;"></div>
       </div>
@@ -1077,6 +1082,44 @@
         </aside>
       </div>
     </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 7b. MEMBERSHIP CARD VIEW -->
+  <main id="view-card" class="view-page" style="display: none;">
+    <section class="section-padding">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-tag">Digital Membership Card</span>
+          <h2 class="section-title">Your BCCI Membership Card</h2>
+          <p class="section-desc">Official digital membership card with holographic security features.</p>
+        </div>
+
+        <div id="membershipCardContainer" style="max-width: 500px; margin: 0 auto;">
+          <!-- Card will be rendered here by JavaScript -->
+          <div style="text-align: center; padding: 60px 20px; background: var(--white); border: var(--rule);">
+            <i class="fas fa-id-card" style="font-size: 48px; color: var(--gray-300); margin-bottom: 16px;"></i>
+            <p style="color: var(--gray-500); font-size: 14px;">Sign in to view your membership card</p>
+            <button class="btn-primary" style="margin-top: 16px;" data-view-nav="membership">
+              <i class="fas fa-sign-in-alt"></i> Sign In
+            </button>
+          </div>
+        </div>
+
+        <div style="max-width: 500px; margin: 24px auto 0; text-align: center;">
+          <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+            <button class="btn-secondary" id="downloadCardBtn" style="display: none;">
+              <i class="fas fa-download"></i> Download Card
+            </button>
+            <button class="btn-secondary" id="printCardBtn" style="display: none;">
+              <i class="fas fa-print"></i> Print Card
+            </button>
+            <button class="btn-secondary" id="shareCardBtn" style="display: none;">
+              <i class="fas fa-share-alt"></i> Share
+            </button>
+          </div>
+        </div>
       </div>
     </section>
   </main>
