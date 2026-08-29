@@ -58,7 +58,15 @@ export default async function handler(req, res) {
       return res.status(413).json({ error: 'Request body too large (max 100KB)' });
     }
 
-    const { applicantName, email: applicantEmail, phone, address, state, city, pincode, gstin, pan, membershipType, paymentProof, paymentAmount, paymentRef } = req.body || {};
+    const { repName, repDesignation, company, legalStatus, enterpriseType, businessServices, annualTurnover, employees, cin, email: applicantEmail, phone, address, district, pincode, gstNo, panNo, paymentRef, paymentProof } = req.body || {};
+
+    // Map form fields to application fields
+    const applicantName = repName;
+    const gstin = gstNo;
+    const pan = panNo;
+    const state = district;
+    const city = district;
+    const membershipType = businessServices;
 
     if (!applicantName || !applicantEmail || !phone || !membershipType) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -72,9 +80,33 @@ export default async function handler(req, res) {
 
     const appId = `BCCI-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
     const application = {
-      id: appId, applicantName, email: applicantEmail, phone, address, state, city, pincode,
-      gstin, pan, membershipType, paymentProof, paymentAmount, paymentRef,
-      status: 'pending', submittedAt: new Date().toISOString(), reviewedAt: null, reviewedBy: null
+      id: appId,
+      applicantName,
+      repName: applicantName,
+      repDesignation: repDesignation || '',
+      company: company || '',
+      email: applicantEmail,
+      phone,
+      address: address || '',
+      state: state || '',
+      city: city || '',
+      pincode: pincode || '',
+      gstin: gstin || '',
+      pan: pan || '',
+      legalStatus: legalStatus || '',
+      enterpriseType: enterpriseType || '',
+      businessServices: businessServices || '',
+      annualTurnover: annualTurnover || '',
+      employees: employees || '',
+      cin: cin || '',
+      membershipType,
+      paymentProof: paymentProof || '',
+      paymentAmount: '',
+      paymentRef: paymentRef || '',
+      status: 'pending',
+      submittedAt: new Date().toISOString(),
+      reviewedAt: null,
+      reviewedBy: null
     };
 
     try {
