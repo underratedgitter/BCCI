@@ -1883,13 +1883,11 @@ footer h4 {
   /* ── Navigation ────────────────────────────────────────────── */
   .top-bar { display: none; }
   .nav-links { display: none; }
-  .nav-actions .btn-nav-cta,
-  .nav-actions .btn-admin-access,
-  .nav-actions .btn-signout-nav { display: none; }
-  .nav-actions .btn-signin-nav { display: none; }
+  .nav-actions { display: none; }
   .mobile-menu-btn { display: flex; align-items: center; justify-content: center; }
   .navbar-inner { padding: 0.75rem 1.25rem; }
   .nav-logo { height: 30px; }
+  #navHeaderMemberBadge { display: none !important; }
 
   /* ── Hero ──────────────────────────────────────────────────── */
   .hero { padding: var(--space-3xl) 0; }
