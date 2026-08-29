@@ -34,16 +34,25 @@ Copy `.env.example` to `.env.local` and fill it in. Never commit it — `.gitign
 
 ### SMTP transport
 
-Defaults suit Gmail on port 465. For any other relay:
-
 | Variable | Default | Notes |
 |---|---|---|
 | `SMTP_HOST` | `smtp.gmail.com` | |
-| `SMTP_PORT` | `465` | |
-| `SMTP_SECURE` | `true` when port is 465 | Set `false` for 587/25 (STARTTLS) |
+| `SMTP_PORT` | `465` | 465 = SSL, 587 = TLS/STARTTLS |
+| `SMTP_SECURE` | `true` when port is 465 | Derived from the port; override only if your relay is unusual |
 | `SMTP_ALLOW_SELF_SIGNED` | unset | Only for a local MTA on the same box |
 
-A local MTA on `localhost` needs no `SMTP_USER` / `SMTP_PASS`.
+**465 vs 587.** Port 465 is implicit TLS — encrypted from the first byte. Port 587 connects in plaintext and upgrades via STARTTLS. Both are fine; the app derives the right mode from the port, so setting `SMTP_PORT` is enough.
+
+On any non-465 remote port the app sets `requireTLS`, so it **refuses to send** if the server will not upgrade, rather than falling back to plaintext and leaking the password. TLS 1.2 is the floor. A local MTA on `localhost` is exempt (traffic never leaves the machine) and needs no credentials.
+
+**The From address.** Gmail and Google Workspace only honour a From header that is the authenticated account or a verified *Send mail as* alias on it. Anything else is silently rewritten back to the account — mail still arrives, but not from the address you configured. Same domain is not sufficient; the alias has to be verified in Gmail settings. Keep `EMAIL_FROM` matching `SMTP_USER` unless you have set that up.
+
+Check the whole thing without sending anything:
+
+```bash
+npm run mail:test                       # resolve config, connect, authenticate
+npm run mail:test -- you@example.com    # also send one of each template
+```
 
 ### VPS-only
 

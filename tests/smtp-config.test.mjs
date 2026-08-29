@@ -27,19 +27,31 @@ ck('From falls back to the authenticated account', c.from === '"BCCI Bharuch Por
 c = resolveSmtpConfig({ SMTP_USER: 'p@bcci.in', SMTP_PASS: 'pw', SMTP_FROM: 'BCCI <x@bcci.in>' });
 ck('SMTP_FROM still wins over the default', c.from === 'BCCI <x@bcci.in>', c.from);
 
-sec('New: ports other than 465 now work');
+sec('Port 465 = SSL, port 587 = TLS/STARTTLS');
+
+c = resolveSmtpConfig({ SMTP_PORT: '465', SMTP_USER: 'p@bcci.in', SMTP_PASS: 'pw' });
+ck('465 → implicit TLS (SSL) from the first byte', c.secure === true && c.requireTLS === false, JSON.stringify(c));
 
 c = resolveSmtpConfig({ SMTP_PORT: '587', SMTP_USER: 'p@bcci.in', SMTP_PASS: 'pw' });
-ck('port 587 → STARTTLS, not implicit TLS', c.secure === false, `secure=${c.secure}`);
+ck('587 → plaintext connect, STARTTLS upgrade', c.secure === false, `secure=${c.secure}`);
+ck('587 → the upgrade is REQUIRED, not opportunistic', c.requireTLS === true, `requireTLS=${c.requireTLS}`);
 
 c = resolveSmtpConfig({ SMTP_PORT: '25', SMTP_USER: 'p@bcci.in', SMTP_PASS: 'pw' });
-ck('port 25 → secure false', c.secure === false);
+ck('25 → secure false, STARTTLS still required', c.secure === false && c.requireTLS === true);
 
 c = resolveSmtpConfig({ SMTP_PORT: '587', SMTP_SECURE: 'true', SMTP_USER: 'p@bcci.in', SMTP_PASS: 'pw' });
-ck('SMTP_SECURE overrides the port-derived default', c.secure === true);
+ck('SMTP_SECURE overrides the port-derived default', c.secure === true && c.requireTLS === false);
+
+sec('Credentials are never sent in the clear');
+
+for (const port of ['587', '25', '2525']) {
+  c = resolveSmtpConfig({ SMTP_HOST: 'smtp.provider.com', SMTP_PORT: port, SMTP_USER: 'p@bcci.in', SMTP_PASS: 'pw' });
+  ck(`remote port ${port} refuses to send without TLS`, c.requireTLS === true, `requireTLS=${c.requireTLS}`);
+}
 
 c = resolveSmtpConfig({ SMTP_HOST: 'localhost', SMTP_PORT: '25' });
 ck('a local MTA needs no credentials', c.configured === true, JSON.stringify(c));
+ck('a local MTA is exempt from requireTLS', c.requireTLS === false, 'would break a local relay');
 
 c = resolveSmtpConfig({ SMTP_HOST: 'smtp.provider.com' });
 ck('a remote host without credentials is not configured', c.configured === false);

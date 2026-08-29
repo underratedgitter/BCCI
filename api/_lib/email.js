@@ -231,10 +231,20 @@ export function resolveSmtpConfig(env = process.env) {
   // A local MTA on the same box needs no credentials.
   const isLocal = host === 'localhost' || host === '127.0.0.1';
 
+  // On a plaintext port, nodemailer upgrades via STARTTLS only if the server
+  // happens to advertise it — otherwise it sends the password in the clear.
+  // Demand the upgrade instead, and fail loudly if it isn't available.
+  // Exempted for a local MTA, where the traffic never leaves the machine and
+  // STARTTLS is often not offered.
+  const requireTLS = !secure && !isLocal;
+
   // EMAIL_FROM is preferred, then SMTP_FROM, then the authenticated account.
   const from = env.EMAIL_FROM || env.SMTP_FROM || `"BCCI Bharuch Portal" <${user}>`;
 
-  return { host, port, secure, user, pass, from, isLocal, configured: Boolean((user && pass) || isLocal) };
+  return {
+    host, port, secure, requireTLS, user, pass, from, isLocal,
+    configured: Boolean((user && pass) || isLocal),
+  };
 }
 
 function getTransport() {
@@ -251,13 +261,15 @@ function getTransport() {
     cachedTransport = nodemailer.createTransport({
       host: cfg.host,
       port: cfg.port,
-      secure: cfg.secure,
+      secure: cfg.secure,          // 465 — implicit TLS from the first byte
+      requireTLS: cfg.requireTLS,  // 587/25 — refuse to send unless STARTTLS succeeds
       ...(cfg.user && cfg.pass ? { auth: { user: cfg.user, pass: cfg.pass } } : {}),
-      // Allow a self-signed cert only when explicitly opted in, for a local
-      // relay. Never relax this for a public provider.
-      ...(process.env.SMTP_ALLOW_SELF_SIGNED === 'true'
-        ? { tls: { rejectUnauthorized: false } }
-        : {}),
+      tls: {
+        minVersion: 'TLSv1.2',
+        // Allow a self-signed cert only when explicitly opted in, for a local
+        // relay. Never relax this for a public provider.
+        ...(process.env.SMTP_ALLOW_SELF_SIGNED === 'true' ? { rejectUnauthorized: false } : {}),
+      },
       connectionTimeout: 10000,
       greetingTimeout: 10000,
       socketTimeout: 15000,

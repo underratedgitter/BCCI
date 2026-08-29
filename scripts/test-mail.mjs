@@ -35,16 +35,31 @@ show('From header', from);
 // EMAIL_FROM was documented in .env.example but never read by the old code,
 // which always sent as SMTP_FROM or the authenticated user. It is honoured
 // now, so a mismatched value can start being rejected or silently rewritten.
-if (process.env.EMAIL_FROM && user) {
-  const fromDomain = (from.match(/@([^>\s]+)/) || [])[1];
-  const userDomain = user.split('@')[1];
-  if (fromDomain && userDomain && fromDomain.toLowerCase() !== userDomain.toLowerCase()) {
-    console.log('\n  ⚠  EMAIL_FROM is on a different domain than the SMTP account.');
-    console.log(`     sending as   ${fromDomain}`);
-    console.log(`     authenticated as ${userDomain}`);
-    console.log('     Most providers reject or rewrite this unless the address is a');
-    console.log('     verified sender/alias. If mail worked before and stops now,');
-    console.log('     unset EMAIL_FROM to fall back to the authenticated account.');
+if (user) {
+  const fromAddress = ((from.match(/<([^>]+)>/) || [])[1] || from).trim().toLowerCase();
+  const account = user.trim().toLowerCase();
+  const isGoogle = /(^|\.)gmail\.com$|(^|\.)googlemail\.com$/.test(host) || host === 'smtp.gmail.com';
+
+  if (fromAddress !== account) {
+    const sameDomain = fromAddress.split('@')[1] === account.split('@')[1];
+    console.log('\n  ⚠  The From address is not the account you authenticate as.');
+    console.log(`     sending as       ${fromAddress}`);
+    console.log(`     authenticated as ${account}`);
+    if (isGoogle) {
+      console.log('     Gmail and Workspace only allow this when the address is a verified');
+      console.log('     "Send mail as" alias on that account. Otherwise Gmail silently');
+      console.log('     rewrites the From header back to the authenticated address —');
+      console.log('     delivery still works, but it will not read as the address you set.');
+      console.log(sameDomain
+        ? '     Same domain is not enough; the alias must be verified in Gmail settings.'
+        : '     A different domain is very likely to be rewritten or rejected.');
+      console.log(`     Simplest fix: set EMAIL_FROM="BCCI Bharuch <${account}>"`);
+    } else {
+      console.log('     Many providers reject or rewrite this unless it is a verified sender.');
+    }
+    console.log('     Unsetting EMAIL_FROM falls back to the authenticated account.');
+  } else {
+    console.log('\n  ✓  From address matches the authenticated account.');
   }
 }
 
