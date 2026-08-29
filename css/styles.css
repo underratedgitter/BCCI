@@ -1881,13 +1881,15 @@ footer h4 {
   }
 
   /* ── Navigation ────────────────────────────────────────────── */
-  .top-bar { display: none; }
-  .nav-links { display: none; }
-  .nav-actions { display: none; }
-  .mobile-menu-btn { display: flex; align-items: center; justify-content: center; }
+  .top-bar { display: none !important; }
+  .nav-links { display: none !important; }
+  .nav-actions { display: none !important; }
+  .nav-actions * { display: none !important; }
+  .nav-profile-wrapper { display: none !important; }
+  #navHeaderMemberBadge { display: none !important; }
+  .mobile-menu-btn { display: flex !important; align-items: center; justify-content: center; }
   .navbar-inner { padding: 0.75rem 1.25rem; }
   .nav-logo { height: 30px; }
-  #navHeaderMemberBadge { display: none !important; }
 
   /* ── Hero ──────────────────────────────────────────────────── */
   .hero { padding: var(--space-3xl) 0; }
