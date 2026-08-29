@@ -3,7 +3,6 @@
     { "path": "/api/renewal-check", "schedule": "0 9 * * *" }
   ],
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "headers": [

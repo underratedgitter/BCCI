@@ -1,32 +1,36 @@
-# Simple workflow for deploying static content to GitHub Pages
-name: Deploy static content to Pages
+# DISABLED — this workflow published the portal to GitHub Pages.
+#
+# GitHub Pages serves static files only: it cannot run the serverless
+# functions in /api, so on the Pages copy every /api/* request returned 404
+# and OTP sign-in, application submission, the enquiry form and the admin
+# portal were all dead. vercel.json (CSP and the other security headers) was
+# ignored there too.
+#
+# The portal is hosted on Vercel, which runs the API. Running both meant the
+# public URL was the broken one.
+#
+# The trigger is now manual-only, so a push to main no longer republishes the
+# broken copy. To retire it for good, delete this file. To bring Pages back
+# (only sensible for a genuinely static site), restore the `push` trigger.
+
+name: Deploy static content to Pages (disabled)
 
 on:
-  # Runs on pushes targeting the default branch
-  push:
-    branches: ["main"]
-
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
-# Force JavaScript actions to execute on Node 24 to align with runner defaults and avoid Node 20 deprecation warnings
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
 concurrency:
   group: "pages"
   cancel-in-progress: false
 
 jobs:
-  # Single deploy job since we're just deploying
   deploy:
     environment:
       name: github-pages
@@ -40,9 +44,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload entire repository
           path: '.'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-
