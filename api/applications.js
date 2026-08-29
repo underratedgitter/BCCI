@@ -1,33 +1,41 @@
-import { createClient } from 'redis';
+import { Redis } from '@upstash/redis';
 import crypto from 'crypto';
 
-const client = createClient({ url: process.env.REDIS_URL });
-client.on('error', () => {});
-if (!client.isOpen) client.connect().catch(() => {});
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN,
+});
 
 const MAX_BODY_SIZE = 100 * 1024; // 100KB limit
+const APPLICATIONS_KEY = 'bcci:applications';
+
+async function getApplications() {
+  return (await redis.get(APPLICATIONS_KEY)) || [];
+}
+
+async function saveApplications(apps) {
+  await redis.set(APPLICATIONS_KEY, apps);
+}
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  const origin = process.env.ALLOWED_ORIGIN || 'https://bccibharuch.in';
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.replace('Bearer ', '');
-  if (!token) return res.status(401).json({ error: 'Unauthorized' });
-
-  const email = await client.get(`admin:${token}`);
-  if (!email) return res.status(401).json({ error: 'Invalid session' });
+  // Auth check for GET/PATCH (POST is public for new applications)
+  if (req.method !== 'POST') {
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.replace('Bearer ', '');
+    if (!token) return res.status(401).json({ error: 'Unauthorized' });
+    const email = await redis.get(`admin:${token}`);
+    if (!email) return res.status(401).json({ error: 'Invalid session' });
+  }
 
   if (req.method === 'GET') {
     try {
-      const keys = await client.keys('application:*');
-      const apps = [];
-      for (const key of keys.slice(0, 100)) {
-        const data = await client.get(key);
-        if (data) apps.push(JSON.parse(data));
-      }
+      const apps = await getApplications();
       apps.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
       return res.status(200).json({ applications: apps, total: apps.length });
     } catch (e) {
@@ -61,10 +69,38 @@ export default async function handler(req, res) {
     };
 
     try {
-      await client.setEx(`application:${appId}`, 86400 * 30, JSON.stringify(application));
+      const apps = await getApplications();
+      apps.unshift(application);
+      await saveApplications(apps);
       res.status(201).json({ success: true, applicationId: appId, message: 'Application submitted successfully' });
     } catch (e) {
+      console.error('[Applications POST Error]', e.message);
       res.status(500).json({ error: 'Failed to submit application' });
+    }
+  }
+
+  if (req.method === 'PATCH') {
+    const { id, status, renewalYears, lastRenewedAt, paymentRef } = req.body || {};
+    if (!id) return res.status(400).json({ error: 'Application ID required' });
+
+    try {
+      const apps = await getApplications();
+      const idx = apps.findIndex(a => a.id === id);
+      if (idx === -1) return res.status(404).json({ error: 'Application not found' });
+
+      // Update fields
+      if (status) apps[idx].status = status;
+      if (status === 'Approved') apps[idx].approvedAt = new Date().toISOString();
+      if (status) apps[idx].reviewedAt = new Date().toISOString();
+      if (renewalYears !== undefined) apps[idx].renewalYears = renewalYears;
+      if (lastRenewedAt) apps[idx].lastRenewedAt = lastRenewedAt;
+      if (paymentRef) apps[idx].paymentRef = paymentRef;
+
+      await saveApplications(apps);
+      return res.status(200).json({ success: true, application: apps[idx] });
+    } catch (e) {
+      console.error('[Applications PATCH Error]', e.message);
+      return res.status(500).json({ error: 'Failed to update application' });
     }
   }
 }
