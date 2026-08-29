@@ -113,7 +113,7 @@ export default async function handler(req, res) {
       const apps = await getApplications();
       apps.unshift(application);
       await saveApplications(apps);
-      res.status(201).json({ success: true, applicationId: appId, message: 'Application submitted successfully' });
+      res.status(201).json({ success: true, applicationId: appId, application, message: 'Application submitted successfully' });
     } catch (e) {
       console.error('[Applications POST Error]', e.message);
       res.status(500).json({ error: 'Failed to submit application' });
