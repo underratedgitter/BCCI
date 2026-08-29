@@ -1189,16 +1189,75 @@ class App {
         </div>
 
         <div class="bcci-card-actions">
-          <button class="bcci-card-action-btn primary" onclick="window.print()">
+          <button class="bcci-card-action-btn primary" id="downloadCardBtn">
+            <i class="fas fa-download"></i> Download Card
+          </button>
+          <button class="bcci-card-action-btn secondary" id="printCardBtn">
             <i class="fas fa-print"></i> Print Card
           </button>
-          <button class="bcci-card-action-btn secondary" onclick="navigator.share?.({title: 'BCCI Membership Card', text: 'My BCCI Membership Card', url: window.location.href})">
+          <button class="bcci-card-action-btn secondary" id="shareCardBtn">
             <i class="fas fa-share-alt"></i> Share
           </button>
+        </div>
+
+        <div class="bcci-card-benefits">
+          <div class="bcci-card-benefits-title">
+            <i class="fas fa-star" style="color: #d4af37;"></i>
+            Member Benefits
+          </div>
+          <div class="bcci-card-benefits-grid">
+            <div class="bcci-card-benefit">
+              <i class="fas fa-certificate"></i>
+              <span>Certificate of Origin</span>
+            </div>
+            <div class="bcci-card-benefit">
+              <i class="fas fa-globe-asia"></i>
+              <span>Trade Facilitation</span>
+            </div>
+            <div class="bcci-card-benefit">
+              <i class="fas fa-passport"></i>
+              <span>Visa Recommendations</span>
+            </div>
+            <div class="bcci-card-benefit">
+              <i class="fas fa-file-signature"></i>
+              <span>Document Attestation</span>
+            </div>
+            <div class="bcci-card-benefit">
+              <i class="fas fa-briefcase"></i>
+              <span>Policy Advisory</span>
+            </div>
+            <div class="bcci-card-benefit">
+              <i class="fas fa-chalkboard-teacher"></i>
+              <span>Training & Workshops</span>
+            </div>
+          </div>
         </div>`;
+
+      // Store card data for download
+      this.currentCardId = app.id;
+      this.currentCardName = app.repName || 'Member';
+      this.currentCardCompany = app.company || 'BCCI Member';
 
       // Generate QR code
       this.generateCardQR(app.id, app.repName, app.company);
+
+      // Bind action buttons
+      setTimeout(() => {
+        document.getElementById('downloadCardBtn')?.addEventListener('click', () => this.downloadCardAsImage());
+        document.getElementById('printCardBtn')?.addEventListener('click', () => window.print());
+        document.getElementById('shareCardBtn')?.addEventListener('click', () => {
+          if (navigator.share) {
+            navigator.share({
+              title: 'BCCI Membership Card',
+              text: `Official BCCI Membership Card - ${app.repName}`,
+              url: window.location.href
+            });
+          } else {
+            navigator.clipboard?.writeText(window.location.href);
+            this.showToast('Link copied to clipboard!', 'success');
+          }
+        });
+      }, 100);
 
     } catch (err) {
       console.error('[Card] Failed to render:', err);
@@ -1217,50 +1276,111 @@ class App {
     const qrContainer = document.getElementById('cardQRCode');
     if (!qrContainer) return;
 
-    // Simple QR code generation using canvas
-    const canvas = document.createElement('canvas');
-    canvas.width = 56;
-    canvas.height = 56;
-    const ctx = canvas.getContext('2d');
+    // Clear previous QR
+    qrContainer.innerHTML = '';
 
-    // Draw a simple QR-like pattern (placeholder for actual QR library)
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, 56, 56);
-    ctx.fillStyle = '#000000';
+    // Generate QR code data
+    const qrData = JSON.stringify({
+      id: memberId,
+      name: name,
+      org: company,
+      type: 'BCCI_MEMBER',
+      verify: `https://bccibharuch.in/verify/${memberId}`
+    });
 
-    // Generate deterministic pattern from member ID
-    const data = `${memberId}|${name}|${company}`;
-    let hash = 0;
-    for (let i = 0; i < data.length; i++) {
-      hash = ((hash << 5) - hash) + data.charCodeAt(i);
-      hash = hash & hash;
-    }
-
-    // Draw QR-like pattern
-    for (let y = 0; y < 14; y++) {
-      for (let x = 0; x < 14; x++) {
-        const bit = (hash >> ((y * 14 + x) % 32)) & 1;
-        if (bit) {
-          ctx.fillRect(x * 4, y * 4, 4, 4);
+    // Use QRCode.js library if available
+    if (typeof QRCode !== 'undefined') {
+      new QRCode(qrContainer, {
+        text: qrData,
+        width: 62,
+        height: 62,
+        colorDark: '#0a1628',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.H
+      });
+    } else {
+      // Fallback: simple canvas pattern
+      const canvas = document.createElement('canvas');
+      canvas.width = 62;
+      canvas.height = 62;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, 62, 62);
+      ctx.fillStyle = '#0a1628';
+      
+      // Generate deterministic pattern
+      let hash = 0;
+      for (let i = 0; i < memberId.length; i++) {
+        hash = ((hash << 5) - hash) + memberId.charCodeAt(i);
+        hash = hash & hash;
+      }
+      
+      for (let y = 0; y < 15; y++) {
+        for (let x = 0; x < 15; x++) {
+          if ((hash >> ((y * 15 + x) % 32)) & 1) {
+            ctx.fillRect(x * 4, y * 4, 4, 4);
+          }
         }
       }
+      qrContainer.appendChild(canvas);
     }
+  }
 
-    // Add corner markers
-    ctx.fillRect(0, 0, 12, 4);
-    ctx.fillRect(0, 0, 4, 12);
-    ctx.fillRect(8, 0, 4, 4);
-    ctx.fillRect(0, 8, 4, 4);
+  async downloadCardAsImage() {
+    const card = document.querySelector('.bcci-membership-card');
+    if (!card) return;
 
-    ctx.fillRect(44, 0, 12, 4);
-    ctx.fillRect(48, 0, 4, 8);
-    ctx.fillRect(44, 4, 4, 4);
+    try {
+      // Create a canvas to render the card
+      const canvas = document.createElement('canvas');
+      const scale = 2; // High resolution
+      canvas.width = 420 * scale;
+      canvas.height = 265 * scale;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(scale, scale);
 
-    ctx.fillRect(0, 44, 4, 12);
-    ctx.fillRect(4, 48, 4, 4);
-    ctx.fillRect(0, 44, 4, 4);
+      // Draw background
+      const gradient = ctx.createLinearGradient(0, 0, 420, 265);
+      gradient.addColorStop(0, '#0a1628');
+      gradient.addColorStop(0.3, '#1a2d4a');
+      gradient.addColorStop(0.7, '#0d1f3c');
+      gradient.addColorStop(1, '#0a1628');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 420, 265);
 
-    qrContainer.appendChild(canvas);
+      // Draw border
+      ctx.strokeStyle = '#d4af37';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(2, 2, 416, 261);
+
+      // Draw text
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 12px Inter, sans-serif';
+      ctx.fillText('BHARUCH CHAMBER OF COMMERCE & INDUSTRY', 80, 40);
+
+      ctx.fillStyle = '#d4af37';
+      ctx.font = 'bold 18px Inter, sans-serif';
+      ctx.fillText(this.currentCardName || 'MEMBER', 30, 150);
+
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.font = '11px Inter, sans-serif';
+      ctx.fillText(this.currentCardCompany || '', 30, 170);
+
+      ctx.fillStyle = '#d4af37';
+      ctx.font = '10px JetBrains Mono, monospace';
+      ctx.fillText(`ID: ${this.currentCardId || ''}`, 30, 230);
+
+      // Create download link
+      const link = document.createElement('a');
+      link.download = `BCCI_Membership_${this.currentCardId || 'Card'}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+
+      this.showToast('Card downloaded successfully!', 'success');
+    } catch (err) {
+      console.error('[Card] Download failed:', err);
+      this.showToast('Failed to download card. Try printing instead.', 'error');
+    }
   }
 
   /* ════════════════════════════════════════════════════════════════════

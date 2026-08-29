@@ -1,11 +1,11 @@
 /* ==========================================================================
-   BCCI MEMBERSHIP CARD — Premium Digital Card Design
-   Luxury aesthetic with holographic accents and gold details
+   BCCI MEMBERSHIP CARD — Premium Digital Card Design v2.0
+   Luxury aesthetic with holographic accents, 3D flip, and micro-animations
    ========================================================================== */
 
 /* ── Card Container ─────────────────────────────────────────────── */
 .bcci-membership-card-wrapper {
-  perspective: 1000px;
+  perspective: 1200px;
   width: 100%;
   max-width: 420px;
   margin: 0 auto;
@@ -23,11 +23,15 @@
     0 0 0 1px rgba(212, 175, 55, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
   transform-style: preserve-3d;
-  transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+  transition: transform 0.8s cubic-bezier(0.23, 1, 0.32, 1), box-shadow 0.4s ease;
 }
 
 .bcci-membership-card:hover {
-  transform: rotateY(-5deg) rotateX(3deg);
+  transform: rotateY(-8deg) rotateX(4deg) scale(1.02);
+  box-shadow: 
+    0 35px 60px -15px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(212, 175, 55, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
 /* ── Holographic Overlay ────────────────────────────────────────── */
@@ -52,16 +56,29 @@
   background: linear-gradient(
     125deg,
     transparent 30%,
-    rgba(255, 215, 0, 0.08) 35%,
-    rgba(255, 215, 0, 0.02) 40%,
+    rgba(255, 215, 0, 0.12) 35%,
+    rgba(255, 215, 0, 0.04) 40%,
     transparent 45%
   );
-  animation: hologramShimmer 4s ease-in-out infinite;
+  animation: hologramShimmer 3s ease-in-out infinite;
+}
+
+.bcci-card-hologram::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    200deg,
+    transparent 60%,
+    rgba(255, 255, 255, 0.05) 65%,
+    transparent 70%
+  );
+  animation: hologramShimmer 4s ease-in-out infinite reverse;
 }
 
 @keyframes hologramShimmer {
-  0%, 100% { opacity: 0.5; transform: translateX(-10%); }
-  50% { opacity: 1; transform: translateX(10%); }
+  0%, 100% { opacity: 0.6; transform: translateX(-15%) rotate(1deg); }
+  50% { opacity: 1; transform: translateX(15%) rotate(-1deg); }
 }
 
 /* ── Gold Border Accent ─────────────────────────────────────────── */
@@ -82,12 +99,11 @@
   z-index: 5;
 }
 
-/* Fix for border-radius with border-image */
 .bcci-card-border::before {
   content: '';
   position: absolute;
   inset: -2px;
-  border: 2px solid rgba(212, 175, 55, 0.4);
+  border: 2px solid rgba(212, 175, 55, 0.3);
   border-radius: 16px;
   pointer-events: none;
 }
@@ -117,21 +133,27 @@
 }
 
 .bcci-card-logo {
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
   background: linear-gradient(135deg, #d4af37 0%, #f4d03f 50%, #d4af37 100%);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow: 
-    0 4px 12px rgba(212, 175, 55, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    0 4px 15px rgba(212, 175, 55, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  animation: logoGlow 2s ease-in-out infinite;
+}
+
+@keyframes logoGlow {
+  0%, 100% { box-shadow: 0 4px 15px rgba(212, 175, 55, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.4); }
+  50% { box-shadow: 0 4px 25px rgba(212, 175, 55, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.4); }
 }
 
 .bcci-card-logo img {
-  width: 42px;
-  height: 42px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
   object-fit: contain;
 }
@@ -143,7 +165,7 @@
 
 .bcci-card-org-name {
   font-family: 'DM Serif Display', Georgia, serif;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 400;
   color: #ffffff;
   letter-spacing: 0.5px;
@@ -153,10 +175,10 @@
 .bcci-card-org-sub {
   font-family: 'JetBrains Mono', monospace;
   font-size: 8px;
-  color: rgba(212, 175, 55, 0.8);
+  color: rgba(212, 175, 55, 0.85);
   text-transform: uppercase;
   letter-spacing: 2px;
-  margin-top: 2px;
+  margin-top: 3px;
 }
 
 .bcci-card-type {
@@ -200,34 +222,60 @@
 
 .bcci-card-member-name {
   font-family: 'Inter', sans-serif;
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 20px;
+  font-weight: 700;
   color: #ffffff;
-  letter-spacing: 0.5px;
+  letter-spacing: 1px;
   margin-bottom: 4px;
   text-transform: uppercase;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .bcci-card-member-company {
   font-family: 'Inter', sans-serif;
-  font-size: 12px;
+  font-size: 13px;
   color: rgba(255, 255, 255, 0.6);
   font-weight: 400;
 }
 
 .bcci-card-qr {
-  width: 64px;
-  height: 64px;
+  width: 72px;
+  height: 72px;
   background: #ffffff;
-  border-radius: 8px;
-  padding: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border-radius: 10px;
+  padding: 5px;
+  box-shadow: 
+    0 4px 15px rgba(0, 0, 0, 0.3),
+    inset 0 0 0 1px rgba(212, 175, 55, 0.3);
+  transition: transform 0.3s ease;
 }
 
-.bcci-card-qr canvas {
-  width: 100%;
-  height: 100%;
-  border-radius: 4px;
+.bcci-card-qr:hover {
+  transform: scale(1.1) rotate(5deg);
+}
+
+.bcci-card-qr canvas,
+.bcci-card-qr img {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 6px;
+}
+
+/* ── Microprint Line ────────────────────────────────────────────── */
+.bcci-card-microprint {
+  position: absolute;
+  bottom: 72px;
+  left: 28px;
+  right: 28px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(212, 175, 55, 0.4) 20%,
+    rgba(212, 175, 55, 0.4) 80%,
+    transparent 100%
+  );
+  z-index: 3;
 }
 
 /* ── Footer Section ─────────────────────────────────────────────── */
@@ -239,7 +287,7 @@
 
 .bcci-card-details {
   display: flex;
-  gap: 24px;
+  gap: 28px;
 }
 
 .bcci-card-detail {
@@ -258,8 +306,8 @@
 
 .bcci-card-detail-value {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
   letter-spacing: 0.5px;
 }
 
@@ -279,32 +327,39 @@
 .bcci-card-validity-value {
   font-family: 'Inter', sans-serif;
   font-size: 11px;
-  font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 4px;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 6px;
   letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 
 .bcci-card-validity-value.active {
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.1) 100%);
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.25) 0%, rgba(34, 197, 94, 0.15) 100%);
   color: #4ade80;
-  border: 1px solid rgba(34, 197, 94, 0.3);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  animation: statusPulse 2s ease-in-out infinite;
 }
 
 .bcci-card-validity-value.expiring {
-  background: linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(251, 191, 36, 0.1) 100%);
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.25) 0%, rgba(251, 191, 36, 0.15) 100%);
   color: #fbbf24;
-  border: 1px solid rgba(251, 191, 36, 0.3);
-  animation: pulseWarning 2s ease-in-out infinite;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  animation: statusPulseWarning 1.5s ease-in-out infinite;
 }
 
 .bcci-card-validity-value.expired {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(239, 68, 68, 0.1) 100%);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.25) 0%, rgba(239, 68, 68, 0.15) 100%);
   color: #f87171;
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  border: 1px solid rgba(239, 68, 68, 0.4);
 }
 
-@keyframes pulseWarning {
+@keyframes statusPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+  50% { box-shadow: 0 0 0 4px rgba(34, 197, 94, 0); }
+}
+
+@keyframes statusPulseWarning {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.7; }
 }
@@ -313,33 +368,228 @@
 .bcci-card-pattern {
   position: absolute;
   inset: 0;
-  opacity: 0.03;
+  opacity: 0.04;
   background-image: 
     radial-gradient(circle at 25% 25%, #ffffff 1px, transparent 1px),
-    radial-gradient(circle at 75% 75%, #ffffff 1px, transparent 1px);
-  background-size: 20px 20px;
+    radial-gradient(circle at 75% 75%, #ffffff 1px, transparent 1px),
+    radial-gradient(circle at 50% 50%, #d4af37 0.5px, transparent 0.5px);
+  background-size: 24px 24px, 24px 24px, 12px 12px;
   pointer-events: none;
   z-index: 1;
 }
 
-/* ── Microprint Line ────────────────────────────────────────────── */
-.bcci-card-microprint {
+/* ── Premium Badge ──────────────────────────────────────────────── */
+.bcci-card-premium-badge {
   position: absolute;
-  bottom: 70px;
-  left: 28px;
-  right: 28px;
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(212, 175, 55, 0.3) 20%,
-    rgba(212, 175, 55, 0.3) 80%,
-    transparent 100%
-  );
-  z-index: 3;
+  top: 16px;
+  right: 16px;
+  background: linear-gradient(135deg, #d4af37 0%, #f4d03f 50%, #d4af37 100%);
+  color: #0a1628;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  padding: 6px 14px;
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(212, 175, 55, 0.5);
+  animation: badgeShine 3s ease-in-out infinite;
 }
 
-/* ── Card Back Side ─────────────────────────────────────────────── */
+@keyframes badgeShine {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* ── Chip Emboss Effect ─────────────────────────────────────────── */
+.bcci-card-chip {
+  position: absolute;
+  top: 80px;
+  left: 28px;
+  width: 40px;
+  height: 30px;
+  background: linear-gradient(135deg, #f4d03f 0%, #d4af37 50%, #a67c00 100%);
+  border-radius: 6px;
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
+    0 2px 4px rgba(0, 0, 0, 0.3);
+  z-index: 4;
+}
+
+.bcci-card-chip::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+.bcci-card-chip::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  right: 3px;
+  height: 1px;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+/* ── Card Actions ───────────────────────────────────────────────── */
+.bcci-card-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+  justify-content: center;
+}
+
+.bcci-card-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 24px;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+  border: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.bcci-card-action-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.bcci-card-action-btn:hover::before {
+  left: 100%;
+}
+
+.bcci-card-action-btn.primary {
+  background: linear-gradient(135deg, #d4af37 0%, #a67c00 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 15px rgba(212, 175, 55, 0.4);
+}
+
+.bcci-card-action-btn.primary:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(212, 175, 55, 0.5);
+}
+
+.bcci-card-action-btn.secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(10px);
+}
+
+.bcci-card-action-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: translateY(-2px);
+}
+
+/* ── Membership Benefits ────────────────────────────────────────── */
+.bcci-card-benefits {
+  margin-top: 32px;
+  padding: 24px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+}
+
+.bcci-card-benefits-title {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 18px;
+  color: #0f2c59;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bcci-card-benefits-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.bcci-card-benefit {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #f8fafc;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #475569;
+  transition: all 0.2s ease;
+}
+
+.bcci-card-benefit:hover {
+  background: #f1f5f9;
+  transform: translateX(4px);
+}
+
+.bcci-card-benefit i {
+  color: #d4af37;
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+}
+
+/* ── Download Card Modal ────────────────────────────────────────── */
+.bcci-download-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(8px);
+  animation: fadeIn 0.3s ease;
+}
+
+.bcci-download-modal-content {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 32px;
+  max-width: 500px;
+  width: 100%;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Flip Card Animation ────────────────────────────────────────── */
+.bcci-card-flipped .bcci-membership-card {
+  transform: rotateY(180deg);
+}
+
+.bcci-card-flipped .bcci-card-front {
+  visibility: hidden;
+}
+
 .bcci-card-back {
   position: absolute;
   inset: 0;
@@ -354,16 +604,16 @@
 }
 
 .bcci-card-back .magnetic-strip {
-  height: 40px;
+  height: 45px;
   background: linear-gradient(90deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%);
   margin: 0 -24px;
-  opacity: 0.8;
+  opacity: 0.85;
 }
 
 .bcci-card-back .signature-strip {
-  height: 36px;
-  background: linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%);
-  border-radius: 4px;
+  height: 40px;
+  background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -371,21 +621,22 @@
 }
 
 .bcci-card-back .signature-strip span {
-  font-family: 'Dancing Script', cursive;
-  font-size: 14px;
+  font-family: 'Dancing Script', cursive, serif;
+  font-size: 16px;
   color: #333;
+  font-style: italic;
 }
 
 .bcci-card-back .cvv-section {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .bcci-card-back .cvv-label {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 8px;
+  font-size: 9px;
   color: rgba(255, 255, 255, 0.4);
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -393,15 +644,15 @@
 
 .bcci-card-back .cvv-box {
   background: #ffffff;
-  padding: 4px 12px;
+  padding: 5px 14px;
   border-radius: 4px;
 }
 
 .bcci-card-back .cvv-value {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
+  font-size: 14px;
   color: #333;
-  letter-spacing: 2px;
+  letter-spacing: 3px;
 }
 
 .bcci-card-back .card-terms {
@@ -409,100 +660,8 @@
   font-size: 7px;
   color: rgba(255, 255, 255, 0.3);
   text-align: center;
-  line-height: 1.6;
-}
-
-/* ── Card Actions ───────────────────────────────────────────────── */
-.bcci-card-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 20px;
-  justify-content: center;
-}
-
-.bcci-card-action-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 20px;
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border: none;
-}
-
-.bcci-card-action-btn.primary {
-  background: linear-gradient(135deg, #d4af37 0%, #a67c00 100%);
-  color: #ffffff;
-  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3);
-}
-
-.bcci-card-action-btn.primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(212, 175, 55, 0.4);
-}
-
-.bcci-card-action-btn.secondary {
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.bcci-card-action-btn.secondary:hover {
-  background: rgba(255, 255, 255, 0.15);
-}
-
-/* ── Premium Badge ──────────────────────────────────────────────── */
-.bcci-card-premium-badge {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  background: linear-gradient(135deg, #d4af37 0%, #f4d03f 50%, #d4af37 100%);
-  color: #0a1628;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 8px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 2px;
-  padding: 6px 12px;
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(212, 175, 55, 0.4);
-}
-
-/* ── Flip Button ────────────────────────────────────────────────── */
-.bcci-card-flip-btn {
-  position: absolute;
-  bottom: 16px;
-  right: 16px;
-  width: 32px;
-  height: 32px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
-  color: rgba(255, 255, 255, 0.6);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-  z-index: 20;
-}
-
-.bcci-card-flip-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
-  color: #ffffff;
-}
-
-/* ── Card Flip Animation ────────────────────────────────────────── */
-.bcci-card-flipped .bcci-membership-card {
-  transform: rotateY(180deg);
-}
-
-.bcci-card-flipped .bcci-card-front {
-  visibility: hidden;
+  line-height: 1.8;
+  padding: 0 16px;
 }
 
 /* ── Responsive ─────────────────────────────────────────────────── */
@@ -512,34 +671,47 @@
   }
   
   .bcci-card-content {
-    padding: 16px 20px;
+    padding: 18px 22px;
   }
   
   .bcci-card-logo {
+    width: 44px;
+    height: 44px;
+  }
+  
+  .bcci-card-logo img {
     width: 40px;
     height: 40px;
   }
   
-  .bcci-card-logo img {
-    width: 36px;
-    height: 36px;
-  }
-  
   .bcci-card-org-name {
-    font-size: 12px;
+    font-size: 13px;
   }
   
   .bcci-card-member-name {
-    font-size: 14px;
+    font-size: 16px;
   }
   
   .bcci-card-qr {
-    width: 56px;
-    height: 56px;
+    width: 60px;
+    height: 60px;
   }
   
   .bcci-card-details {
-    gap: 16px;
+    gap: 18px;
+  }
+  
+  .bcci-card-benefits-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .bcci-card-actions {
+    flex-direction: column;
+  }
+  
+  .bcci-card-action-btn {
+    width: 100%;
+    justify-content: center;
   }
 }
 
@@ -547,16 +719,88 @@
 @media print {
   .bcci-membership-card-wrapper {
     max-width: 100%;
-    box-shadow: none;
-  }
-  
-  .bcci-membership-card {
-    box-shadow: none;
+    box-shadow: none !important;
     border: 2px solid #d4af37;
   }
   
-  .bcci-card-hologram,
-  .bcci-card-flip-btn {
-    display: none;
+  .bcci-membership-card {
+    box-shadow: none !important;
+    transform: none !important;
   }
+  
+  .bcci-card-hologram,
+  .bcci-card-flip-btn,
+  .bcci-card-actions,
+  .bcci-card-benefits {
+    display: none !important;
+  }
+  
+  body {
+    background: #ffffff !important;
+  }
+}
+
+/* ── Loading State ──────────────────────────────────────────────── */
+.bcci-card-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+}
+
+.bcci-card-spinner {
+  width: 48px;
+  height: 48px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #d4af37;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.bcci-card-loading-text {
+  margin-top: 16px;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  color: #64748b;
+}
+
+/* ── Success Animation ──────────────────────────────────────────── */
+.bcci-card-success {
+  animation: cardAppear 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@keyframes cardAppear {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* ── Hover Glow Effect ──────────────────────────────────────────── */
+.bcci-membership-card::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  background: linear-gradient(45deg, #d4af37, #f4d03f, #d4af37, #a67c00);
+  border-radius: 18px;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.bcci-membership-card:hover::before {
+  opacity: 1;
 }
