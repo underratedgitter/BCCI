@@ -7,18 +7,78 @@
 import { Store } from './store.js?v=4.0.0';
 
 // ── Configuration ──────────────────────────────────────────────
+// Notification recipients are chosen server-side (ADMIN_EMAILS); the browser
+// must never get to pick who receives mail.
 const CONFIG = {
-  ADMIN_EMAIL: 'admin@bccibharuch.in',
+  SUPPORT_EMAIL: 'admin@bccibharuch.in',
   SUPPORT_PHONE: '+91 7861906384',
   UPI_ID: '7861906384.eazypay@icici',
 };
 
-// ── XSS Sanitization ──────────────────────────────────────────
-function escapeHtml(str) {
-  if (!str) return '';
+// ── XSS sanitisation ──────────────────────────────────────────
+// Every value that reaches innerHTML goes through this. Applicant-supplied
+// text (company names, enquiry subjects) is rendered in the admin portal, so
+// an unescaped field there is an admin-session takeover, not a cosmetic bug.
+function escapeHtml(value) {
+  if (value === null || value === undefined) return '';
   const div = document.createElement('div');
-  div.textContent = str;
+  div.textContent = String(value);
   return div.innerHTML;
+}
+
+/** Escapes a value for use inside a quoted HTML attribute. */
+function escapeAttr(value) {
+  return escapeHtml(value).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+/** Formats a date defensively — bad input renders as a dash, not "Invalid Date". */
+function formatDate(value) {
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-IN');
+}
+
+// ── Routing ───────────────────────────────────────────────────
+// Each view gets a real URL so it can be linked, bookmarked, shared and
+// indexed. vercel.json rewrites every non-/api path to index.html, so these
+// resolve on a cold load too.
+const VIEW_PATHS = {
+  home: '/',
+  about: '/about',
+  services: '/services',
+  gallery: '/gallery',
+  qrcode: '/qr',
+  enquiry: '/enquiry',
+  membership: '/membership',
+  card: '/card',
+  signin: '/signin',
+  admin: '/admin',
+};
+
+const PATH_VIEWS = Object.fromEntries(
+  Object.entries(VIEW_PATHS).map(([view, path]) => [path, view])
+);
+
+const PAGE_TITLES = {
+  home: 'BCCI Bharuch — Bharuch Chamber of Commerce & Industry',
+  about: 'About BCCI — Bharuch Chamber of Commerce & Industry',
+  services: 'Member Services — BCCI Bharuch',
+  gallery: 'Gallery — BCCI Bharuch',
+  qrcode: 'Pay by UPI — BCCI Bharuch',
+  enquiry: 'Contact Us — BCCI Bharuch',
+  membership: 'Apply for Membership — BCCI Bharuch',
+  card: 'Digital Membership Card — BCCI Bharuch',
+  signin: 'Secretariat Sign In — BCCI Bharuch',
+  admin: 'Admin Portal — BCCI Bharuch',
+};
+
+/** Resolves the view for the current URL, tolerating the old #hash links. */
+function viewFromLocation() {
+  const hash = (window.location.hash || '').toLowerCase().replace('#', '');
+  if (hash === 'admin' || hash === 'secret-admin') return 'admin';
+  if (hash === 'signin' || hash === 'login') return 'signin';
+
+  const path = window.location.pathname.replace(/\/+$/, '') || '/';
+  return PATH_VIEWS[path] || 'home';
 }
 
 class App {
@@ -34,7 +94,9 @@ class App {
   init() {
     this.bindNavigation();
     this.updateNavAuthUI();
-    this.renderView('home');
+    // Render whatever the URL asks for, so a deep link or a refresh lands on
+    // the right view instead of always bouncing to the homepage.
+    this.renderView(viewFromLocation(), { updateHistory: false });
     this.updateApplicantAuthUI();
     this.setupSecretAccessHandlers();
     this.setupApplicantAuthHandlers();
@@ -147,7 +209,7 @@ class App {
           otpStep2Form.style.display = 'block';
           const noticeBanner = document.getElementById('otpNoticeBanner');
           if (noticeBanner) {
-            noticeBanner.innerHTML = `<i class="fas fa-envelope-open-text"></i> Verification code sent to <strong>${email}</strong>. Check your inbox (and spam folder).`;
+            noticeBanner.innerHTML = `<i class="fas fa-envelope-open-text"></i> Verification code sent to <strong>${escapeHtml(email)}</strong>. Check your inbox (and spam folder).`;
           }
           this.showToast(`Verification code sent to ${email}`, 'success');
         } else {
@@ -243,10 +305,14 @@ class App {
       const session = this.store.getApplicantSession();
 
       if (signOutBtn) {
-        this.store.clearApplicantSession();
         this.closeModal();
+        // Clear locally first so the UI never looks signed-in after a click,
+        // then invalidate the token server-side.
+        this.store.forgetApplicantSession();
+        this.updateNavAuthUI();
         this.updateApplicantAuthUI();
-        this.showToast('Session ended. You have been signed out successfully.', 'info');
+        this.showToast('Signed out.', 'info');
+        this.store.clearApplicantSession().catch(() => {});
       }
 
       if (cardBtn && session) {
@@ -277,16 +343,16 @@ class App {
         statusHtml = `<span style="color: #059669; background: #ECFDF5; border: 1px solid #A7F3D0; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 700;"><i class="fas fa-check-circle"></i> ⭐ ACTIVE MEMBER</span>`;
         detailsHtml = `
           <div style="background: #F8FAFC; border: 1px solid #E2E8F0; padding: 1rem; border-radius: 8px; margin: 1rem 0; font-size: 0.85rem;">
-            <div><strong>Company:</strong> ${memberApp.company}</div>
-            <div><strong>Member ID:</strong> <code style="color: var(--primary); font-weight:700;">${memberApp.id}</code></div>
-            <div><strong>Valid Until:</strong> ${validity ? validity.validUntilDate : 'Active'}</div>
+            <div><strong>Company:</strong> ${escapeHtml(memberApp.company)}</div>
+            <div><strong>Member ID:</strong> <code style="color: var(--primary); font-weight:700;">${escapeHtml(memberApp.id)}</code></div>
+            <div><strong>Valid Until:</strong> ${escapeHtml(validity ? validity.validUntilDate : 'Active')}</div>
           </div>
         `;
       } else if (memberApp.status === 'Pending') {
         statusHtml = `<span style="color: #D97706; background: #FEF3C7; border: 1px solid #FDE68A; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 700;"><i class="fas fa-clock"></i> ⌛ PENDING ADMIN APPROVAL</span>`;
         detailsHtml = `
           <div style="background: #FEF3C7; border: 1px solid #FDE68A; color: #92400E; padding: 0.85rem; border-radius: 8px; margin: 1rem 0; font-size: 0.85rem;">
-            <strong>Ref ID: ${memberApp.id}</strong> — Submitted on ${new Date(memberApp.submittedAt).toLocaleDateString()}. Pending Secretariat review.
+            <strong>Ref ID: ${escapeHtml(memberApp.id)}</strong> — Submitted on ${escapeHtml(formatDate(memberApp.submittedAt))}. Pending Secretariat review.
           </div>
         `;
       }
@@ -298,11 +364,11 @@ class App {
         <div style="padding: 0.5rem 0;">
           <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
             <div style="width: 52px; height: 52px; background: linear-gradient(135deg, #0F2C59 0%, #1E3E62 100%); color: #FFD700; border: 2px solid #D4AF37; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.3rem;">
-              ${(session.name || session.email).charAt(0).toUpperCase()}
+              ${escapeHtml((session.name || session.email || '?').charAt(0).toUpperCase())}
             </div>
             <div>
-              <div style="font-size: 1.1rem; font-weight: 700; color: #0F172A;">${session.name || 'BCCI Applicant'}</div>
-              <div style="font-size: 0.85rem; color: #64748B;">${session.email}</div>
+              <div style="font-size: 1.1rem; font-weight: 700; color: #0F172A;">${escapeHtml(session.name || 'BCCI Applicant')}</div>
+              <div style="font-size: 0.85rem; color: #64748B;">${escapeHtml(session.email)}</div>
             </div>
           </div>
           <div style="margin-bottom: 1rem;">
@@ -370,11 +436,11 @@ class App {
         if (emailDisplay) {
           emailDisplay.innerHTML = `
             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-              <span style="font-size: 1.15rem; font-weight: 800; color: #FFFFFF;">${memberApp.company}</span>
-              <span style="font-size: 0.75rem; background: rgba(255,215,0,0.2); color: #FFD700; border: 1px solid #FFD700; padding: 2px 8px; border-radius: 12px; font-family: monospace; font-weight: 700;">${memberApp.id}</span>
+              <span style="font-size: 1.15rem; font-weight: 800; color: #FFFFFF;">${escapeHtml(memberApp.company)}</span>
+              <span style="font-size: 0.75rem; background: rgba(255,215,0,0.2); color: #FFD700; border: 1px solid #FFD700; padding: 2px 8px; border-radius: 12px; font-family: monospace; font-weight: 700;">${escapeHtml(memberApp.id)}</span>
             </div>
             <div style="font-size: 0.85rem; color: #CBD5E1; margin-top: 3px;">
-              Delegate: <strong style="color: #FFFFFF;">${memberApp.repName}</strong> (${session.email})
+              Delegate: <strong style="color: #FFFFFF;">${escapeHtml(memberApp.repName)}</strong> (${escapeHtml(session.email)})
             </div>
             <div style="display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; margin-top: 0.6rem;">
               <span style="font-size: 0.8rem; font-weight: 700; padding: 4px 12px; border-radius: 20px; ${statusBadgeClass}">
@@ -398,14 +464,14 @@ class App {
         if (emailDisplay) {
           emailDisplay.innerHTML = `
             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-              <span style="font-size: 1.05rem; font-weight: 800; color: #FFFFFF;">${memberApp.company}</span>
-              <span style="font-size: 0.75rem; background: rgba(251,191,36,0.2); color: #FBBF24; border: 1px solid #F59E0B; padding: 2px 8px; border-radius: 12px; font-family: monospace; font-weight: 700;">${memberApp.id}</span>
+              <span style="font-size: 1.05rem; font-weight: 800; color: #FFFFFF;">${escapeHtml(memberApp.company)}</span>
+              <span style="font-size: 0.75rem; background: rgba(251,191,36,0.2); color: #FBBF24; border: 1px solid #F59E0B; padding: 2px 8px; border-radius: 12px; font-family: monospace; font-weight: 700;">${escapeHtml(memberApp.id)}</span>
             </div>
             <div style="font-size: 0.85rem; color: #FCD34D; margin-top: 3px;">
               <i class="fas fa-hourglass-half"></i> <strong>Application Status: PENDING SECRETARIAT REVIEW</strong>
             </div>
             <div style="font-size: 0.8rem; color: #94A3B8; margin-top: 0.2rem;">
-              Submitted on ${new Date(memberApp.submittedAt).toLocaleDateString()}. The Secretariat Board is reviewing your documentation.
+              Submitted on ${escapeHtml(formatDate(memberApp.submittedAt))}. The Secretariat Board is reviewing your documentation.
             </div>
           `;
         }
@@ -484,7 +550,7 @@ class App {
       cursor: pointer;
       box-shadow: 0 4px 12px rgba(15, 44, 89, 0.25);
     `;
-    badgeEl.innerHTML = `<i class="fas fa-award" style="color: ${starColor}; font-size: 0.95rem;"></i> OFFICIAL MEMBER: ${memberApp.company} <span style="color: #FFD700; font-family: monospace; font-size: 0.75rem; background: rgba(255,215,0,0.15); padding: 1px 6px; border-radius: 8px;">${memberApp.id}</span>`;
+    badgeEl.innerHTML = `<i class="fas fa-award" style="color: ${starColor}; font-size: 0.95rem;"></i> OFFICIAL MEMBER: ${escapeHtml(memberApp.company)} <span style="color: #FFD700; font-family: monospace; font-size: 0.75rem; background: rgba(255,215,0,0.15); padding: 1px 6px; border-radius: 8px;">${escapeHtml(memberApp.id)}</span>`;
     badgeEl.title = `Official Member ID: ${memberApp.id} - Tap to view Digital Membership Pass`;
 
     badgeEl.onclick = () => this.showDigitalMemberCardModal(memberApp);
@@ -578,8 +644,8 @@ class App {
       content: `
         <div style="padding: 0.5rem 0;">
           <div style="background: #EFF6FF; border: 1px solid #BFDBFE; padding: 1rem; border-radius: 8px; margin-bottom: 1.25rem; font-size: 0.9rem; color: #1E3E62;">
-            <div style="font-weight: 700; margin-bottom: 0.25rem;"><i class="fas fa-building"></i> Enterprise: ${app.company} (${app.id})</div>
-            <div>Current Validity: <strong>${validity ? validity.validUntilDate : 'N/A'}</strong></div>
+            <div style="font-weight: 700; margin-bottom: 0.25rem;"><i class="fas fa-building"></i> Enterprise: ${escapeHtml(app.company)} (${escapeHtml(app.id)})</div>
+            <div>Current Validity: <strong>${escapeHtml(validity ? validity.validUntilDate : 'N/A')}</strong></div>
             <div style="margin-top: 0.4rem; color: var(--primary); font-weight: 600;">
               Renewing will extend your BCCI membership by +1 Year (${validity ? validity.yearsTenure + 1 : 2} Years Total).
             </div>
@@ -630,23 +696,24 @@ class App {
      ════════════════════════════════════════════════════════════════════ */
 
   setupSecretAccessHandlers() {
-    const handleHashChange = () => {
-      const hash = (window.location.hash || '').toLowerCase();
-      if (hash === '#admin' || hash === '#secret-admin') {
-        this.renderView(this.adminAuthed ? 'admin' : 'signin');
-      } else if (hash === '#signin' || hash === '#login') {
-        this.renderView('signin');
-      }
-    };
+    // Back / forward through the real URLs.
+    window.addEventListener('popstate', () => {
+      this.renderView(viewFromLocation(), { updateHistory: false });
+    });
 
-    window.addEventListener('hashchange', handleHashChange);
-    if (window.location.hash) handleHashChange();
+    // Legacy #admin / #signin links still work.
+    window.addEventListener('hashchange', () => {
+      const hash = (window.location.hash || '').toLowerCase();
+      if (['#admin', '#secret-admin', '#signin', '#login'].includes(hash)) {
+        this.renderView(this.adminAuthed ? 'admin' : 'signin');
+      }
+    });
 
     document.addEventListener('keydown', (e) => {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
         e.preventDefault();
         this.renderView(this.adminAuthed ? 'admin' : 'signin');
-        this.showToast('Secretariat Access Shortcut Triggered', 'info');
+        this.showToast('Secretariat access', 'info');
       }
     });
   }
@@ -675,7 +742,7 @@ class App {
         </button>
       `;
     } else if (session && session.email) {
-      const initial = (session.name || session.email).charAt(0).toUpperCase();
+      const initial = escapeHtml((session.name || session.email || '?').charAt(0).toUpperCase());
       desktopHtml = `
         <div class="nav-profile-wrapper">
           <button type="button" class="nav-profile-avatar" id="navProfileAvatarBtn" title="My Profile">
@@ -823,16 +890,16 @@ class App {
         }
         statusHtml = `<div class="profile-dropdown-status ${statusClass}"><i class="fas ${statusIcon}"></i> ${statusText}</div>`;
         infoHtml = `
-          <div class="profile-dropdown-info"><span class="info-label">Company</span><span class="info-value">${memberApp.company}</span></div>
-          <div class="profile-dropdown-info"><span class="info-label">Member ID</span><span class="info-value" style="font-family:monospace;color:var(--primary);">${memberApp.id}</span></div>
-          <div class="profile-dropdown-info"><span class="info-label">Valid Until</span><span class="info-value" style="color:${validity && validity.state === 'EXPIRED' ? '#DC2626' : '#059669'};">${validity ? validity.validUntilDate : 'Active'}</span></div>
+          <div class="profile-dropdown-info"><span class="info-label">Company</span><span class="info-value">${escapeHtml(memberApp.company)}</span></div>
+          <div class="profile-dropdown-info"><span class="info-label">Member ID</span><span class="info-value" style="font-family:monospace;color:var(--primary);">${escapeHtml(memberApp.id)}</span></div>
+          <div class="profile-dropdown-info"><span class="info-label">Valid Until</span><span class="info-value" style="color:${validity && validity.state === 'EXPIRED' ? '#DC2626' : '#059669'};">${escapeHtml(validity ? validity.validUntilDate : 'Active')}</span></div>
         `;
       } else if (memberApp.status === 'Pending') {
         statusHtml = `<div class="profile-dropdown-status pending"><i class="fas fa-hourglass-half"></i> ⏳ Pending Approval</div>`;
         infoHtml = `
-          <div class="profile-dropdown-info"><span class="info-label">Company</span><span class="info-value">${memberApp.company}</span></div>
-          <div class="profile-dropdown-info"><span class="info-label">Ref ID</span><span class="info-value" style="font-family:monospace;color:#D97706;">${memberApp.id}</span></div>
-          <div class="profile-dropdown-info"><span class="info-label">Submitted</span><span class="info-value">${new Date(memberApp.submittedAt).toLocaleDateString()}</span></div>
+          <div class="profile-dropdown-info"><span class="info-label">Company</span><span class="info-value">${escapeHtml(memberApp.company)}</span></div>
+          <div class="profile-dropdown-info"><span class="info-label">Ref ID</span><span class="info-value" style="font-family:monospace;color:#D97706;">${escapeHtml(memberApp.id)}</span></div>
+          <div class="profile-dropdown-info"><span class="info-label">Submitted</span><span class="info-value">${escapeHtml(formatDate(memberApp.submittedAt))}</span></div>
         `;
       }
     } else {
@@ -856,10 +923,10 @@ class App {
 
     return `
       <div class="profile-dropdown-header">
-        <div class="profile-dropdown-avatar">${initial}</div>
+        <div class="profile-dropdown-avatar">${escapeHtml(initial)}</div>
         <div>
-          <div class="profile-dropdown-name">${displayName}</div>
-          <div class="profile-dropdown-email">${displayEmail}</div>
+          <div class="profile-dropdown-name">${escapeHtml(displayName)}</div>
+          <div class="profile-dropdown-email">${escapeHtml(displayEmail)}</div>
         </div>
       </div>
       <div class="profile-dropdown-body">
@@ -928,10 +995,11 @@ class App {
   }
 
   handleApplicantSignOut() {
-    this.store.clearApplicantSession();
+    this.store.forgetApplicantSession();
     this.updateNavAuthUI();
     this.updateApplicantAuthUI();
-    this.showToast('Session ended. You have been signed out successfully.', 'info');
+    this.showToast('Signed out.', 'info');
+    this.store.clearApplicantSession().catch(() => {});
   }
 
   openMobileDrawer() {
@@ -978,17 +1046,27 @@ class App {
     }
   }
 
-  async renderView(viewId) {
+  async renderView(viewId, { updateHistory = true } = {}) {
+    if (!VIEW_PATHS[viewId]) viewId = 'home';
+
     if (viewId === 'admin' && !this.adminAuthed) {
-      this.renderView('signin');
-      return;
+      return this.renderView('signin', { updateHistory });
     }
     if (viewId === 'signin' && this.adminAuthed) {
-      this.renderView('admin');
-      return;
+      return this.renderView('admin', { updateHistory });
     }
 
     this.currentView = viewId;
+
+    // Give the view a real address, so it can be shared and the browser's
+    // back button behaves the way people expect.
+    if (updateHistory) {
+      const path = VIEW_PATHS[viewId];
+      if (window.location.pathname !== path || window.location.hash) {
+        window.history.pushState({ view: viewId }, '', path);
+      }
+    }
+    document.title = PAGE_TITLES[viewId] || PAGE_TITLES.home;
 
     document.querySelectorAll('.nav-link').forEach(link => {
       link.classList.toggle('active', link.getAttribute('data-view-nav') === viewId);
@@ -1029,17 +1107,17 @@ class App {
       <div class="team-card">
         ${m.image ? `
           <div class="team-avatar-img-wrap">
-            <img src="${m.image}" alt="${m.name}" class="team-avatar-img" />
+            <img src="${escapeAttr(m.image)}" alt="${escapeAttr(m.name)}" class="team-avatar-img" loading="lazy" />
           </div>
         ` : `
-          <div class="team-avatar">${m.initials}</div>
+          <div class="team-avatar">${escapeHtml(m.initials)}</div>
         `}
-        <h4 class="team-name">${m.name}</h4>
-        <div class="team-title">${m.role}</div>
-        <span class="team-badge">${m.category}</span>
+        <h4 class="team-name">${escapeHtml(m.name)}</h4>
+        <div class="team-title">${escapeHtml(m.role)}</div>
+        <span class="team-badge">${escapeHtml(m.category)}</span>
         ${m.linkedin ? `
           <div style="margin-top: 1rem;">
-            <a href="${m.linkedin}" target="_blank" rel="noopener noreferrer" class="team-linkedin-btn" title="View ${m.name}'s LinkedIn Profile">
+            <a href="${escapeAttr(m.linkedin)}" target="_blank" rel="noopener noreferrer" class="team-linkedin-btn" title="View ${escapeAttr(m.name)}'s LinkedIn profile">
               <i class="fab fa-linkedin"></i> LinkedIn
             </a>
           </div>
@@ -1054,9 +1132,9 @@ class App {
       const services = this.store.getServices();
       servicesContainer.innerHTML = services.map(s => `
         <div class="service-card">
-          <div class="service-icon"><i class="fas ${s.icon}"></i></div>
-          <h3 class="service-title">${s.title}</h3>
-          <p class="service-desc">${s.desc}</p>
+          <div class="service-icon"><i class="fas ${escapeAttr(s.icon)}" aria-hidden="true"></i></div>
+          <h3 class="service-title">${escapeHtml(s.title)}</h3>
+          <p class="service-desc">${escapeHtml(s.desc)}</p>
         </div>
       `).join('');
     }
@@ -1073,7 +1151,7 @@ class App {
             <span>${escapeHtml(f.q)}</span>
             <i class="fas fa-chevron-down" aria-hidden="true"></i>
           </button>
-          <div class="faq-answer" id="faqId" role="region"><p>${escapeHtml(f.a)}</p></div>
+          <div class="faq-answer" id="${faqId}" role="region"><p>${escapeHtml(f.a)}</p></div>
         </div>
       `;
       }).join('');
@@ -1425,7 +1503,28 @@ class App {
           canvas.width = w; canvas.height = h;
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, w, h);
-          this.currentPaymentProofBase64 = canvas.toDataURL('image/jpeg', 0.82);
+
+          // Compress to fit the request budget rather than to a fixed quality.
+          // A 1200px photo at 0.82 is ~350–550KB once base64-encoded, which the
+          // server rejects outright — so step quality down, then dimensions,
+          // until the encoded string fits.
+          const BUDGET_BYTES = 600 * 1024;
+          let quality = 0.82;
+          let encoded = canvas.toDataURL('image/jpeg', quality);
+          while (encoded.length > BUDGET_BYTES && quality > 0.35) {
+            quality -= 0.08;
+            encoded = canvas.toDataURL('image/jpeg', quality);
+          }
+          if (encoded.length > BUDGET_BYTES) {
+            // Still too big: halve the dimensions once and re-encode.
+            const shrunk = document.createElement('canvas');
+            shrunk.width = Math.round(w / 2);
+            shrunk.height = Math.round(h / 2);
+            shrunk.getContext('2d').drawImage(canvas, 0, 0, shrunk.width, shrunk.height);
+            encoded = shrunk.toDataURL('image/jpeg', 0.7);
+          }
+
+          this.currentPaymentProofBase64 = encoded;
           imgEl.src = this.currentPaymentProofBase64;
           imgEl.setAttribute('data-lightbox', 'true');
           fileNameEl.textContent = file.name;
@@ -1434,6 +1533,13 @@ class App {
           if (dropzone) { dropzone.classList.remove('is-invalid'); dropzone.classList.add('is-valid'); }
         };
         img.onerror = () => {
+          // Could not decode it for resizing — only accept it as-is if the
+          // original is already small enough to send.
+          if (rawBase64.length > 600 * 1024) {
+            this.showToast('That image could not be processed. Please try a different file.', 'error');
+            fileInput.value = '';
+            return;
+          }
           this.currentPaymentProofBase64 = rawBase64;
           imgEl.src = rawBase64;
           fileNameEl.textContent = file.name;
@@ -1651,38 +1757,10 @@ class App {
           const data = Object.fromEntries(formData.entries());
           data.paymentProof = this.currentPaymentProofBase64 || '';
 
+          // The server sends both the applicant confirmation and the admin
+          // alert as part of this request, so they go out even if the
+          // applicant closes the tab the moment they hit submit.
           const newApp = await this.store.addApplication(data);
-
-          // ── Send Emails via Unified Email API ──────────────────────
-          const emailDate = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
-
-          // 1. User receives: "Application Submitted" confirmation
-          if (newApp.email) {
-            this.store.sendEmail('application_submitted', newApp.email, {
-              appId: newApp.id,
-              company: newApp.company,
-              repName: newApp.repName,
-              sector: newApp.businessServices,
-              date: emailDate,
-            }).catch(err => console.warn('[Email] application_submitted failed:', err));
-          }
-
-          // 2. Admin receives: "New Application" alert with full details
-          this.store.sendEmail('admin_new_application', CONFIG.ADMIN_EMAIL, {
-            appId: newApp.id,
-            company: newApp.company,
-            repName: newApp.repName,
-            repDesignation: newApp.repDesignation,
-            email: newApp.email,
-            phone: newApp.phone,
-            sector: newApp.businessServices,
-            enterpriseType: newApp.enterpriseType,
-            legalStatus: newApp.legalStatus,
-            gstNo: newApp.gstNo,
-            panNo: newApp.panNo,
-            paymentRef: newApp.paymentRef,
-            date: emailDate,
-          }).catch(err => console.warn('[Email] admin_new_application failed:', err));
 
           // Reset form
           membershipForm.reset();
@@ -1700,7 +1778,7 @@ class App {
             if (errDiv) errDiv.style.display = 'none';
           });
 
-          const applicantEmailDisplay = newApp.email ? `<strong>${newApp.email}</strong>` : 'your registered email';
+          const applicantEmailDisplay = newApp.email ? `<strong>${escapeHtml(newApp.email)}</strong>` : 'your registered email';
           this.showModal({
             title: '<i class="fas fa-check-circle" style="color: #10B981;"></i> Application Submitted',
             content: `
@@ -1713,7 +1791,7 @@ class App {
                   Thank you for applying to join <strong>Bharuch Chamber of Commerce &amp; Industry</strong>.
                 </p>
                 <div style="background: #F8FAFC; border: 1px solid #E2E8F0; padding: 0.75rem 1.25rem; border-radius: 8px; font-size: 0.9rem; color: #334155; margin-bottom: 1.25rem; display: inline-block;">
-                  Application Reference ID: <strong style="color: var(--primary); font-family: monospace; font-size: 1.05rem;">${newApp.id}</strong>
+                  Application Reference ID: <strong style="color: var(--primary); font-family: monospace; font-size: 1.05rem;">${escapeHtml(newApp.id)}</strong>
                 </div>
                 <p style="color: #64748B; font-size: 0.88rem; margin-bottom: 1.5rem; line-height: 1.5;">
                   A confirmation email has been sent to ${applicantEmailDisplay}.
@@ -1724,7 +1802,18 @@ class App {
           });
         } catch (err) {
           console.error('[Membership Submit Error]', err);
-          this.showToast(err.message || 'Submission failed. Please try again.', 'error');
+          if (err.status === 409) {
+            // Already applied — show them where they stand instead of an error.
+            this.showToast(err.message, 'warning');
+            await this.updateApplicantAuthUI();
+          } else if (err.status === 401) {
+            this.showToast('Please verify your email address again before submitting.', 'warning');
+            await this.updateApplicantAuthUI();
+          } else if (err.status === 413) {
+            this.showToast('Your payment receipt is too large. Please attach a smaller image.', 'error');
+          } else {
+            this.showToast(err.message || 'Submission failed. Please try again.', 'error');
+          }
         } finally {
           if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit Application for Admin Approval'; }
         }
@@ -1758,23 +1847,6 @@ class App {
           const data = Object.fromEntries(formData.entries());
           const newEnq = await this.store.addEnquiry(data);
 
-          // Notify admin via Vercel API
-          this.store.sendEmail('admin_new_application', CONFIG.ADMIN_EMAIL, {
-            appId: newEnq.id,
-            company: data.company || 'N/A',
-            repName: data.name,
-            repDesignation: 'Enquiry Sender',
-            email: data.email,
-            phone: data.phone,
-            sector: data.subject || 'General Enquiry',
-            enterpriseType: 'N/A',
-            legalStatus: 'N/A',
-            gstNo: 'N/A',
-            panNo: 'N/A',
-            paymentRef: '',
-            date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
-          }).catch(err => console.warn('[Email] enquiry notification failed:', err));
-
           enquiryForm.reset();
           enquiryForm.querySelectorAll('input, select, textarea').forEach(input => {
             input.classList.remove('is-valid', 'is-invalid');
@@ -1789,7 +1861,7 @@ class App {
                 <i class="fas fa-check-circle" style="font-size: 3.5rem; color: #10B981; margin-bottom: 1.25rem;"></i>
                 <h3 style="margin-bottom: 0.8rem; color: var(--primary);">Thank You for Contacting BCCI</h3>
                 <p style="color: #64748B; margin-bottom: 1.5rem; font-size: 0.95rem; line-height: 1.6;">
-                  Your enquiry (Ref: <strong style="color: var(--primary); font-family: monospace;">${newEnq.id}</strong>) has been received. We'll respond at <strong>${data.email || 'your email'}</strong> within 24 hours.
+                  Your enquiry (Ref: <strong style="color: var(--primary); font-family: monospace;">${escapeHtml(newEnq.id)}</strong>) has been received. We'll respond at <strong>${escapeHtml(data.email || 'your email')}</strong> within 24 hours.
                 </p>
                 <button class="btn-primary" id="modalCloseBtn" style="width: 100%; justify-content: center; font-weight: 600; padding: 0.75rem 1.5rem;">Done</button>
               </div>
@@ -1810,7 +1882,9 @@ class App {
       pageAdminLoginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const user = document.getElementById('pageAdminUser').value.trim();
-        const pass = document.getElementById('pageAdminPass').value.trim();
+        // Never trim the password — a trailing space in the configured secret
+        // would otherwise cause a sign-in failure with no visible cause.
+        const pass = document.getElementById('pageAdminPass').value;
         const submitBtn = pageAdminLoginForm.querySelector('button[type="submit"]');
 
         if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Authenticating…'; }
@@ -1840,205 +1914,227 @@ class App {
      ════════════════════════════════════════════════════════════════════ */
 
   async renderAdminPortal() {
-    const [apps, enquiries] = await Promise.all([
-      this.store.getApplications(),
-      this.store.getEnquiries()
-    ]);
+    const setMetric = (id, value) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value;
+    };
+
+    let apps = [];
+    let enquiries = [];
+    try {
+      [apps, enquiries] = await Promise.all([
+        this.store.getApplications(),
+        this.store.getEnquiries(),
+      ]);
+    } catch (err) {
+      // An expired admin session is the common case here; the store has
+      // already cleared it, so send the user back to sign in.
+      if (err.status === 401) {
+        this.adminAuthed = false;
+        this.updateNavAuthUI();
+        this.showToast('Your admin session expired. Please sign in again.', 'warning');
+        this.renderView('signin');
+        return;
+      }
+      this.showToast(err.message || 'Could not load the admin dashboard.', 'error');
+      return;
+    }
 
     const pendingApps = apps.filter(a => a.status === 'Pending');
     const approvedApps = apps.filter(a => a.status === 'Approved');
     const rejectedApps = apps.filter(a => a.status === 'Rejected');
 
-    document.getElementById('metricTotal').textContent = apps.length;
-    document.getElementById('metricPending').textContent = pendingApps.length;
-    document.getElementById('metricApproved').textContent = approvedApps.length;
-    document.getElementById('metricRejected').textContent = rejectedApps.length;
+    setMetric('metricTotal', apps.length);
+    setMetric('metricPending', pendingApps.length);
+    setMetric('metricApproved', approvedApps.length);
+    setMetric('metricRejected', rejectedApps.length);
 
-    // Render Pending Applications
-    const pendingTableBody = document.getElementById('pendingAppsBody');
-    const pendingCards = document.getElementById('pendingAppsCards');
+    const emptyState = (icon, text) =>
+      `<div style="text-align: center; color: #94A3B8; padding: 2rem;"><i class="fas ${icon}" style="font-size: 1.8rem; margin-bottom: 0.5rem; display: block;"></i>${escapeHtml(text)}</div>`;
 
-    if (pendingApps.length === 0) {
-      const emptyHtml = `<div style="text-align: center; color: #94A3B8; padding: 2rem;"><i class="fas fa-check-double" style="font-size: 1.8rem; margin-bottom: 0.5rem; display: block;"></i>No pending applications.</div>`;
-      if (pendingTableBody) pendingTableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #94A3B8; padding: 2rem;">${emptyHtml}</td></tr>`;
-      if (pendingCards) pendingCards.innerHTML = emptyHtml;
-    } else {
-      if (pendingTableBody) {
-        pendingTableBody.innerHTML = pendingApps.map(app => `
-          <tr>
-            <td><strong>${app.id}</strong></td>
-            <td><div style="font-weight: 600;">${app.company}</div><small style="color: #94A3B8;">${app.legalStatus} • ${app.enterpriseType}</small></td>
-            <td>${app.repName}<br/><small style="color: #94A3B8;">${app.repDesignation || 'Applicant'}</small></td>
-            <td>${app.businessServices}</td>
-            <td><span class="badge-status badge-pending"><i class="fas fa-clock"></i> Pending</span></td>
-            <td>${new Date(app.submittedAt).toLocaleDateString()}</td>
-            <td>
-              <div style="display: flex; gap: 0.4rem;">
-                <button class="btn-action-approve" data-approve-id="${app.id}"><i class="fas fa-check"></i> Approve</button>
-                <button class="btn-action-reject" data-reject-id="${app.id}"><i class="fas fa-times"></i> Reject</button>
-                <button class="btn-secondary" data-inspect-id="${app.id}" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;"><i class="fas fa-eye"></i></button>
-              </div>
-            </td>
-          </tr>
-        `).join('');
+    const fill = (tableBodyId, cardsId, rows, cards, colspan, emptyIcon, emptyText) => {
+      const tableBody = document.getElementById(tableBodyId);
+      const cardsEl = document.getElementById(cardsId);
+      if (!rows.length) {
+        const empty = emptyState(emptyIcon, emptyText);
+        if (tableBody) tableBody.innerHTML = `<tr><td colspan="${colspan}" style="padding: 0;">${empty}</td></tr>`;
+        if (cardsEl) cardsEl.innerHTML = empty;
+        return;
       }
-      if (pendingCards) {
-        pendingCards.innerHTML = pendingApps.map(app => `
-          <div class="admin-mobile-card">
-            <div class="admin-card-header">
-              <div><div class="admin-card-company">${app.company}</div><small style="color: #64748B;">${app.legalStatus} • ${app.enterpriseType}</small></div>
-              <span class="admin-card-id">${app.id}</span>
+      if (tableBody) tableBody.innerHTML = rows.join('');
+      if (cardsEl) cardsEl.innerHTML = cards.join('');
+    };
+
+    // ── Pending applications ───────────────────────────────────────
+    fill(
+      'pendingAppsBody',
+      'pendingAppsCards',
+      pendingApps.map(app => `
+        <tr>
+          <td><strong>${escapeHtml(app.id)}</strong></td>
+          <td><div style="font-weight: 600;">${escapeHtml(app.company)}</div><small style="color: #94A3B8;">${escapeHtml(app.legalStatus)} &bull; ${escapeHtml(app.enterpriseType)}</small></td>
+          <td>${escapeHtml(app.repName)}<br/><small style="color: #94A3B8;">${escapeHtml(app.repDesignation || 'Applicant')}</small></td>
+          <td>${escapeHtml(app.businessServices)}</td>
+          <td><span class="badge-status badge-pending"><i class="fas fa-clock"></i> Pending</span></td>
+          <td>${escapeHtml(formatDate(app.submittedAt))}</td>
+          <td>
+            <div style="display: flex; gap: 0.4rem;">
+              <button class="btn-action-approve" data-approve-id="${escapeAttr(app.id)}"><i class="fas fa-check"></i> Approve</button>
+              <button class="btn-action-reject" data-reject-id="${escapeAttr(app.id)}"><i class="fas fa-times"></i> Reject</button>
+              <button class="btn-secondary" data-inspect-id="${escapeAttr(app.id)}" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" aria-label="Inspect application ${escapeAttr(app.id)}"><i class="fas fa-eye"></i></button>
             </div>
-            <div class="admin-card-meta">
-              <div><strong>Rep:</strong> ${app.repName}</div>
-              <div><strong>Sector:</strong> ${app.businessServices}</div>
-              <div><strong>Status:</strong> <span class="badge-status badge-pending"><i class="fas fa-clock"></i> Pending</span></div>
-              <div><strong>Date:</strong> ${new Date(app.submittedAt).toLocaleDateString()}</div>
-            </div>
-            <div class="admin-card-actions">
-              <button class="btn-action-approve" data-approve-id="${app.id}"><i class="fas fa-check"></i> Approve</button>
-              <button class="btn-action-reject" data-reject-id="${app.id}"><i class="fas fa-times"></i> Reject</button>
-              <button class="btn-secondary" data-inspect-id="${app.id}"><i class="fas fa-eye"></i> Inspect</button>
-            </div>
+          </td>
+        </tr>
+      `),
+      pendingApps.map(app => `
+        <div class="admin-mobile-card">
+          <div class="admin-card-header">
+            <div><div class="admin-card-company">${escapeHtml(app.company)}</div><small style="color: #64748B;">${escapeHtml(app.legalStatus)} &bull; ${escapeHtml(app.enterpriseType)}</small></div>
+            <span class="admin-card-id">${escapeHtml(app.id)}</span>
           </div>
-        `).join('');
-      }
-    }
-
-    // Render Approved Members
-    const approvedTableBody = document.getElementById('approvedAppsBody');
-    const approvedCards = document.getElementById('approvedAppsCards');
-
-    if (approvedApps.length === 0) {
-      const emptyHtml = `<div style="text-align: center; color: #94A3B8; padding: 2rem;">No approved members yet.</div>`;
-      if (approvedTableBody) approvedTableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 2rem; color: #94A3B8;">No approved members yet.</td></tr>`;
-      if (approvedCards) approvedCards.innerHTML = emptyHtml;
-    } else {
-      if (approvedTableBody) {
-        approvedTableBody.innerHTML = approvedApps.map(app => `
-          <tr>
-            <td><strong>${app.id}</strong></td>
-            <td><strong style="color: var(--primary);">${app.company}</strong></td>
-            <td>${app.repName}</td>
-            <td>${app.email}</td>
-            <td><span class="badge-status badge-approved"><i class="fas fa-check-circle"></i> Active</span></td>
-            <td>${app.approvedAt ? new Date(app.approvedAt).toLocaleDateString() : 'Active'}</td>
-          </tr>
-        `).join('');
-      }
-      if (approvedCards) {
-        approvedCards.innerHTML = approvedApps.map(app => `
-          <div class="admin-mobile-card">
-            <div class="admin-card-header">
-              <div><div class="admin-card-company">${app.company}</div><small style="color: #64748B;">${app.email}</small></div>
-              <span class="admin-card-id">${app.id}</span>
-            </div>
-            <div class="admin-card-meta">
-              <div><strong>Rep:</strong> ${app.repName}</div>
-              <div><strong>Status:</strong> <span class="badge-status badge-approved"><i class="fas fa-check-circle"></i> Active</span></div>
-            </div>
+          <div class="admin-card-meta">
+            <div><strong>Rep:</strong> ${escapeHtml(app.repName)}</div>
+            <div><strong>Sector:</strong> ${escapeHtml(app.businessServices)}</div>
+            <div><strong>Status:</strong> <span class="badge-status badge-pending"><i class="fas fa-clock"></i> Pending</span></div>
+            <div><strong>Date:</strong> ${escapeHtml(formatDate(app.submittedAt))}</div>
           </div>
-        `).join('');
-      }
-    }
-
-    // Render Enquiries
-    const enquiriesTableBody = document.getElementById('enquiriesBody');
-    const enquiriesCards = document.getElementById('enquiriesCards');
-
-    if (enquiries.length === 0) {
-      const emptyHtml = `<div style="text-align: center; color: #94A3B8; padding: 2rem;">No enquiries yet.</div>`;
-      if (enquiriesTableBody) enquiriesTableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 2rem; color: #94A3B8;">No enquiries yet.</td></tr>`;
-      if (enquiriesCards) enquiriesCards.innerHTML = emptyHtml;
-    } else {
-      if (enquiriesTableBody) {
-        enquiriesTableBody.innerHTML = enquiries.map(enq => `
-          <tr>
-            <td><strong>${enq.id}</strong></td>
-            <td>${enq.name}<br/><small style="color: #94A3B8;">${enq.company || '-'}</small></td>
-            <td>${enq.email}<br/><small style="color: #94A3B8;">${enq.phone}</small></td>
-            <td>${enq.subject}</td>
-            <td>${new Date(enq.submittedAt).toLocaleDateString()}</td>
-          </tr>
-        `).join('');
-      }
-      if (enquiriesCards) {
-        enquiriesCards.innerHTML = enquiries.map(enq => `
-          <div class="admin-mobile-card">
-            <div class="admin-card-header">
-              <div><div class="admin-card-company">${enq.subject}</div><small style="color: #64748B;">From: ${enq.name}</small></div>
-              <span class="admin-card-id">${enq.id}</span>
-            </div>
-            <div class="admin-card-meta">
-              <div><strong>Email:</strong> ${enq.email}</div>
-              <div><strong>Phone:</strong> ${enq.phone}</div>
-              <div><strong>Date:</strong> ${new Date(enq.submittedAt).toLocaleDateString()}</div>
-            </div>
+          <div class="admin-card-actions">
+            <button class="btn-action-approve" data-approve-id="${escapeAttr(app.id)}"><i class="fas fa-check"></i> Approve</button>
+            <button class="btn-action-reject" data-reject-id="${escapeAttr(app.id)}"><i class="fas fa-times"></i> Reject</button>
+            <button class="btn-secondary" data-inspect-id="${escapeAttr(app.id)}"><i class="fas fa-eye"></i> Inspect</button>
           </div>
-        `).join('');
-      }
-    }
+        </div>
+      `),
+      7,
+      'fa-check-double',
+      'No pending applications.'
+    );
+
+    // ── Approved members ───────────────────────────────────────────
+    fill(
+      'approvedAppsBody',
+      'approvedAppsCards',
+      approvedApps.map(app => `
+        <tr>
+          <td><strong>${escapeHtml(app.id)}</strong></td>
+          <td><strong style="color: var(--primary);">${escapeHtml(app.company)}</strong></td>
+          <td>${escapeHtml(app.repName)}</td>
+          <td>${escapeHtml(app.email)}</td>
+          <td><span class="badge-status badge-approved"><i class="fas fa-check-circle"></i> Active</span></td>
+          <td>${escapeHtml(app.approvedAt ? formatDate(app.approvedAt) : 'Active')}</td>
+        </tr>
+      `),
+      approvedApps.map(app => `
+        <div class="admin-mobile-card">
+          <div class="admin-card-header">
+            <div><div class="admin-card-company">${escapeHtml(app.company)}</div><small style="color: #64748B;">${escapeHtml(app.email)}</small></div>
+            <span class="admin-card-id">${escapeHtml(app.id)}</span>
+          </div>
+          <div class="admin-card-meta">
+            <div><strong>Rep:</strong> ${escapeHtml(app.repName)}</div>
+            <div><strong>Status:</strong> <span class="badge-status badge-approved"><i class="fas fa-check-circle"></i> Active</span></div>
+          </div>
+        </div>
+      `),
+      6,
+      'fa-user-group',
+      'No approved members yet.'
+    );
+
+    // ── Enquiries ──────────────────────────────────────────────────
+    fill(
+      'enquiriesBody',
+      'enquiriesCards',
+      enquiries.map(enq => `
+        <tr>
+          <td><strong>${escapeHtml(enq.id)}</strong></td>
+          <td>${escapeHtml(enq.name)}<br/><small style="color: #94A3B8;">${escapeHtml(enq.company || '-')}</small></td>
+          <td>${escapeHtml(enq.email)}<br/><small style="color: #94A3B8;">${escapeHtml(enq.phone)}</small></td>
+          <td>${escapeHtml(enq.subject)}</td>
+          <td>${escapeHtml(formatDate(enq.submittedAt))}</td>
+        </tr>
+      `),
+      enquiries.map(enq => `
+        <div class="admin-mobile-card">
+          <div class="admin-card-header">
+            <div><div class="admin-card-company">${escapeHtml(enq.subject)}</div><small style="color: #64748B;">From: ${escapeHtml(enq.name)}</small></div>
+            <span class="admin-card-id">${escapeHtml(enq.id)}</span>
+          </div>
+          <div class="admin-card-meta">
+            <div><strong>Email:</strong> ${escapeHtml(enq.email)}</div>
+            <div><strong>Phone:</strong> ${escapeHtml(enq.phone)}</div>
+            <div><strong>Date:</strong> ${escapeHtml(formatDate(enq.submittedAt))}</div>
+          </div>
+        </div>
+      `),
+      5,
+      'fa-inbox',
+      'No enquiries yet.'
+    );
 
     this.bindAdminActions();
   }
 
   async handleApproveApplication(id) {
     try {
+      // The server sends the approval email as part of the status change, so
+      // it goes out even if the admin closes the tab straight after clicking.
       const updated = await this.store.updateApplicationStatus(id, 'Approved');
       if (!updated) return;
 
-      // ── Send Approval Email via Unified API ────────────────────────
-      const validity = this.store.getMembershipValidity(updated);
-      this.store.sendEmail('application_approved', updated.email, {
-        appId: updated.id,
-        company: updated.company,
-        repName: updated.repName,
-        validUntil: validity ? validity.validUntilDate : 'Active',
-      }).catch(err => console.warn('[Email] application_approved failed:', err));
-
       await this.renderAdminPortal();
-      this.showToast(`Application ${id} approved! Confirmation email sent to ${updated.email}.`, 'success');
+      this.showToast(`Application ${id} approved. Confirmation email sent to ${updated.email}.`, 'success');
 
       this.showModal({
-        title: `<i class="fas fa-envelope-open-text" style="color: #10B981;"></i> Membership Approved & Confirmation Email Sent`,
+        title: `<i class="fas fa-envelope-open-text" style="color: #10B981;"></i> Membership approved`,
         content: `
           <div style="font-size: 0.9rem; line-height: 1.6;">
             <div style="background: #ECFDF5; border: 1px solid #A7F3D0; padding: 1rem; border-radius: 8px; margin-bottom: 1.25rem; color: #065F46;">
-              <div style="font-weight: 700; font-size: 1rem; margin-bottom: 0.25rem;"><i class="fas fa-check-circle"></i> Application ${updated.id} Approved</div>
-              <div>Confirmation email with digital membership card sent to <strong>${updated.email}</strong>.</div>
-            </div>
-            <div style="background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; font-size: 0.85rem; color: #1E3E62;">
-              <strong>Email dispatched:</strong> application_approved notification with membership validity details.
+              <div style="font-weight: 700; font-size: 1rem; margin-bottom: 0.25rem;"><i class="fas fa-check-circle"></i> Application ${escapeHtml(updated.id)} approved</div>
+              <div>A confirmation email with the digital membership card was sent to <strong>${escapeHtml(updated.email)}</strong>.</div>
             </div>
             <button class="btn-secondary" id="modalCloseBtn" style="width: 100%; justify-content: center;">Close</button>
           </div>
         `
       });
     } catch (err) {
-      this.showToast('Failed to approve application. Please try again.', 'error');
+      if (err.status === 401) {
+        this.adminAuthed = false;
+        this.updateNavAuthUI();
+        this.showToast('Your admin session expired. Please sign in again.', 'warning');
+        this.renderView('signin');
+        return;
+      }
+      this.showToast(err.message || 'Could not approve the application. Please try again.', 'error');
     }
   }
 
   async handleRejectApplication(id) {
-    const app = await this.store.getApplicationById(id);
+    let app;
+    try {
+      app = await this.store.getApplicationById(id);
+    } catch (err) {
+      this.showToast(err.message || 'Could not load that application.', 'error');
+      return;
+    }
     if (!app) return;
 
     this.showModal({
-      title: `<i class="fas fa-times-circle" style="color: #EF4444;"></i> Reject Application: ${app.company}`,
+      title: `<i class="fas fa-times-circle" style="color: #EF4444;"></i> Reject application: ${escapeHtml(app.company)}`,
       content: `
         <div style="padding: 0.5rem 0;">
           <div style="background: #FEF2F2; border: 1px solid #FECACA; padding: 1rem; border-radius: 8px; margin-bottom: 1.25rem; font-size: 0.9rem; color: #991B1B;">
-            <strong>Applicant:</strong> ${app.repName} (${app.email})<br>
-            <strong>Company:</strong> ${app.company} (${app.id})
+            <strong>Applicant:</strong> ${escapeHtml(app.repName)} (${escapeHtml(app.email)})<br>
+            <strong>Company:</strong> ${escapeHtml(app.company)} (${escapeHtml(app.id)})
           </div>
           <div class="form-group" style="margin-bottom: 1.25rem;">
-            <label class="form-label">Rejection Reason (optional)</label>
-            <textarea id="rejectionReasonInput" class="form-control" rows="3" placeholder="e.g. Incomplete documentation, invalid GSTIN, payment not verified..."></textarea>
+            <label class="form-label" for="rejectionReasonInput">Reason (optional — included in the email)</label>
+            <textarea id="rejectionReasonInput" class="form-control" rows="3" maxlength="1000" placeholder="e.g. Incomplete documentation, invalid GSTIN, payment not verified"></textarea>
           </div>
           <div style="display: flex; gap: 0.75rem;">
             <button type="button" class="btn-secondary" id="modalCloseBtn" style="flex: 1; justify-content: center;">Cancel</button>
             <button type="button" class="btn-primary" id="confirmRejectBtn" style="flex: 1; justify-content: center; background: #DC2626; border-color: #B91C1C;">
-              <i class="fas fa-times"></i> Confirm Rejection
+              <i class="fas fa-times"></i> Confirm rejection
             </button>
           </div>
         </div>
@@ -2046,25 +2142,43 @@ class App {
     });
 
     setTimeout(() => {
-      document.getElementById('confirmRejectBtn')?.addEventListener('click', async () => {
+      const confirmBtn = document.getElementById('confirmRejectBtn');
+      confirmBtn?.addEventListener('click', async () => {
         const reason = document.getElementById('rejectionReasonInput')?.value?.trim() || '';
-        this.closeModal();
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Rejecting…';
         try {
-          const updated = await this.store.updateApplicationStatus(id, 'Rejected');
+          const updated = await this.store.updateApplicationStatus(id, 'Rejected', reason);
+          this.closeModal();
           if (!updated) return;
-          this.store.sendEmail('application_declined', updated.email, {
-            appId: updated.id,
-            company: updated.company,
-            repName: updated.repName,
-            reason,
-          }).catch(err => console.warn('[Email] application_declined failed:', err));
           await this.renderAdminPortal();
-          this.showToast(`Application ${id} rejected. Notification email sent to ${updated.email}.`, 'warning');
+          this.showToast(`Application ${id} rejected. Notification sent to ${updated.email}.`, 'warning');
         } catch (err) {
-          this.showToast('Failed to reject application. Please try again.', 'error');
+          confirmBtn.disabled = false;
+          confirmBtn.innerHTML = '<i class="fas fa-times"></i> Confirm rejection';
+          this.showToast(err.message || 'Could not reject the application. Please try again.', 'error');
         }
       });
     }, 100);
+  }
+
+  /**
+   * Renders a stored payment receipt. The value is applicant-supplied, so it
+   * is only emitted when it is genuinely an inline image data URI — never a
+   * javascript: or other scheme.
+   */
+  _paymentProofHtml(proof) {
+    if (typeof proof !== 'string' || !proof) return '';
+    if (!/^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=\s]+$/.test(proof)) {
+      return `<div style="grid-column: 1 / -1; color: #92400E; background: #FEF3C7; border: 1px solid #FDE68A; padding: 0.6rem 0.8rem; border-radius: 6px;">
+        <i class="fas fa-triangle-exclamation"></i> A payment receipt was submitted but could not be displayed.
+      </div>`;
+    }
+    return `
+      <div style="grid-column: 1 / -1; margin-top: 0.5rem; background: #F8FAFC; border: 1px solid #CBD5E1; padding: 1rem; border-radius: 8px;">
+        <strong style="color: var(--primary); display: block; margin-bottom: 0.5rem;"><i class="fas fa-file-invoice-dollar" style="color: var(--accent-gold-dark);"></i> Payment receipt</strong>
+        <img src="${escapeAttr(proof)}" alt="Payment receipt" data-lightbox style="max-height: 220px; border-radius: 6px; border: 1px solid #CBD5E1; cursor: pointer;" />
+      </div>`;
   }
 
   bindAdminActions() {
@@ -2079,49 +2193,63 @@ class App {
     document.querySelectorAll('[data-inspect-id]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = btn.getAttribute('data-inspect-id');
-        const app = await this.store.getApplicationById(id);
-        if (app) {
-          this.showModal({
-            title: `Application Details - ${app.id}`,
-            content: `
-              <div style="font-size: 0.9rem; line-height: 1.8;">
-                <div style="margin-bottom: 1rem; padding-bottom: 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.1);">
-                  <h4 style="color: #FFD700; font-size: 1.2rem;">${app.company}</h4>
-                  <p style="color: #94A3B8;">Status: <span class="badge-status badge-${app.status.toLowerCase()}">${app.status}</span></p>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
-                  <div><strong>Legal Status:</strong> ${app.legalStatus || 'N/A'}</div>
-                  <div><strong>Enterprise Scale:</strong> ${app.enterpriseType || 'N/A'}</div>
-                  <div><strong>GST:</strong> ${app.gstNo || 'N/A'}</div>
-                  <div><strong>PAN:</strong> ${app.panNo || 'N/A'}</div>
-                  <div><strong>Turnover:</strong> ${app.annualTurnover || 'N/A'}</div>
-                  <div><strong>Employees:</strong> ${app.employees || 'N/A'}</div>
-                  <div><strong>Contact:</strong> ${app.repName}</div>
-                  <div><strong>Phone:</strong> ${app.phone || 'N/A'}</div>
-                  ${app.paymentRef ? `<div style="grid-column: 1 / -1; background: #EFF6FF; border: 1px solid #BFDBFE; padding: 0.5rem 0.8rem; border-radius: 6px; color: #1E3E62;"><strong>UPI UTR:</strong> <code style="font-weight:700; color:#0284C7;">${app.paymentRef}</code></div>` : ''}
-                  ${app.paymentProof ? `
-                    <div style="grid-column: 1 / -1; margin-top: 0.5rem; background: #F8FAFC; border: 1px solid #CBD5E1; padding: 1rem; border-radius: 8px;">
-                      <strong style="color: var(--primary); display: block; margin-bottom: 0.5rem;"><i class="fas fa-file-invoice-dollar" style="color: var(--accent-gold-dark);"></i> Payment Receipt:</strong>
-                      <img src="${app.paymentProof}" alt="Payment Receipt" data-lightbox style="max-height: 220px; border-radius: 6px; border: 1px solid #CBD5E1; cursor: pointer;" />
-                    </div>
-                  ` : ''}
-                </div>
-                <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.5rem;">
-                  ${app.status === 'Pending' ? `
-                    <button class="btn-action-approve" id="inspectApproveBtn"><i class="fas fa-check"></i> Approve</button>
-                    <button class="btn-action-reject" id="inspectRejectBtn"><i class="fas fa-times"></i> Reject</button>
-                  ` : ''}
-                  <button class="btn-secondary" id="modalCloseBtn">Close</button>
-                </div>
-              </div>
-            `
-          });
-
-          const approveBtn = document.getElementById('inspectApproveBtn');
-          if (approveBtn) approveBtn.addEventListener('click', () => { this.closeModal(); this.handleApproveApplication(app.id); });
-          const rejectBtn = document.getElementById('inspectRejectBtn');
-          if (rejectBtn) rejectBtn.addEventListener('click', () => { this.closeModal(); this.handleRejectApplication(app.id); });
+        let app;
+        try {
+          app = await this.store.getApplicationById(id);
+        } catch (err) {
+          this.showToast(err.message || 'Could not load that application.', 'error');
+          return;
         }
+        if (!app) {
+          this.showToast('That application no longer exists.', 'warning');
+          return;
+        }
+
+        const field = (label, value) =>
+          `<div><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value || 'N/A')}</div>`;
+        const statusSlug = String(app.status || 'pending').toLowerCase();
+
+        this.showModal({
+          title: `Application details — ${escapeHtml(app.id)}`,
+          content: `
+            <div style="font-size: 0.9rem; line-height: 1.8;">
+              <div style="margin-bottom: 1rem; padding-bottom: 0.8rem; border-bottom: 1px solid #E2E8F0;">
+                <h4 style="color: var(--primary); font-size: 1.2rem;">${escapeHtml(app.company)}</h4>
+                <p style="color: #64748B;">Status: <span class="badge-status badge-${escapeAttr(statusSlug)}">${escapeHtml(app.status)}</span></p>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+                ${field('Legal status', app.legalStatus)}
+                ${field('Enterprise scale', app.enterpriseType)}
+                ${field('GST', app.gstNo)}
+                ${field('PAN', app.panNo)}
+                ${field('Turnover', app.annualTurnover)}
+                ${field('Employees', app.employees)}
+                ${field('Contact', app.repName)}
+                ${field('Phone', app.phone)}
+                ${field('Email', app.email)}
+                ${field('Submitted', formatDate(app.submittedAt))}
+                ${app.paymentRef ? `<div style="grid-column: 1 / -1; background: #EFF6FF; border: 1px solid #BFDBFE; padding: 0.5rem 0.8rem; border-radius: 6px; color: #1E3E62;"><strong>UPI UTR:</strong> <code style="font-weight:700; color:#0284C7;">${escapeHtml(app.paymentRef)}</code></div>` : ''}
+                ${this._paymentProofHtml(app.paymentProof)}
+              </div>
+              <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.5rem;">
+                ${app.status === 'Pending' ? `
+                  <button class="btn-action-approve" id="inspectApproveBtn"><i class="fas fa-check"></i> Approve</button>
+                  <button class="btn-action-reject" id="inspectRejectBtn"><i class="fas fa-times"></i> Reject</button>
+                ` : ''}
+                <button class="btn-secondary" id="modalCloseBtn">Close</button>
+              </div>
+            </div>
+          `
+        });
+
+        document.getElementById('inspectApproveBtn')?.addEventListener('click', () => {
+          this.closeModal();
+          this.handleApproveApplication(app.id);
+        });
+        document.getElementById('inspectRejectBtn')?.addEventListener('click', () => {
+          this.closeModal();
+          this.handleRejectApplication(app.id);
+        });
       });
     });
 
@@ -2141,11 +2269,25 @@ class App {
   }
 
   async exportApplicationsCSV() {
-    const apps = await this.store.getApplications();
+    let apps;
+    try {
+      apps = await this.store.getApplications();
+    } catch (err) {
+      this.showToast(err.message || 'Could not export records.', 'error');
+      return;
+    }
     if (!apps || apps.length === 0) {
       this.showToast('No records to export.', 'warning');
       return;
     }
+
+    // A cell starting with =, +, - or @ is executed as a formula by Excel and
+    // Sheets. Applicant-supplied fields land in this file, so prefix them.
+    const cell = (value) => {
+      const s = String(value ?? '');
+      const guarded = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+      return `"${guarded.replace(/"/g, '""')}"`;
+    };
 
     const headers = [
       'Application ID', 'Company Name', 'Legal Status', 'Enterprise Scale', 'Business Services',
@@ -2154,16 +2296,14 @@ class App {
     ];
 
     const rows = apps.map(a => [
-      `"${a.id || ''}"`, `"${(a.company || '').replace(/"/g, '""')}"`, `"${a.legalStatus || ''}"`,
-      `"${a.enterpriseType || ''}"`, `"${a.businessServices || ''}"`, `"${a.gstNo || ''}"`,
-      `"${a.panNo || ''}"`, `"${a.cin || ''}"`, `"${a.annualTurnover || ''}"`, `"${a.employees || ''}"`,
-      `"${(a.repName || '').replace(/"/g, '""')}"`, `"${a.repDesignation || ''}"`,
-      `"${a.email || ''}"`, `"${a.phone || ''}"`, `"${a.district || ''}"`,
-      `"${(a.address || '').replace(/"/g, '""')}"`, `"${a.pincode || ''}"`,
-      `"${a.paymentRef || ''}"`, `"${a.status || ''}"`, `"${a.submittedAt || ''}"`
-    ]);
+      a.id, a.company, a.legalStatus, a.enterpriseType, a.businessServices,
+      a.gstNo, a.panNo, a.cin, a.annualTurnover, a.employees,
+      a.repName, a.repDesignation, a.email, a.phone, a.district,
+      a.address, a.pincode, a.paymentRef, a.status, a.submittedAt
+    ].map(cell));
 
-    const csvData = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    // The BOM keeps Excel from mangling non-ASCII company names.
+    const csvData = '﻿' + [headers.map(cell).join(','), ...rows.map(r => r.join(','))].join('\r\n');
     const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -2228,7 +2368,7 @@ class App {
       max-width: 420px; display: flex; align-items: center; gap: 0.6rem;
       animation: toastSlideIn 0.35s ease;
     `;
-    toast.innerHTML = `<i class="fas ${icon}" style="font-size:1.1rem;"></i> <span>${message}</span>`;
+    toast.innerHTML = `<i class="fas ${icon}" style="font-size:1.1rem;"></i> <span>${escapeHtml(message)}</span>`;
     // Stack toasts vertically
     const existingToasts = document.querySelectorAll('.bcci-toast');
     let bottomOffset = 2;
@@ -2248,19 +2388,28 @@ class App {
       const imgTarget = e.target.closest('[data-lightbox]');
       const btnTarget = e.target.closest('[data-img-src]');
 
+      // Only same-origin paths and inline images are ever shown, so a crafted
+      // src cannot turn the lightbox into an injection point.
+      const safeSrc = (value) =>
+        typeof value === 'string' &&
+        (/^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=\s]+$/.test(value) ||
+          /^(?!\/\/)[./A-Za-z0-9_-][^\s:]*$/.test(value));
+
       if (imgTarget) {
         const src = imgTarget.getAttribute('src');
-        const alt = imgTarget.getAttribute('alt') || 'BCCI Photo';
+        const alt = imgTarget.getAttribute('alt') || 'BCCI photo';
+        if (!safeSrc(src)) return;
         this.showModal({
-          title: alt,
-          content: `<div style="text-align: center;"><img src="${src}" alt="${alt}" class="lightbox-img-view" /><div style="margin-top: 1rem; color: #94A3B8; font-size: 0.85rem;"><i class="fas fa-search-plus"></i> High Resolution View</div></div>`
+          title: escapeHtml(alt),
+          content: `<div style="text-align: center;"><img src="${escapeAttr(src)}" alt="${escapeAttr(alt)}" class="lightbox-img-view" /><div style="margin-top: 1rem; color: #94A3B8; font-size: 0.85rem;"><i class="fas fa-search-plus"></i> High resolution view</div></div>`
         });
       } else if (btnTarget) {
         const src = btnTarget.getAttribute('data-img-src');
-        const title = btnTarget.getAttribute('data-img-title') || 'BCCI Event Photo';
+        const title = btnTarget.getAttribute('data-img-title') || 'BCCI event photo';
+        if (!safeSrc(src)) return;
         this.showModal({
-          title: title,
-          content: `<div style="text-align: center;"><img src="${src}" alt="${title}" class="lightbox-img-view" /><div style="margin-top: 1rem; color: #94A3B8; font-size: 0.85rem;"><i class="fas fa-camera"></i> Official BCCI Media Archive</div></div>`
+          title: escapeHtml(title),
+          content: `<div style="text-align: center;"><img src="${escapeAttr(src)}" alt="${escapeAttr(title)}" class="lightbox-img-view" /><div style="margin-top: 1rem; color: #94A3B8; font-size: 0.85rem;"><i class="fas fa-camera"></i> Official BCCI media archive</div></div>`
         });
       }
     });

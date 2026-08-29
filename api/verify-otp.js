@@ -1,93 +1,102 @@
 // api/verify-otp.js
-// Vercel Serverless Function — BCCI Bharuch OTP Verification
-// Checks submitted OTP against value stored in Vercel KV
+// Checks a verification code and issues a server-side applicant session.
 
-import { Redis } from '@upstash/redis';
+import crypto from 'crypto';
+import { redis, KEYS, withRetry } from './_lib/redis.js';
+import {
+  applyCors,
+  handlePreflight,
+  bearerToken,
+  rateLimit,
+  tooManyRequests,
+  safeEqual,
+  str,
+  isEmail,
+  withErrorHandling,
+} from './_lib/http.js';
 
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN,
-});
+const MAX_ATTEMPTS = 5;
+const SESSION_TTL_SECONDS = 24 * 60 * 60;
 
-const MAX_ATTEMPTS = 5; // lockout after 5 wrong attempts
+async function handler(req, res) {
+  applyCors(req, res, 'POST, DELETE, OPTIONS');
+  if (handlePreflight(req, res)) return;
 
-export default async function handler(req, res) {
-  // ── CORS Headers ────────────────────────────────────────────────────
-  const origin = process.env.ALLOWED_ORIGIN || 'https://bccibharuch.in';
-  res.setHeader('Access-Control-Allow-Origin', origin);
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  // Sign out — invalidate the applicant's session server-side.
+  if (req.method === 'DELETE') {
+    const token = bearerToken(req);
+    if (token) await redis.del(KEYS.applicantSession(token)).catch(() => {});
+    return res.status(200).json({ success: true, message: 'Signed out' });
+  }
 
-  if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') {
     return res.status(405).json({ success: false, error: 'Method not allowed.' });
   }
 
-  // ── Input Validation ────────────────────────────────────────────────
-  const { email, code, name } = req.body || {};
+  const email = str(req.body?.email, 254).toLowerCase();
+  const code = str(req.body?.code, 12);
+  const name = str(req.body?.name, 120);
 
-  if (!email || typeof email !== 'string') {
-    return res.status(400).json({ success: false, error: 'Email is required.' });
+  if (!isEmail(email)) {
+    return res.status(400).json({ success: false, error: 'A valid email address is required.' });
   }
-  if (!code || typeof code !== 'string') {
+  if (!code) {
     return res.status(400).json({ success: false, error: 'Verification code is required.' });
   }
 
-  const normalizedEmail = email.trim().toLowerCase();
-  const submittedCode = code.trim();
-
-  // ── Check Lockout ────────────────────────────────────────────────────
-  const attemptsKey = `bcci:attempts:${normalizedEmail}`;
-  const attempts = parseInt(await redis.get(attemptsKey) || '0', 10);
-
-  if (attempts >= MAX_ATTEMPTS) {
-    return res.status(429).json({
-      success: false,
-      error: 'Too many incorrect attempts. Please request a new verification code.'
-    });
+  // The counter's TTL is set only when it is created, so repeated wrong
+  // guesses can no longer keep extending their own window.
+  const attempt = await rateLimit(`otpverify:${email}`, { max: MAX_ATTEMPTS, windowSec: 600 });
+  if (!attempt.ok) {
+    // Burn the code as well, so a lockout genuinely forces a new one.
+    await redis.del(`bcci:otp:${email}`).catch(() => {});
+    return tooManyRequests(res, attempt.retryAfter, 'Too many incorrect attempts. Please request a new verification code.');
   }
 
-  // ── Fetch Stored OTP ─────────────────────────────────────────────────
-  const otpKey = `bcci:otp:${normalizedEmail}`;
-  const storedOtp = await redis.get(otpKey);
-
+  const storedOtp = await withRetry(() => redis.get(`bcci:otp:${email}`));
   if (!storedOtp) {
     return res.status(400).json({
       success: false,
-      error: 'Verification code has expired or was not found. Please request a new code.'
+      error: 'That code has expired or was already used. Please request a new one.',
     });
   }
 
-  // ── Verify OTP ───────────────────────────────────────────────────────
-  if (submittedCode !== String(storedOtp)) {
-    // Increment failed attempts
-    const newAttempts = attempts + 1;
-    await redis.set(attemptsKey, newAttempts.toString(), { ex: 600 });
-
-    const remaining = MAX_ATTEMPTS - newAttempts;
+  if (!safeEqual(code, String(storedOtp))) {
+    const remaining = Math.max(0, attempt.remaining ?? 0);
     return res.status(400).json({
       success: false,
       error: remaining > 0
-        ? `Invalid code. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`
-        : 'Too many incorrect attempts. Please request a new verification code.'
+        ? `Incorrect code. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`
+        : 'Too many incorrect attempts. Please request a new verification code.',
     });
   }
 
-  // ── Success — clean up KV ────────────────────────────────────────────
-  await redis.del(otpKey);
-  await redis.del(attemptsKey);
-  await redis.del(`bcci:ratelimit:${normalizedEmail}`);
+  // Success — clear the code and the attempt counter.
+  await redis.del(`bcci:otp:${email}`).catch(() => {});
+  await redis.del(`bcci:rl:otpverify:${email}`).catch(() => {});
 
-  console.log(`[BCCI OTP] Verified for ${normalizedEmail}`);
+  // Issue an opaque server-side token. The old response was an unsigned JSON
+  // object the browser simply stored, so anyone could hand-write one in the
+  // console and be treated as any member.
+  const token = crypto.randomUUID();
+  await withRetry(() =>
+    redis.set(KEYS.applicantSession(token), email, { ex: SESSION_TTL_SECONDS })
+  );
+
+  console.log(`[OTP] verified ${email}`);
 
   return res.status(200).json({
     success: true,
     message: 'Verification successful.',
     session: {
-      email: normalizedEmail,
-      name: (name || '').trim() || normalizedEmail.split('@')[0],
+      token,
+      email,
+      name: name || email.split('@')[0],
       authenticatedAt: new Date().toISOString(),
-      authMethod: 'email_otp'
-    }
+      authMethod: 'email_otp',
+      expiresIn: SESSION_TTL_SECONDS, // seconds
+    },
   });
 }
+
+export default withErrorHandling('VerifyOtp', handler);

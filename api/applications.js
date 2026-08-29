@@ -1,147 +1,290 @@
-import { Redis } from '@upstash/redis';
+// api/applications.js
+// Membership applications — list (admin), read own (applicant), create, update.
+
 import crypto from 'crypto';
+import {
+  listApplications,
+  getApplication,
+  getApplicationByEmail,
+  putApplication,
+  updateApplication,
+  STATUS,
+  normalizeStatus,
+} from './_lib/redis.js';
+import {
+  applyCors,
+  handlePreflight,
+  getAdminSession,
+  getApplicantSession,
+  rateLimit,
+  tooManyRequests,
+  clientIp,
+  str,
+  isEmail,
+  withErrorHandling,
+} from './_lib/http.js';
+import { sendEmail, adminRecipients } from './_lib/email.js';
 
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN,
-});
+// A receipt is base64 in the JSON body, so the cap has to leave room for it.
+const MAX_BODY_SIZE = 900 * 1024;
 
-const MAX_BODY_SIZE = 100 * 1024; // 100KB limit
-const APPLICATIONS_KEY = 'bcci:applications';
-
-async function getApplications() {
-  return (await redis.get(APPLICATIONS_KEY)) || [];
+function newApplicationId() {
+  return `BCCI-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
 }
 
-async function saveApplications(apps) {
-  await redis.set(APPLICATIONS_KEY, apps);
+const INDIAN_DATE = { day: 'numeric', month: 'long', year: 'numeric' };
+
+/** Membership expiry, mirroring the client's getMembershipValidity(). */
+function validUntil(app) {
+  const from = app.approvedAt ? new Date(app.approvedAt) : new Date(app.submittedAt || Date.now());
+  const until = new Date(from);
+  until.setFullYear(until.getFullYear() + (Number(app.renewalYears) || 1));
+  return until;
 }
 
-export default async function handler(req, res) {
-  const origin = process.env.ALLOWED_ORIGIN || 'https://bccibharuch.in';
-  res.setHeader('Access-Control-Allow-Origin', origin);
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  if (req.method === 'OPTIONS') return res.status(200).end();
+async function handler(req, res) {
+  applyCors(req, res, 'GET, POST, PATCH, OPTIONS');
+  if (handlePreflight(req, res)) return;
 
-  // Auth check for PATCH (admin only)
-  if (req.method === 'PATCH') {
-    const authHeader = req.headers.authorization;
-    const token = authHeader?.replace('Bearer ', '');
-    if (!token) return res.status(401).json({ error: 'Unauthorized' });
-    const email = await redis.get(`admin:${token}`);
-    if (!email) return res.status(401).json({ error: 'Invalid session' });
-  }
-
+  // ── GET ──────────────────────────────────────────────────────────
   if (req.method === 'GET') {
-    try {
-      const { email } = req.query || {};
-      const apps = await getApplications();
-      
-      // If email query param provided, return only that applicant's application
-      if (email) {
-        const userApp = apps.find(a => (a.email || '').toLowerCase() === email.toLowerCase());
-        return res.status(200).json({ application: userApp || null });
+    const requested = str(req.query?.email, 254).toLowerCase();
+    const adminEmail = await getAdminSession(req);
+
+    // Full list is admin-only. Previously this was wide open and returned
+    // every applicant's PAN, GSTIN, address and payment receipt.
+    if (!requested) {
+      if (!adminEmail) {
+        return res.status(401).json({ error: 'Admin authentication required.' });
       }
-      
-      // Otherwise return all (admin view)
-      apps.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
-      return res.status(200).json({ applications: apps, total: apps.length });
-    } catch (e) {
-      return res.status(500).json({ error: 'Failed to fetch applications' });
+      const applications = await listApplications();
+      return res.status(200).json({ applications, total: applications.length });
     }
+
+    // Single record: the owner, or an admin.
+    const applicantEmail = await getApplicantSession(req);
+    const isOwner = applicantEmail && applicantEmail === requested;
+    if (!adminEmail && !isOwner) {
+      return res.status(401).json({
+        error: 'Sign in with this email address to view its application.',
+      });
+    }
+
+    const application = await getApplicationByEmail(requested);
+    return res.status(200).json({ application: application || null });
   }
 
+  // ── POST — submit a new application ──────────────────────────────
   if (req.method === 'POST') {
-    const body = JSON.stringify(req.body || {});
-    if (body.length > MAX_BODY_SIZE) {
-      return res.status(413).json({ error: 'Request body too large (max 100KB)' });
+    const body = req.body || {};
+    const raw = JSON.stringify(body);
+    if (raw.length > MAX_BODY_SIZE) {
+      return res.status(413).json({
+        error: 'Your payment receipt is too large. Please attach a smaller image.',
+      });
     }
 
-    const { repName, repDesignation, company, legalStatus, enterpriseType, businessServices, annualTurnover, employees, cin, email: applicantEmail, phone, address, district, pincode, gstNo, panNo, paymentRef, paymentProof } = req.body || {};
-
-    // Map form fields to application fields
-    const applicantName = repName;
-    const gstin = gstNo;
-    const pan = panNo;
-    const state = district;
-    const city = district;
-    const membershipType = businessServices;
-
-    if (!applicantName || !applicantEmail || !phone || !membershipType) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(applicantEmail)) {
-      return res.status(400).json({ error: 'Invalid email format' });
-    }
-    if (!/^\d{10}$/.test(phone)) {
-      return res.status(400).json({ error: 'Phone must be 10 digits' });
+    // Submitting requires a verified email, and the application must be filed
+    // under the address that was actually verified.
+    const applicantEmail = await getApplicantSession(req);
+    if (!applicantEmail) {
+      return res.status(401).json({
+        error: 'Please verify your email address before submitting.',
+      });
     }
 
-    const appId = `BCCI-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+    const ip = clientIp(req);
+    const limit = await rateLimit(`apply:${ip}`, { max: 5, windowSec: 3600 });
+    if (!limit.ok) {
+      return tooManyRequests(res, limit.retryAfter, 'Too many submissions from this network. Please try again later.');
+    }
+
+    const repName = str(body.repName, 120);
+    const company = str(body.company, 200);
+    const phone = str(body.phone, 20).replace(/\D/g, '');
+    const membershipType = str(body.businessServices, 120);
+    const applicantAddress = str(body.address, 500);
+
+    if (!repName || !company || !phone || !membershipType) {
+      return res.status(400).json({
+        error: 'Representative name, company, phone and business sector are all required.',
+      });
+    }
+    if (!isEmail(applicantEmail)) {
+      return res.status(400).json({ error: 'Invalid email format.' });
+    }
+    if (!/^[6-9]\d{9}$/.test(phone)) {
+      return res.status(400).json({ error: 'Enter a valid 10-digit Indian mobile number.' });
+    }
+
+    // One application per verified email.
+    const existing = await getApplicationByEmail(applicantEmail);
+    if (existing) {
+      return res.status(409).json({
+        error: `An application for this email already exists (${existing.id}).`,
+        applicationId: existing.id,
+        application: existing,
+      });
+    }
+
+    const district = str(body.district, 120);
     const application = {
-      id: appId,
-      applicantName,
-      repName: applicantName,
-      repDesignation: repDesignation || '',
-      company: company || '',
+      id: newApplicationId(),
+      applicantName: repName,
+      repName,
+      repDesignation: str(body.repDesignation, 120),
+      company,
       email: applicantEmail,
       phone,
-      address: address || '',
-      state: state || '',
-      city: city || '',
-      pincode: pincode || '',
-      gstin: gstin || '',
-      pan: pan || '',
-      legalStatus: legalStatus || '',
-      enterpriseType: enterpriseType || '',
-      businessServices: businessServices || '',
-      annualTurnover: annualTurnover || '',
-      employees: employees || '',
-      cin: cin || '',
+      address: applicantAddress,
+      state: district,
+      city: district,
+      district,
+      pincode: str(body.pincode, 10),
+      gstin: str(body.gstNo, 20),
+      gstNo: str(body.gstNo, 20),
+      pan: str(body.panNo, 15),
+      panNo: str(body.panNo, 15),
+      legalStatus: str(body.legalStatus, 80),
+      enterpriseType: str(body.enterpriseType, 80),
+      businessServices: membershipType,
+      annualTurnover: str(body.annualTurnover, 60),
+      employees: str(body.employees, 30),
+      cin: str(body.cin, 30),
       membershipType,
-      paymentProof: paymentProof || '',
+      paymentProof: typeof body.paymentProof === 'string' ? body.paymentProof : '',
       paymentAmount: '',
-      paymentRef: paymentRef || '',
-      status: 'pending',
+      paymentRef: str(body.paymentRef, 80),
+      status: STATUS.PENDING,
       submittedAt: new Date().toISOString(),
       reviewedAt: null,
-      reviewedBy: null
+      reviewedBy: null,
+      renewalYears: 1,
     };
 
-    try {
-      const apps = await getApplications();
-      apps.unshift(application);
-      await saveApplications(apps);
-      res.status(201).json({ success: true, applicationId: appId, application, message: 'Application submitted successfully' });
-    } catch (e) {
-      console.error('[Applications POST Error]', e.message);
-      res.status(500).json({ error: 'Failed to submit application' });
-    }
+    const saved = await putApplication(application);
+
+    // Notifications are sent here rather than by the browser, so they still go
+    // out if the applicant closes the tab, and so the recipient list cannot be
+    // chosen by the client.
+    const date = new Date().toLocaleDateString('en-IN', INDIAN_DATE);
+    const shared = {
+      appId: saved.id,
+      company: saved.company,
+      repName: saved.repName,
+      sector: saved.businessServices,
+      date,
+    };
+
+    await Promise.allSettled([
+      sendEmail({ type: 'application_submitted', to: saved.email, data: shared }),
+      sendEmail({
+        type: 'admin_new_application',
+        to: adminRecipients(),
+        data: {
+          ...shared,
+          repDesignation: saved.repDesignation,
+          email: saved.email,
+          phone: saved.phone,
+          enterpriseType: saved.enterpriseType,
+          legalStatus: saved.legalStatus,
+          gstNo: saved.gstNo,
+          panNo: saved.panNo,
+          paymentRef: saved.paymentRef,
+        },
+      }),
+    ]);
+
+    return res.status(201).json({
+      success: true,
+      applicationId: saved.id,
+      application: saved,
+      message: 'Application submitted successfully',
+    });
   }
 
+  // ── PATCH — review decision, or a renewal ────────────────────────
   if (req.method === 'PATCH') {
-    const { id, status, renewalYears, lastRenewedAt, paymentRef } = req.body || {};
+    const { id, action } = req.body || {};
     if (!id) return res.status(400).json({ error: 'Application ID required' });
 
-    try {
-      const apps = await getApplications();
-      const idx = apps.findIndex(a => a.id === id);
-      if (idx === -1) return res.status(404).json({ error: 'Application not found' });
+    const adminEmail = await getAdminSession(req);
 
-      // Update fields
-      if (status) apps[idx].status = status;
-      if (status === 'Approved') apps[idx].approvedAt = new Date().toISOString();
-      if (status) apps[idx].reviewedAt = new Date().toISOString();
-      if (renewalYears !== undefined) apps[idx].renewalYears = renewalYears;
-      if (lastRenewedAt) apps[idx].lastRenewedAt = lastRenewedAt;
-      if (paymentRef) apps[idx].paymentRef = paymentRef;
+    // Renewal: allowed for an admin, or the member renewing their own
+    // membership. Deliberately cannot change status.
+    if (action === 'renew') {
+      const applicantEmail = await getApplicantSession(req);
+      const target = await getApplication(id);
+      if (!target) return res.status(404).json({ error: 'Application not found' });
 
-      await saveApplications(apps);
-      return res.status(200).json({ success: true, application: apps[idx] });
-    } catch (e) {
-      console.error('[Applications PATCH Error]', e.message);
-      return res.status(500).json({ error: 'Failed to update application' });
+      const isOwner = applicantEmail && applicantEmail === String(target.email || '').toLowerCase();
+      if (!adminEmail && !isOwner) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      if (target.status !== STATUS.APPROVED) {
+        return res.status(409).json({ error: 'Only an approved membership can be renewed.' });
+      }
+
+      const paymentRef = str(req.body.paymentRef, 80);
+      if (!paymentRef) {
+        return res.status(400).json({ error: 'Payment UTR / transaction reference is required.' });
+      }
+
+      const updated = await updateApplication(id, (app) => ({
+        ...app,
+        renewalYears: (Number(app.renewalYears) || 1) + 1,
+        lastRenewedAt: new Date().toISOString(),
+        paymentRef,
+      }));
+      return res.status(200).json({ success: true, application: updated });
     }
+
+    // Everything else is an admin review action.
+    if (!adminEmail) return res.status(401).json({ error: 'Admin authentication required.' });
+
+    const { status } = req.body || {};
+    if (!status) return res.status(400).json({ error: 'No changes supplied.' });
+
+    const nextStatus = normalizeStatus(status);
+    const updated = await updateApplication(id, (app) => {
+      const next = { ...app, status: nextStatus, reviewedAt: new Date().toISOString(), reviewedBy: adminEmail };
+      if (nextStatus === STATUS.APPROVED && !app.approvedAt) {
+        next.approvedAt = new Date().toISOString();
+      }
+      return next;
+    });
+
+    if (!updated) return res.status(404).json({ error: 'Application not found' });
+
+    // Tell the applicant what was decided.
+    if (nextStatus === STATUS.APPROVED) {
+      await sendEmail({
+        type: 'application_approved',
+        to: updated.email,
+        data: {
+          appId: updated.id,
+          company: updated.company,
+          repName: updated.repName,
+          validUntil: validUntil(updated).toLocaleDateString('en-IN', INDIAN_DATE),
+        },
+      });
+    } else if (nextStatus === STATUS.REJECTED) {
+      await sendEmail({
+        type: 'application_declined',
+        to: updated.email,
+        data: {
+          appId: updated.id,
+          company: updated.company,
+          repName: updated.repName,
+          reason: str(req.body.reason, 1000),
+        },
+      });
+    }
+
+    return res.status(200).json({ success: true, application: updated });
   }
+
+  return res.status(405).json({ error: 'Method not allowed' });
 }
+
+export default withErrorHandling('Applications', handler);

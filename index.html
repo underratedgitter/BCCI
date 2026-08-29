@@ -55,18 +55,22 @@
   }
   </script>
 
-  <!-- Preconnect for fonts -->
+  <!-- Fonts. styles.css asks for DM Serif Display / Inter / JetBrains Mono;
+       these were preconnected but never actually loaded, so every page was
+       rendering in a system fallback. -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" />
 
   <!-- FontAwesome 6 -->
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <!-- QR Code Library -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
   <!-- Custom Stylesheet -->
-  <link rel="stylesheet" href="css/styles.css?v=2.4.0" />
+  <link rel="stylesheet" href="css/styles.css?v=2.5.0" />
   <!-- Premium Membership Card Styles -->
-  <link rel="stylesheet" href="css/membership-card.css" />
+  <link rel="stylesheet" href="css/membership-card.css?v=2.5.0" />
 </head><body>
 
   <!-- Skip to Content (Accessibility) -->

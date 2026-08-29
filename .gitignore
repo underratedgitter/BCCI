@@ -1,1 +1,12 @@
 node_modules/
+
+# Local secrets — never commit these
+.env
+.env.local
+.env.*.local
+
+# Tooling
+.vercel/
+.freebuff/
+.DS_Store
+*.log

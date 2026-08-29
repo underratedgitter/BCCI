@@ -1,7 +1,8 @@
 User-agent: *
 Allow: /
 Disallow: /api/
-Disallow: /#admin
-Disallow: /#signin
+Disallow: /admin
+Disallow: /signin
+Disallow: /card
 
 Sitemap: https://bccibharuch.in/sitemap.xml

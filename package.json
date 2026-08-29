@@ -1,11 +1,16 @@
 {
   "name": "bcci-bharuch-portal",
-  "version": "4.1.0",
-  "description": "BCCI Bharuch Chamber of Commerce & Industry — Official Membership Portal with server-backed data persistence",
+  "version": "5.0.0",
+  "description": "BCCI Bharuch Chamber of Commerce & Industry — Official Membership Portal",
   "type": "module",
   "scripts": {
     "dev": "vercel dev",
     "deploy": "vercel --prod",
+    "test": "node tests/api.test.mjs && node tests/data.test.mjs && node tests/client.test.mjs",
+    "test:api": "node tests/api.test.mjs",
+    "test:data": "node tests/data.test.mjs",
+    "test:client": "node tests/client.test.mjs",
+    "check": "for f in api/*.js api/_lib/*.js js/*.js; do node --check \"$f\" || exit 1; done && echo 'syntax OK'",
     "typecheck": "echo 'No TypeScript configured — vanilla JS project'"
   },
   "dependencies": {

@@ -1,216 +1,211 @@
 /* ==========================================================================
-   BCCI BHARUCH - Data Store & API Client
-   All server operations go through Vercel API routes (Redis-backed).
-   localStorage is ONLY used for client-side session caching.
+   BCCI BHARUCH — Data Store & API Client
+   All server operations go through the Vercel API routes (Redis-backed).
+   localStorage holds session tokens only; it is never the source of truth.
    ========================================================================== */
 
-const API_BASE = ''; // Same origin in production
+const API_BASE = ''; // same origin
 
 const STORAGE_KEYS = {
   ADMIN_SESSION: 'bcci_admin_session',
   APPLICANT_SESSION: 'bcci_applicant_session',
 };
 
+const REQUEST_TIMEOUT_MS = 20000;
+
 export class Store {
-  constructor() {
-    // No localStorage initialization needed for server-backed data
-  }
+  /* ── API helper ───────────────────────────────────────────────────── */
 
-  /* ── API Helper ──────────────────────────────────────────────────── */
+  /**
+   * @param {string} endpoint
+   * @param {{method?: string, body?: any, auth?: 'admin'|'applicant'|null, retries?: number}} options
+   */
   async apiCall(endpoint, options = {}) {
-    const { method = 'GET', body, adminAuth = false } = options;
-    const headers = { 'Content-Type': 'application/json' };
+    const { method = 'GET', body, auth = null, retries = method === 'GET' ? 2 : 0 } = options;
 
-    if (adminAuth) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (auth === 'admin') {
       const session = this.getAdminSession();
-      if (session && session.token) {
-        headers['Authorization'] = `Bearer ${session.token}`;
+      if (session?.token) headers['Authorization'] = `Bearer ${session.token}`;
+    } else if (auth === 'applicant') {
+      const session = this.getApplicantSession();
+      if (session?.token) headers['Authorization'] = `Bearer ${session.token}`;
+    }
+
+    let lastErr;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+      try {
+        const res = await fetch(`${API_BASE}${endpoint}`, {
+          method,
+          headers,
+          signal: controller.signal,
+          ...(body && method !== 'GET' ? { body: JSON.stringify(body) } : {}),
+        });
+
+        let data = {};
+        try {
+          data = await res.json();
+        } catch {
+          // Non-JSON response (a proxy error page, say).
+          if (!res.ok) throw new Error(`Server returned ${res.status}.`);
+        }
+
+        if (!res.ok) {
+          // An expired or revoked session should clear itself rather than
+          // leaving the UI in a signed-in state that no longer works.
+          if (res.status === 401) {
+            if (auth === 'admin') this.forgetAdminSession();
+            if (auth === 'applicant') this.forgetApplicantSession();
+          }
+          const error = new Error(data.error || `Request failed (${res.status}).`);
+          error.status = res.status;
+          error.data = data;
+          throw error;
+        }
+
+        return data;
+      } catch (err) {
+        lastErr = err;
+        // Only retry transient network/timeout failures, never a real
+        // HTTP error — re-sending a POST would duplicate the record.
+        const transient = !err.status && attempt < retries;
+        if (!transient) break;
+        await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+      } finally {
+        clearTimeout(timer);
       }
     }
 
-    const fetchOptions = { method, headers };
-    if (body && method !== 'GET') {
-      fetchOptions.body = JSON.stringify(body);
+    if (lastErr && !lastErr.status) {
+      const netErr = new Error('Could not reach the server. Check your connection and try again.');
+      netErr.cause = lastErr;
+      throw netErr;
     }
-
-    const res = await fetch(`${API_BASE}${endpoint}`, fetchOptions);
-    const data = await res.json();
-
-    if (!res.ok) {
-      const error = new Error(data.error || `API error: ${res.status}`);
-      error.status = res.status;
-      error.data = data;
-      throw error;
-    }
-
-    return data;
+    throw lastErr;
   }
 
   /* ════════════════════════════════════════════════════════════════════
-     APPLICATIONS — Server-backed CRUD
+     APPLICATIONS
      ════════════════════════════════════════════════════════════════════ */
 
+  /** Admin-only: every application, newest first. */
   async getApplications() {
     try {
-      const result = await this.apiCall('/api/applications', { adminAuth: true });
+      const result = await this.apiCall('/api/applications', { auth: 'admin' });
       return result.applications || [];
     } catch (err) {
       console.error('[Store] Failed to fetch applications:', err.message);
-      return [];
+      throw err;
     }
   }
 
   async getApplicationById(id) {
     const apps = await this.getApplications();
-    return apps.find(app => app.id === id) || null;
+    return apps.find((app) => app.id === id) || null;
   }
 
   async addApplication(appData) {
-    try {
-      const result = await this.apiCall('/api/applications', {
-        method: 'POST',
-        body: appData
-      });
-      return result.application;
-    } catch (err) {
-      console.error('[Store] Failed to add application:', err.message);
-      throw err;
-    }
+    const result = await this.apiCall('/api/applications', {
+      method: 'POST',
+      body: appData,
+      auth: 'applicant',
+    });
+    return result.application;
   }
 
+  /** The signed-in applicant's own application (or any, for an admin). */
   async getApplicationByEmail(email) {
     if (!email) return null;
     try {
-      // Try to get application by email (works for both admin and applicant)
-      const result = await this.apiCall(`/api/applications?email=${encodeURIComponent(email)}`);
+      const result = await this.apiCall(
+        `/api/applications?email=${encodeURIComponent(email)}`,
+        { auth: this.isAdminAuthed() ? 'admin' : 'applicant' }
+      );
       return result.application || null;
     } catch (err) {
-      // Fallback: try admin auth
-      try {
-        const apps = await this.getApplications();
-        return apps.find(app => (app.email || '').toLowerCase().trim() === email.toLowerCase().trim()) || null;
-      } catch {
-        return null;
-      }
+      if (err.status === 401) return null;
+      console.error('[Store] Failed to fetch application:', err.message);
+      return null;
     }
   }
 
-  async updateApplicationStatus(id, newStatus) {
-    try {
-      const result = await this.apiCall('/api/applications', {
-        method: 'PATCH',
-        body: { id, status: newStatus },
-        adminAuth: true
-      });
-      return result.application;
-    } catch (err) {
-      console.error('[Store] Failed to update application:', err.message);
-      throw err;
-    }
+  async updateApplicationStatus(id, newStatus, reason = '') {
+    const result = await this.apiCall('/api/applications', {
+      method: 'PATCH',
+      body: { id, status: newStatus, reason },
+      auth: 'admin',
+    });
+    return result.application;
   }
 
+  /** Extends the member's own membership by one year. */
   async renewMembership(appId, utrRef = '') {
-    // Renewal extends the membership by 1 year client-side
-    // (server stores renewalYears as part of the application)
-    try {
-      const apps = await this.getApplications();
-      const app = apps.find(a => a.id === appId);
-      if (!app) return null;
-
-      // Update via PATCH with renewal data
-      const result = await this.apiCall('/api/applications', {
-        method: 'PATCH',
-        body: {
-          id: appId,
-          status: 'Approved',
-          renewalYears: (app.renewalYears || 1) + 1,
-          lastRenewedAt: new Date().toISOString(),
-          paymentRef: utrRef || app.paymentRef,
-        },
-        adminAuth: true
-      });
-      return result.application;
-    } catch (err) {
-      console.error('[Store] Failed to renew membership:', err.message);
-      throw err;
-    }
+    const result = await this.apiCall('/api/applications', {
+      method: 'PATCH',
+      body: { id: appId, action: 'renew', paymentRef: utrRef },
+      auth: this.isAdminAuthed() ? 'admin' : 'applicant',
+    });
+    return result.application;
   }
 
   getMembershipValidity(app) {
     if (!app || app.status !== 'Approved') return null;
 
-    const approvedDate = app.approvedAt ? new Date(app.approvedAt) : new Date(app.submittedAt || Date.now());
+    const approvedDate = app.approvedAt
+      ? new Date(app.approvedAt)
+      : new Date(app.submittedAt || Date.now());
     const validUntil = new Date(approvedDate);
-    const yearsToAdd = app.renewalYears || 1;
+    const yearsToAdd = Number(app.renewalYears) || 1;
     validUntil.setFullYear(validUntil.getFullYear() + yearsToAdd);
 
-    const now = new Date();
-    const diffMs = validUntil.getTime() - now.getTime();
-    const daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    const daysRemaining = Math.ceil((validUntil.getTime() - Date.now()) / 86400000);
 
     let state = 'ACTIVE';
-    if (daysRemaining <= 0) {
-      state = 'EXPIRED';
-    } else if (daysRemaining <= 30) {
-      state = 'RENEWAL_DUE';
-    }
+    if (daysRemaining <= 0) state = 'EXPIRED';
+    else if (daysRemaining <= 30) state = 'RENEWAL_DUE';
 
+    const fmt = { day: 'numeric', month: 'long', year: 'numeric' };
     return {
-      approvedDate: approvedDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
-      validUntilDate: validUntil.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
+      approvedDate: approvedDate.toLocaleDateString('en-IN', fmt),
+      validUntilDate: validUntil.toLocaleDateString('en-IN', fmt),
       validUntilISO: validUntil.toISOString(),
       daysRemaining: Math.max(0, daysRemaining),
       yearsTenure: yearsToAdd,
-      state: state,
+      state,
     };
   }
 
   /* ════════════════════════════════════════════════════════════════════
-     ENQUIRIES — Server-backed CRUD
+     ENQUIRIES
      ════════════════════════════════════════════════════════════════════ */
 
+  /** Admin-only. */
   async getEnquiries() {
     try {
-      const result = await this.apiCall('/api/enquiries');
+      const result = await this.apiCall('/api/enquiries', { auth: 'admin' });
       return result.enquiries || [];
     } catch (err) {
       console.error('[Store] Failed to fetch enquiries:', err.message);
-      return [];
-    }
-  }
-
-  async addEnquiry(enquiryData) {
-    try {
-      const result = await this.apiCall('/api/enquiries', {
-        method: 'POST',
-        body: enquiryData
-      });
-      return result.enquiry;
-    } catch (err) {
-      console.error('[Store] Failed to add enquiry:', err.message);
       throw err;
     }
   }
 
+  async addEnquiry(enquiryData) {
+    const result = await this.apiCall('/api/enquiries', {
+      method: 'POST',
+      body: enquiryData,
+    });
+    return result.enquiry;
+  }
+
   /* ════════════════════════════════════════════════════════════════════
-     ADMIN AUTHENTICATION — Server-backed with session tokens
+     ADMIN SESSION
      ════════════════════════════════════════════════════════════════════ */
 
   getAdminSession() {
-    const data = localStorage.getItem(STORAGE_KEYS.ADMIN_SESSION);
-    if (!data) return null;
-    try {
-      const session = JSON.parse(data);
-      // Check if client-side session is expired
-      if (session.expiresAt && Date.now() > session.expiresAt) {
-        localStorage.removeItem(STORAGE_KEYS.ADMIN_SESSION);
-        return null;
-      }
-      return session;
-    } catch {
-      localStorage.removeItem(STORAGE_KEYS.ADMIN_SESSION);
-      return null;
-    }
+    return this._readSession(STORAGE_KEYS.ADMIN_SESSION);
   }
 
   isAdminAuthed() {
@@ -221,165 +216,100 @@ export class Store {
     try {
       const result = await this.apiCall('/api/admin-auth', {
         method: 'POST',
-        body: { username, password }
+        body: { username, password },
       });
 
       if (result.success && result.session) {
-        const clientSession = {
-          token: result.session.token,
-          username: result.session.username,
-          createdAt: result.session.createdAt,
-          expiresAt: Date.now() + result.session.expiresIn,
-        };
-        localStorage.setItem(STORAGE_KEYS.ADMIN_SESSION, JSON.stringify(clientSession));
+        this._writeSession(STORAGE_KEYS.ADMIN_SESSION, result.session);
         return { success: true };
       }
-
-      return { success: false, error: result.error };
+      return { success: false, error: result.error || 'Sign-in failed.' };
     } catch (err) {
-      return { success: false, error: err.message || 'Login failed.' };
+      return { success: false, error: err.message || 'Sign-in failed.' };
     }
   }
 
   async clearAdminSession() {
-    const session = this.getAdminSession();
-    if (session && session.token) {
+    if (this.getAdminSession()) {
       try {
-        await this.apiCall('/api/admin-auth', {
-          method: 'DELETE',
-          adminAuth: true
-        });
+        await this.apiCall('/api/admin-auth', { method: 'DELETE', auth: 'admin' });
       } catch (err) {
-        console.warn('[Store] Failed to invalidate server session:', err.message);
+        console.warn('[Store] Could not invalidate admin session server-side:', err.message);
       }
     }
-    localStorage.removeItem(STORAGE_KEYS.ADMIN_SESSION);
+    this.forgetAdminSession();
+  }
+
+  forgetAdminSession() {
+    try { localStorage.removeItem(STORAGE_KEYS.ADMIN_SESSION); } catch {}
   }
 
   /* ════════════════════════════════════════════════════════════════════
-     APPLICANT SESSION — Client-side only (OTP verified)
+     APPLICANT SESSION — token issued by /api/verify-otp
      ════════════════════════════════════════════════════════════════════ */
 
   getApplicantSession() {
-    const data = localStorage.getItem(STORAGE_KEYS.APPLICANT_SESSION);
-    return data ? JSON.parse(data) : null;
+    return this._readSession(STORAGE_KEYS.APPLICANT_SESSION);
   }
 
   setApplicantSession(sessionData) {
-    localStorage.setItem(STORAGE_KEYS.APPLICANT_SESSION, JSON.stringify(sessionData));
+    this._writeSession(STORAGE_KEYS.APPLICANT_SESSION, sessionData);
   }
 
-  clearApplicantSession() {
-    localStorage.removeItem(STORAGE_KEYS.APPLICANT_SESSION);
+  async clearApplicantSession() {
+    if (this.getApplicantSession()) {
+      try {
+        await this.apiCall('/api/verify-otp', { method: 'DELETE', auth: 'applicant' });
+      } catch (err) {
+        console.warn('[Store] Could not invalidate applicant session server-side:', err.message);
+      }
+    }
+    this.forgetApplicantSession();
   }
 
-  /* ════════════════════════════════════════════════════════════════════
-     EMAIL NOTIFICATION HELPERS (Client-side generation, sent via API)
-     ════════════════════════════════════════════════════════════════════ */
-
-  generateApprovalEmailData(application) {
-    const repName = application.repName || 'Member Representative';
-    return {
-      recipientName: repName,
-      recipientEmail: application.email,
-      subject: `Official Membership Approval - Bharuch Chamber of Commerce & Industry (${application.id})`,
-      body: `Dear ${repName},
-
-We are pleased to inform you that your application for BCCI Membership (${application.id}) for "${application.company}" has been formally REVIEWED and APPROVED by the BCCI Secretariat Board.
-
-Your institutional membership is now ACTIVE. You are entitled to all member privileges, trade facilitation services, and policy representation under the Bharuch Chamber of Commerce & Industry.
-
-Official Membership Record:
-- Application ID: ${application.id}
-- Enterprise: ${application.company}
-- Approved On: ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
-- Status: ACTIVATED & APPROVED
-
-Welcome to Asia's Largest Industrial Corridor Network.
-
-Warm Regards,
-BCCI Secretariat & Membership Board
-Bharuch Chamber of Commerce & Industry
-admin@bccibharuch.in | +91 7861906384`
-    };
+  forgetApplicantSession() {
+    try { localStorage.removeItem(STORAGE_KEYS.APPLICANT_SESSION); } catch {}
   }
 
-  generateAdminNotificationData(application) {
-    const repName = application.repName || 'Applicant';
-    return {
-      subject: `[ADMIN ALERT] New BCCI Membership Application: ${application.company} (${application.id})`,
-      body: `ATTN: BCCI Secretariat & Admin Board,
+  /* ── Session storage plumbing ─────────────────────────────────────── */
 
-A new membership application has been submitted on the BCCI Official Portal and is pending your review & approval.
-
-Application Summary:
-- Application ID: ${application.id}
-- Company Name: ${application.company}
-- Representative: ${repName} (${application.repDesignation || 'Delegate'})
-- Sector: ${application.businessServices || 'N/A'}
-- Scale: ${application.enterpriseType || 'N/A'} • ${application.legalStatus || 'N/A'}
-- Email: ${application.email}
-- Phone: ${application.phone}
-- GSTIN: ${application.gstNo || 'N/A'}
-- UTR Ref: ${application.paymentRef || 'N/A'}
-- Date Submitted: ${new Date().toLocaleString('en-IN')}
-
-Please sign in to the BCCI Admin Portal to inspect details and approve or reject this membership.`
-    };
-  }
-
-  generateApplicantReceivedEmailData(application) {
-    const repName = application.repName || 'Valued Applicant';
-    return {
-      recipientName: repName,
-      recipientEmail: application.email,
-      subject: `BCCI Membership Application Received (${application.id}) - Pending Admin Verification`,
-      body: `Dear ${repName},
-
-Thank you for applying for Institutional Membership with the Bharuch Chamber of Commerce & Industry (BCCI).
-
-We have successfully received your membership application for "${application.company}".
-
-Application Record Details:
-- Application Reference ID: ${application.id}
-- Enterprise / Firm: ${application.company}
-- Representative: ${repName}
-- Date Submitted: ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
-- Status: PENDING ADMIN APPROVAL & VERIFICATION
-
-Next Steps:
-As per BCCI institutional regulations, your application credentials, legal documentation, and payment proof reference are currently undergoing verification by the BCCI Secretariat Administration.
-
-Once reviewed and approved by the Secretariat Board, you will receive a formal Membership Confirmation & Welcome Email activating your institutional membership privileges.
-
-For urgent enquiries, you may contact the BCCI Secretariat office at admin@bccibharuch.in or +91 7861906384.
-
-Warm Regards,
-BCCI Secretariat & Membership Board
-Bharuch Chamber of Commerce & Industry
-Station Road, Bharuch - 392001`
-    };
-  }
-
-  /* ════════════════════════════════════════════════════════════════════
-     EMAIL DISPATCH — Sends via /api/send-email (Resend + SMTP fallback)
-     ════════════════════════════════════════════════════════════════════ */
-
-  async sendEmail(type, to, data) {
+  _writeSession(key, session) {
+    // expiresIn arrives in SECONDS; Date.now() is in milliseconds. Forgetting
+    // to convert made admin sessions expire 3.6 seconds after sign-in.
+    const ttlMs = (Number(session.expiresIn) || 3600) * 1000;
+    const stored = { ...session, expiresAt: Date.now() + ttlMs };
     try {
-      const result = await this.apiCall('/api/send-email', {
-        method: 'POST',
-        body: { type, to, data }
-      });
-      return result;
+      localStorage.setItem(key, JSON.stringify(stored));
     } catch (err) {
-      console.error(`[Store] Failed to send ${type} email:`, err.message);
-      return { success: false, error: err.message };
+      console.warn('[Store] Could not persist session:', err.message);
+    }
+  }
+
+  _readSession(key) {
+    let raw;
+    try {
+      raw = localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+    if (!raw) return null;
+
+    try {
+      const session = JSON.parse(raw);
+      if (!session?.token) throw new Error('missing token');
+      if (session.expiresAt && Date.now() > session.expiresAt) {
+        try { localStorage.removeItem(key); } catch {}
+        return null;
+      }
+      return session;
+    } catch {
+      try { localStorage.removeItem(key); } catch {}
+      return null;
     }
   }
 
   /* ════════════════════════════════════════════════════════════════════
-     STATIC DATA — Remains client-side (no server needed)
+     STATIC CONTENT
      ════════════════════════════════════════════════════════════════════ */
 
   getLeadership() {
@@ -388,9 +318,9 @@ Station Road, Bharuch - 392001`
       { name: 'MR. KAMAL KUMAR', role: 'Joint Vice President', category: 'Executive Board', initials: 'KK', image: 'assets/KAmal.webp', linkedin: 'https://www.linkedin.com/in/kamal-kumar-165a5b86' },
       { name: 'MR. ANISH PARIKH', role: 'Joint Vice President', category: 'Executive Board', initials: 'AP', image: 'assets/anish.webp', linkedin: 'https://www.linkedin.com/in/anish-parikh-4a5156b6/' },
       { name: 'MR. TUSHAR P. SHAH', role: 'Secretary', category: 'Executive Board', initials: 'TS', image: 'assets/tushar.webp' },
-      { name: 'DR. C. D. SHELAT', role: 'Executive Secretary', category: 'Administration', initials: 'CS', image: 'assets/WhatsApp Image 2026-07-02 at 08.01.51.webp', linkedin: 'https://www.linkedin.com/in/dr-c-d-shelat-16902563/' },
+      { name: 'DR. C. D. SHELAT', role: 'Executive Secretary', category: 'Administration', initials: 'CS', image: 'assets/cd-shelat.webp', linkedin: 'https://www.linkedin.com/in/dr-c-d-shelat-16902563/' },
       { name: 'MR. TUSHAR J. SHAH', role: 'Hon. Treasurer', category: 'Finance', initials: 'TJ' },
-      { name: 'BHAAVIK BAROT', role: 'Founder Member - IT & AI', category: 'Technology', initials: 'BB', image: 'assets/WhatsApp Image 2026-02-13 at 14.59.38.webp', linkedin: 'https://www.linkedin.com/in/bhavikbarot/' }
+      { name: 'BHAAVIK BAROT', role: 'Founder Member - IT & AI', category: 'Technology', initials: 'BB', image: 'assets/bhavik-barot.webp', linkedin: 'https://www.linkedin.com/in/bhavikbarot/' }
     ];
   }
 
