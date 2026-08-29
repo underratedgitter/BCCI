@@ -523,11 +523,35 @@ class App {
       : '<i class="fas fa-file-signature"></i><span>Apply</span>';
   }
 
+  /**
+   * "Apply for Membership" is wrong for anyone who already has an
+   * application. An approved member has nothing to apply for, and a pending
+   * one would just hit the one-application-per-email guard — so the call to
+   * action reflects where they actually are.
+   */
+  _updateApplyCtas(memberApp) {
+    const status = memberApp && memberApp.status;
+    document.querySelectorAll('[data-apply-cta]').forEach((el) => {
+      if (status === 'Approved') {
+        el.style.display = 'none';
+      } else if (status === 'Pending') {
+        el.style.display = '';
+        el.innerHTML = '<i class="fas fa-hourglass-half"></i> My Application';
+        el.setAttribute('data-view-nav', 'membership');
+      } else {
+        el.style.display = '';
+        el.innerHTML = '<i class="fas fa-building"></i> Apply for Membership';
+        el.setAttribute('data-view-nav', 'membership');
+      }
+    });
+  }
+
   updateHeaderMemberBadge(memberApp, validity) {
     const desktopAuthContainer = document.getElementById('navAuthContainer');
     let badgeEl = document.getElementById('navHeaderMemberBadge');
 
     this._updateMobileMembershipTab(memberApp);
+    this._updateApplyCtas(memberApp);
 
     if (!memberApp || memberApp.status !== 'Approved') {
       if (badgeEl) badgeEl.remove();

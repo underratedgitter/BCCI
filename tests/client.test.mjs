@@ -78,5 +78,22 @@ ck('admin recipient no longer hardcoded client-side', !SRC.includes('CONFIG.ADMI
 ck('toast output is escaped', /toast\.innerHTML[\s\S]{0,120}escapeHtml\(message\)/.test(SRC));
 ck('FAQ answer id bug fixed', SRC.includes('id="${faqId}"') && !SRC.includes('id="faqId"'));
 
+console.log('\nMembership CTAs reflect the member\'s actual state');
+console.log('─────────────────────────────────────────────────');
+const HTML = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+const tagged = (HTML.match(/data-apply-cta/g) || []).length;
+ck('every Apply button is tagged for JS to manage', tagged === 3, `found ${tagged}, expected 3 (header, drawer, hero)`);
+
+// No tagged button should be left hardcoded as the only label.
+const applyButtons = [...HTML.matchAll(/<button[^>]*data-apply-cta[^>]*>[\s\S]*?<\/button>/g)].map(m => m[0]);
+ck('all three say "Apply for Membership" by default', applyButtons.filter(b => /Apply for Membership/.test(b)).length === 3, `${applyButtons.length} found`);
+
+ck('_updateApplyCtas exists', SRC.includes('_updateApplyCtas('));
+ck('it is wired into the badge update path', /_updateApplyCtas\(memberApp\)/.test(SRC));
+ck('approved members get the CTA hidden', /status === 'Approved'[\s\S]{0,120}display = 'none'/.test(SRC));
+ck('pending members get "My Application"', SRC.includes('My Application'));
+ck('everyone else keeps "Apply for Membership"', /innerHTML = '<i class="fas fa-building"><\/i> Apply for Membership'/.test(SRC));
+ck('the mobile tab flips to My Card when approved', SRC.includes('My Card'));
+
 console.log(`\n${'═'.repeat(52)}\n  ${pass} passed, ${fail} failed\n${'═'.repeat(52)}`);
 process.exit(fail?1:0);
