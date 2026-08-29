@@ -1,8 +1,8 @@
 // api/send-email.js
 // Internal-only email dispatcher, kept for operational testing.
 //
-// The application flow no longer calls this route — applications.js and
-// renewal-check.js send through api/_lib/email.js directly. This endpoint used
+// The application flow no longer calls this route — applications.js sends
+// through api/_lib/email.js directly. This endpoint used
 // to be public and unauthenticated, which let anyone send arbitrary HTML to
 // any address from BCCI's own mailbox.
 

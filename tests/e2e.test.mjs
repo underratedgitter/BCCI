@@ -11,7 +11,6 @@ process.env.UPSTASH_REDIS_REST_URL = redis.url;
 process.env.UPSTASH_REDIS_REST_TOKEN = 'test-token';
 process.env.ADMIN_EMAILS = 'secretariat@bccibharuch.in';
 process.env.ADMIN_PASSWORD = 'a-long-random-admin-secret';
-process.env.CRON_SECRET = 'cron-secret-value';
 process.env.INTERNAL_API_SECRET = 'internal-secret-value';
 process.env.SMTP_HOST = '127.0.0.1';
 process.env.SMTP_PORT = String(smtp.port);
@@ -20,7 +19,6 @@ process.env.SMTP_USER = 'portal@bccibharuch.in';
 process.env.SMTP_PASS = 'app-password';
 process.env.EMAIL_FROM = 'BCCI Bharuch <portal@bccibharuch.in>';
 process.env.PORT = '0';
-process.env.DISABLE_CRON = '1';
 
 const server = (await import('../server.js')).default;
 await new Promise((r) => (server.listening ? r() : server.once('listening', r)));

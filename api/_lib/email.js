@@ -169,43 +169,6 @@ export const TEMPLATES = {
     }),
   }),
 
-  renewal_reminder: (d) => ({
-    subject: `Membership Renewal Due — BCCI Bharuch (${d.appId})`,
-    html: shell({
-      accent: '#B45309',
-      heading: 'Membership Renewal Reminder',
-      sub: 'Your BCCI membership is expiring soon',
-      footer: 'BCCI Bharuch • Membership Renewal Department',
-      body: `
-        <p style="margin:0 0 8px;font-size:15px;color:#1E293B;">Dear <strong>${esc(d.repName)}</strong>,</p>
-        <p style="margin:0 0 20px;font-size:14px;color:#475569;line-height:1.6;">
-          Your BCCI Institutional Membership expires in
-          <strong style="color:#DC2626;">${esc(d.daysLeft)} day${Number(d.daysLeft) === 1 ? '' : 's'}</strong>.
-          Please renew to continue enjoying member privileges.
-        </p>
-        ${panel(
-          row('Company', d.company, '#92400E') +
-          row('Member ID', d.appId, '#92400E') +
-          `<tr><td style="padding:4px 0;font-size:13px;color:#DC2626;font-weight:700;">Expires: ${esc(d.validUntil)}</td></tr>`,
-          '#FEF3C7',
-          '#FDE68A'
-        )}
-        <div style="text-align:center;margin-bottom:20px;">
-          <p style="font-size:13px;color:#475569;margin-bottom:8px;"><strong>Scan to pay the renewal fee</strong></p>
-          <div style="display:inline-block;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:12px;">
-            <p style="margin:0 0 4px;font-size:12px;color:#0F2C59;font-weight:700;">M/S. BHARUCH CHAMBER OF COMMERCE AND INDUSTRY</p>
-            <p style="margin:0;font-size:11px;color:#0284C7;font-weight:700;">UPI: 7861906384.eazypay@icici</p>
-            <p style="margin:4px 0 0;font-size:10px;color:#94A3B8;">ICICI Bank • GPay, PhonePe, Paytm, BHIM</p>
-          </div>
-        </div>
-        <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:12px;font-size:12px;color:#1E3E62;">
-          <strong>How to renew:</strong><br>
-          1. Pay the annual renewal fee using the UPI ID above<br>
-          2. Sign in to the BCCI Portal → My Profile → Annual Renewal<br>
-          3. Enter your UTR / transaction reference number
-        </div>`,
-    }),
-  }),
 };
 
 // ── Delivery ───────────────────────────────────────────────────────

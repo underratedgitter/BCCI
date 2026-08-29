@@ -63,7 +63,6 @@ const RECOMMENDED = [
   ['ADMIN_EMAILS', 'admin sign-in and new-application notifications'],
   ['SMTP_USER', 'OTP and notification email (falls back to GMAIL_USER)'],
   ['SMTP_PASS', 'OTP and notification email (falls back to GMAIL_PASS)'],
-  ['CRON_SECRET', 'the daily renewal-reminder job'],
   ['ALLOWED_ORIGIN', 'browser CORS — defaults to https://bccibharuch.in'],
 ];
 

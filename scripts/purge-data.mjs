@@ -38,7 +38,6 @@ const OPERATIONAL = [
   ['bcci:attempts:*', 'legacy OTP attempt counters'],
   ['bcci:ratelimit:*', 'legacy rate-limit counters'],
   ['bcci:email_log', 'email audit log'],
-  ['bcci:renewal_reminders', 'renewal reminder ledger'],
 ];
 
 async function keysMatching(pattern) {

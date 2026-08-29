@@ -7,7 +7,6 @@ process.env.UPSTASH_REDIS_REST_URL = mock.url;
 process.env.UPSTASH_REDIS_REST_TOKEN = 'test-token';
 process.env.ADMIN_EMAILS = 'admin@bccibharuch.in';
 process.env.ADMIN_PASSWORD = 'correct-horse-battery-staple';
-process.env.CRON_SECRET = 'cron-secret-value';
 process.env.INTERNAL_API_SECRET = 'internal-secret-value';
 process.env.ALLOWED_ORIGIN = 'https://bccibharuch.in';
 process.env.SMTP_TRANSPORT = 'json';
@@ -19,7 +18,6 @@ const adminStats = (await import(`${BCCI}/admin-stats.js`)).default;
 const enquiries = (await import(`${BCCI}/enquiries.js`)).default;
 const sendOtp = (await import(`${BCCI}/send-otp.js`)).default;
 const verifyOtp = (await import(`${BCCI}/verify-otp.js`)).default;
-const renewalCheck = (await import(`${BCCI}/renewal-check.js`)).default;
 const sendEmailRoute = (await import(`${BCCI}/send-email.js`)).default;
 
 // ── Fake req/res ────────────────────────────────────────────────────
@@ -177,18 +175,6 @@ check('no token → 401', r.statusCode === 401, `got ${r.statusCode}`);
 r = await call(adminStats, { method: 'GET', token: adminToken });
 check('valid admin token → 200 (was always 401 before)', r.statusCode === 200, JSON.stringify(r.body).slice(0, 200));
 check('counts the approved member', r.body?.stats?.approved === 1, `got ${r.body?.stats?.approved}`);
-
-// ════════════════════════════════════════════════════════════════════
-section('SEC-04  Renewal cron cannot be triggered anonymously');
-
-r = await call(renewalCheck, { method: 'GET' });
-check('anonymous GET → 401 (this used to run the email blast)', r.statusCode === 401, `got ${r.statusCode}`);
-
-r = await call(renewalCheck, { method: 'GET', query: { secret: 'guess' } });
-check('wrong secret → 401', r.statusCode === 401, `got ${r.statusCode}`);
-
-r = await call(renewalCheck, { method: 'GET', token: 'cron-secret-value' });
-check('correct cron bearer → 200', r.statusCode === 200, JSON.stringify(r.body).slice(0, 200));
 
 // ════════════════════════════════════════════════════════════════════
 section('SEC-03  The email endpoint is no longer an open relay');

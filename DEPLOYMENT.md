@@ -2,8 +2,8 @@
 
 The app runs in two places without code changes:
 
-- **Vercel** — `api/*.js` are serverless functions; `vercel.json` supplies headers, the SPA rewrite and the daily cron.
-- **Any Node host (VPS, Docker, Render, Railway)** — `server.js` serves the same handlers plus the static site, applies the same security headers in code, and runs the daily job in-process.
+- **Vercel** — `api/*.js` are serverless functions; `vercel.json` supplies headers and the SPA rewrite.
+- **Any Node host (VPS, Docker, Render, Railway)** — `server.js` serves the same handlers plus the static site and applies the same security headers in code.
 
 Nothing host-specific lives in the application logic. Moving from Vercel to a VPS is: set the same environment variables, run `node server.js`, put TLS in front.
 
@@ -28,7 +28,6 @@ Copy `.env.example` to `.env.local` and fill it in. Never commit it — `.gitign
 | Variable | What it does |
 |---|---|
 | `ALLOWED_ORIGIN` | Comma-separated origins allowed to call the API from a browser. Set this to your real domain(s). |
-| `CRON_SECRET` | Authorises the renewal job. Without it, renewal reminders are disabled. `openssl rand -hex 32` |
 | `INTERNAL_API_SECRET` | Authorises server-to-server calls to `/api/send-email`. `openssl rand -hex 32` |
 | `EMAIL_FROM` | The From address recipients see, e.g. `BCCI Bharuch <noreply@bccibharuch.in>` |
 
@@ -62,8 +61,6 @@ npm run mail:test -- you@example.com    # also send one of each template
 | `HOST` | Default `0.0.0.0` |
 | `TRUST_PROXY` | **Set to `1` behind nginx/Caddy.** Otherwise every visitor is seen as `127.0.0.1` and they all share one rate-limit bucket. |
 | `BEHIND_TLS` | `1` to send HSTS. Implied by `TRUST_PROXY`. |
-| `RENEWAL_HOUR` | Hour (server local time) for the daily renewal job. Default `9`. |
-| `DISABLE_CRON` | `1` to skip the in-process scheduler, e.g. if you run it from system cron. |
 
 ---
 

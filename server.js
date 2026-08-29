@@ -208,55 +208,6 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-// ── Daily renewal job ──────────────────────────────────────────────
-// On Vercel this is the "crons" entry in vercel.json. On a VPS there is no
-// such scheduler, so run it in-process. The handler keeps a ledger in Redis,
-// so an extra run never sends a duplicate reminder.
-
-function scheduleRenewalCheck() {
-  if (!process.env.CRON_SECRET) {
-    console.warn('  [cron] CRON_SECRET not set — renewal reminders are disabled');
-    return;
-  }
-  if (process.env.DISABLE_CRON === '1') {
-    console.log('  [cron] disabled via DISABLE_CRON');
-    return;
-  }
-
-  const HOUR = Number(process.env.RENEWAL_HOUR || 9);
-  let lastRunDate = null;
-
-  const tick = async () => {
-    const now = new Date();
-    const today = now.toISOString().slice(0, 10);
-    if (now.getHours() !== HOUR || lastRunDate === today) return;
-    lastRunDate = today;
-
-    try {
-      const handler = await loadHandler('renewal-check');
-      if (!handler) return;
-      const req = {
-        method: 'GET',
-        query: { secret: process.env.CRON_SECRET },
-        headers: { authorization: `Bearer ${process.env.CRON_SECRET}` },
-        socket: {},
-      };
-      const res = decorate({
-        statusCode: 200,
-        setHeader() {},
-        end(body) { console.log(`  [cron] renewal check: ${body}`); },
-        get headersSent() { return false; },
-      });
-      await handler(req, res);
-    } catch (err) {
-      console.error('  [cron] renewal check failed:', err.message);
-    }
-  };
-
-  setInterval(tick, 5 * 60 * 1000).unref?.();
-  console.log(`  [cron] renewal reminders scheduled daily at ${HOUR}:00 server time`);
-}
-
 // ── Boot ───────────────────────────────────────────────────────────
 
 console.log('\nBCCI Bharuch portal');
@@ -276,8 +227,6 @@ if (!TRUST_PROXY) {
     '                    rate-limit bucket, locking each other out.'
   );
 }
-
-scheduleRenewalCheck();
 
 server.listen(PORT, HOST, () => {
   console.log(`  listening on http://${HOST}:${PORT}`);

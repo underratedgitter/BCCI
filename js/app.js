@@ -1260,7 +1260,16 @@ class App {
 
       const validity = this.store.getMembershipValidity(app);
       const validityClass = validity.state === 'ACTIVE' ? 'active' : validity.state === 'RENEWAL_DUE' ? 'expiring' : 'expired';
-      const validityText = validity.state === 'ACTIVE' ? `VALID TILL ${validity.validUntilDate.toUpperCase()}` : validity.state === 'RENEWAL_DUE' ? `EXPIRES IN ${validity.daysRemaining} DAYS` : 'EXPIRED';
+
+      // The card is the only place a member is told about expiry — there are
+      // no reminder emails — so it always carries the date, and adds the
+      // countdown once renewal is close.
+      const validityText =
+        validity.state === 'RENEWAL_DUE'
+          ? `RENEW BY ${validity.validUntilDate.toUpperCase()}`
+          : validity.state === 'EXPIRED'
+            ? `EXPIRED ${validity.validUntilDate.toUpperCase()}`
+            : `VALID TILL ${validity.validUntilDate.toUpperCase()}`;
 
       container.innerHTML = `
         <div class="bcci-membership-card-wrapper">

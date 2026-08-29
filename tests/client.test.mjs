@@ -132,5 +132,21 @@ ck('skeleton shimmer is disabled under reduced motion', /prefers-reduced-motion[
 ck('progress bar has a complete state', CSS.includes('.form-progress.is-complete'));
 ck('progress bar stacks on narrow screens', /max-width: 560px[\s\S]{0,140}flex-direction: column/.test(CSS));
 
+console.log('\nRenewal: card-only, no scheduled job');
+console.log('────────────────────────────────────');
+import('node:fs').then(() => {});
+const exists = (p) => { try { fs.accessSync(new URL(p, import.meta.url)); return true; } catch { return false; } };
+ck('the renewal-check endpoint is gone', !exists('../api/renewal-check.js'));
+ck('no cron is scheduled in vercel.json', !JSON.parse(fs.readFileSync(new URL('../vercel.json', import.meta.url),'utf8')).crons);
+ck('health no longer reports a cron job', !fs.readFileSync(new URL('../api/health.js', import.meta.url),'utf8').includes('cron'));
+ck('the reminder email template is gone', !fs.readFileSync(new URL('../api/_lib/email.js', import.meta.url),'utf8').includes('renewal_reminder'));
+ck('the VPS scheduler is gone from server.js', !fs.readFileSync(new URL('../server.js', import.meta.url),'utf8').includes('scheduleRenewalCheck'));
+ck('no cron dependency was ever added', !Object.keys(JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url),'utf8')).dependencies).some(d => /cron|schedule|agenda|bree/i.test(d)));
+
+ck('members can still renew themselves', fs.readFileSync(new URL('../api/applications.js', import.meta.url),'utf8').includes("action === 'renew'"));
+ck('the card states the date when active', SRC.includes('VALID TILL ${validity.validUntilDate'));
+ck('the card states the date when renewal is due', SRC.includes('RENEW BY ${validity.validUntilDate'));
+ck('the card states the date when expired', SRC.includes('EXPIRED ${validity.validUntilDate'));
+
 console.log(`\n${'═'.repeat(52)}\n  ${pass} passed, ${fail} failed\n${'═'.repeat(52)}`);
 process.exit(fail?1:0);
