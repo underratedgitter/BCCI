@@ -221,14 +221,31 @@ function getTransport() {
 
   const user = process.env.SMTP_USER || process.env.GMAIL_USER;
   const pass = process.env.SMTP_PASS || process.env.GMAIL_PASS;
-  if (!user || !pass) return null;
+  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
+  const port = parseInt(process.env.SMTP_PORT || '465', 10);
+
+  // Port 465 is implicit TLS; 587 and 25 start plaintext and upgrade with
+  // STARTTLS. Hardcoding secure:true worked for Gmail on 465 but breaks
+  // against a relay on 587 or a local MTA on a VPS.
+  const secure = process.env.SMTP_SECURE
+    ? process.env.SMTP_SECURE === 'true'
+    : port === 465;
+
+  // A local MTA on the same box needs no credentials.
+  const isLocal = host === 'localhost' || host === '127.0.0.1';
+  if ((!user || !pass) && !isLocal) return null;
 
   if (!cachedTransport) {
     cachedTransport = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: parseInt(process.env.SMTP_PORT || '465', 10),
-      secure: true,
-      auth: { user, pass },
+      host,
+      port,
+      secure,
+      ...(user && pass ? { auth: { user, pass } } : {}),
+      // Allow a self-signed cert only when explicitly opted in, for a local
+      // relay on a VPS. Never relax this for a public provider.
+      ...(process.env.SMTP_ALLOW_SELF_SIGNED === 'true'
+        ? { tls: { rejectUnauthorized: false } }
+        : {}),
       connectionTimeout: 10000,
       greetingTimeout: 10000,
       socketTimeout: 15000,
@@ -237,6 +254,18 @@ function getTransport() {
     });
   }
   return cachedTransport;
+}
+
+/** Verifies the SMTP connection and credentials without sending anything. */
+export async function verifyTransport() {
+  const transport = getTransport();
+  if (!transport) return { ok: false, error: 'SMTP is not configured' };
+  try {
+    await transport.verify();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
 }
 
 /** Sends a one-off message that isn't one of the stored templates (e.g. OTP). */
