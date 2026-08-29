@@ -285,6 +285,11 @@ class App {
 
           if (result.success && result.session) {
             this.store.setApplicantSession(result.session);
+            // Both, and in this order: updateNavAuthUI swaps the "Sign In"
+            // button for the profile avatar, updateApplicantAuthUI inserts the
+            // member badge beside it. Without the first, the header sat in its
+            // signed-out state until the next page load.
+            this.updateNavAuthUI();
             this.updateApplicantAuthUI();
             this.showToast(`Welcome, ${result.session.name}! Identity verified successfully.`, 'success');
             pendingSession = null;
@@ -636,12 +641,13 @@ class App {
 
                 <div class="bcci-card-microprint"></div>
 
+                <div class="bcci-card-detail bcci-card-id-row">
+                  <div class="bcci-card-detail-label">Member ID</div>
+                  <div class="bcci-card-detail-value" title="${escapeAttr(app.id)}">${escapeHtml(app.id)}</div>
+                </div>
+
                 <div class="bcci-card-footer">
                   <div class="bcci-card-details">
-                    <div class="bcci-card-detail">
-                      <div class="bcci-card-detail-label">Member ID</div>
-                      <div class="bcci-card-detail-value">${escapeHtml(app.id)}</div>
-                    </div>
                     <div class="bcci-card-detail">
                       <div class="bcci-card-detail-label">Since</div>
                       <div class="bcci-card-detail-value">${escapeHtml(validity ? validity.approvedDate : 'N/A')}</div>

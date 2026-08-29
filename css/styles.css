@@ -341,6 +341,7 @@ small, .mono {
 
 .nav-links { min-width: 0; }
 .navbar-inner > * { min-width: 0; }
+#navAuthContainer { flex-shrink: 0; }
 
 /* ── Member badge in the header ─────────────────────────────────
    Built in js/app.js. The company name truncates; the member ID and the
@@ -352,6 +353,7 @@ small, .mono {
   gap: 0.45rem;
   min-width: 0;
   max-width: min(340px, 26vw);
+  overflow: hidden;
   padding: 0.4rem 0.85rem;
   border-radius: 20px;
   font-size: 0.82rem;
@@ -382,7 +384,9 @@ small, .mono {
 }
 
 .nav-member-badge .badge-id {
-  flex-shrink: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-family: var(--font-mono, monospace);
   font-size: 0.75rem;
   color: #FFD700;
@@ -391,7 +395,9 @@ small, .mono {
   border-radius: 8px;
 }
 
-@media (max-width: 1280px) {
+/* Member IDs are ~28 chars (BCCI- plus a timestamp), so they need more room
+   than the breakpoint name suggests before they stop crowding the avatar. */
+@media (max-width: 1400px) {
   .nav-member-badge .badge-id { display: none; }
 }
 @media (max-width: 1120px) {
@@ -524,7 +530,9 @@ small, .mono {
 }
 
 /* ── Profile Dropdown ──────────────────────────────────────────── */
-.nav-profile-wrapper { position: relative; }
+/* Without flex-shrink:0 the wrapper collapses under a long member badge and the
+   36px avatar inside it spills out and collides with the badge. */
+.nav-profile-wrapper { position: relative; flex-shrink: 0; }
 
 .nav-profile-avatar {
   width: 36px;
