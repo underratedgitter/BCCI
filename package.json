@@ -1,7 +1,7 @@
 {
   "name": "bcci-bharuch-portal",
   "version": "5.0.0",
-  "description": "BCCI Bharuch Chamber of Commerce & Industry \u2014 Official Membership Portal",
+  "description": "BCCI Bharuch Chamber of Commerce & Industry — Official Membership Portal",
   "type": "module",
   "main": "server.js",
   "scripts": {
@@ -16,13 +16,13 @@
     "test:data": "node tests/data.test.mjs",
     "test:client": "node tests/client.test.mjs",
     "check": "for f in api/*.js api/_lib/*.js js/*.js; do node --check \"$f\" || exit 1; done && echo 'syntax OK'",
-    "typecheck": "echo 'No TypeScript configured \u2014 vanilla JS project'",
+    "typecheck": "echo 'No TypeScript configured — vanilla JS project'",
     "test:purge": "node tests/purge.test.mjs",
     "purge:data": "node --env-file=.env.local scripts/purge-data.mjs"
   },
   "dependencies": {
     "@upstash/redis": "^1.38.2",
-    "nodemailer": "^6.9.14"
+    "nodemailer": "^9.0.6"
   },
   "engines": {
     "node": ">=18.0.0"
