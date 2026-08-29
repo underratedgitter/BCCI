@@ -38,7 +38,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Email and password required' });
   }
 
-  const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase());
+  const adminEmails = (process.env.ADMIN_EMAILS || process.env.ADMIN_USERNAME || '').split(',').map(e => e.trim().toLowerCase());
   const adminPassword = process.env.ADMIN_PASSWORD;
 
   if (!adminEmails.includes(email.toLowerCase()) || !timingSafeEqual(password, adminPassword)) {
