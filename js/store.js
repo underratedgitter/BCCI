@@ -80,8 +80,19 @@ export class Store {
 
   async getApplicationByEmail(email) {
     if (!email) return null;
-    const apps = await this.getApplications();
-    return apps.find(app => (app.email || '').toLowerCase().trim() === email.toLowerCase().trim()) || null;
+    try {
+      // Try to get application by email (works for both admin and applicant)
+      const result = await this.apiCall(`/api/applications?email=${encodeURIComponent(email)}`);
+      return result.application || null;
+    } catch (err) {
+      // Fallback: try admin auth
+      try {
+        const apps = await this.getApplications();
+        return apps.find(app => (app.email || '').toLowerCase().trim() === email.toLowerCase().trim()) || null;
+      } catch {
+        return null;
+      }
+    }
   }
 
   async updateApplicationStatus(id, newStatus) {

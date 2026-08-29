@@ -24,8 +24,8 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  // Auth check for GET/PATCH (POST is public for new applications)
-  if (req.method !== 'POST') {
+  // Auth check for PATCH (admin only)
+  if (req.method === 'PATCH') {
     const authHeader = req.headers.authorization;
     const token = authHeader?.replace('Bearer ', '');
     if (!token) return res.status(401).json({ error: 'Unauthorized' });
@@ -35,7 +35,16 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
+      const { email } = req.query || {};
       const apps = await getApplications();
+      
+      // If email query param provided, return only that applicant's application
+      if (email) {
+        const userApp = apps.find(a => (a.email || '').toLowerCase() === email.toLowerCase());
+        return res.status(200).json({ application: userApp || null });
+      }
+      
+      // Otherwise return all (admin view)
       apps.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
       return res.status(200).json({ applications: apps, total: apps.length });
     } catch (e) {
