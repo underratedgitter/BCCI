@@ -37,6 +37,13 @@ function formatDate(value) {
   return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-IN');
 }
 
+/** Honours prefers-reduced-motion — CSS scroll-behavior does not apply to
+    scrollTo({behavior:'smooth'}) called from script. */
+const prefersReducedMotion = () =>
+  window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+
+const scrollBehavior = () => (prefersReducedMotion() ? 'auto' : 'smooth');
+
 // ── Routing ───────────────────────────────────────────────────
 // Each view gets a real URL so it can be linked, bookmarked, shared and
 // indexed. vercel.json rewrites every non-/api path to index.html, so these
@@ -107,6 +114,8 @@ class App {
     this.setupLightboxEvents();
     this.setupScrollToTop();
     this.setupScrollReveal();
+    this.setupDraftPersistence();
+    this.setupConnectivityWatch();
   }
 
   setupScrollReveal() {
@@ -143,7 +152,7 @@ class App {
     btn.style.cssText = `
       opacity: 0; visibility: hidden; transform: translateY(10px);
     `;
-    btn.onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+    btn.onclick = () => window.scrollTo({ top: 0, behavior: scrollBehavior() });
     document.body.appendChild(btn);
 
     window.addEventListener('scroll', () => {
@@ -1098,6 +1107,9 @@ class App {
       }
     }
     document.title = PAGE_TITLES[viewId] || PAGE_TITLES.home;
+    // A screen reader gets no signal from a display:none swap, so say which
+    // page this now is.
+    this.announce(`${(PAGE_TITLES[viewId] || '').split('—')[0].trim()} page loaded`);
 
     document.querySelectorAll('.nav-link').forEach(link => {
       link.classList.toggle('active', link.getAttribute('data-view-nav') === viewId);
@@ -1120,7 +1132,7 @@ class App {
     const targetPage = document.getElementById(`view-${viewId}`);
     if (targetPage) {
       targetPage.style.display = 'block';
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: scrollBehavior() });
     }
 
     if (viewId === 'home' || viewId === 'about') this.renderLeadership();
@@ -1683,6 +1695,13 @@ class App {
       container.appendChild(errorDiv);
     }
 
+    // Tie the message to the field so a screen reader reads it out when the
+    // field is focused, instead of leaving a red box nobody hears about.
+    if (!errorDiv.id) {
+      errorDiv.id = `err-${name || Math.random().toString(36).slice(2, 8)}`;
+    }
+    errorDiv.setAttribute('role', 'alert');
+
     if (name === 'paymentProof') {
       if (input.hasAttribute('required') && !this.currentPaymentProofBase64) {
         isValid = false;
@@ -1729,6 +1748,8 @@ class App {
 
     if (!isValid) {
       if (name !== 'paymentProof') { input.classList.add('is-invalid'); input.classList.remove('is-valid'); }
+      input.setAttribute('aria-invalid', 'true');
+      input.setAttribute('aria-describedby', errorDiv.id);
       errorDiv.textContent = errorMsg;
       errorDiv.style.display = 'flex';
     } else {
@@ -1736,6 +1757,8 @@ class App {
         input.classList.remove('is-invalid');
         input.classList.toggle('is-valid', !!val);
       }
+      input.removeAttribute('aria-invalid');
+      input.removeAttribute('aria-describedby');
       errorDiv.textContent = '';
       errorDiv.style.display = 'none';
     }
@@ -1763,7 +1786,7 @@ class App {
         if (!session || !session.email) {
           this.showToast('Please sign in with your email to submit the application.', 'warning');
           const authGate = document.getElementById('applicantAuthGate');
-          if (authGate) authGate.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          if (authGate) authGate.scrollIntoView({ behavior: scrollBehavior(), block: 'center' });
           return;
         }
 
@@ -1775,7 +1798,7 @@ class App {
         });
 
         if (!isFormValid) {
-          if (firstInvalidInput) { firstInvalidInput.focus(); firstInvalidInput.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+          if (firstInvalidInput) { firstInvalidInput.focus(); firstInvalidInput.scrollIntoView({ behavior: scrollBehavior(), block: 'center' }); }
           this.showToast('Please fix the highlighted errors before submitting.', 'warning');
           return;
         }
@@ -1792,6 +1815,9 @@ class App {
           // alert as part of this request, so they go out even if the
           // applicant closes the tab the moment they hit submit.
           const newApp = await this.store.addApplication(data);
+
+          // Submitted successfully — the saved draft has served its purpose.
+          this._clearDraft();
 
           // Reset form
           membershipForm.reset();
@@ -1865,7 +1891,7 @@ class App {
         });
 
         if (!isFormValid) {
-          if (firstInvalidInput) { firstInvalidInput.focus(); firstInvalidInput.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+          if (firstInvalidInput) { firstInvalidInput.focus(); firstInvalidInput.scrollIntoView({ behavior: scrollBehavior(), block: 'center' }); }
           this.showToast('Please fix the highlighted errors before submitting.', 'warning');
           return;
         }
@@ -2356,21 +2382,207 @@ class App {
   showModal({ title, content }) {
     const backdrop = document.getElementById('modalBackdrop');
     const container = document.getElementById('modalContainer');
-    if (backdrop && container) {
-      container.innerHTML = `
-        <button class="modal-close" id="modalCloseIcon">&times;</button>
-        <h3 class="modal-title">${title}</h3>
-        <div>${content}</div>
-      `;
-      backdrop.classList.add('show');
-      document.getElementById('modalCloseIcon')?.addEventListener('click', () => this.closeModal());
-      document.getElementById('modalCloseBtn')?.addEventListener('click', () => this.closeModal());
-    }
+    if (!backdrop || !container) return;
+
+    // Remember where focus came from, so it can be handed back on close.
+    this._modalReturnFocus = document.activeElement;
+
+    container.innerHTML = `
+      <button class="modal-close" id="modalCloseIcon" aria-label="Close dialog">&times;</button>
+      <h3 class="modal-title">${title}</h3>
+      <div>${content}</div>
+    `;
+    backdrop.classList.add('show');
+    document.getElementById('modalCloseIcon')?.addEventListener('click', () => this.closeModal());
+    document.getElementById('modalCloseBtn')?.addEventListener('click', () => this.closeModal());
+
+    // Move focus into the dialog and keep Tab inside it. Without this, a
+    // keyboard user tabs straight out into the page behind the overlay.
+    const focusables = () =>
+      [...container.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])')]
+        .filter((el) => el.offsetParent !== null);
+
+    setTimeout(() => (focusables()[0] || container).focus?.(), 50);
+
+    this._modalKeydown = (e) => {
+      if (e.key !== 'Tab') return;
+      const items = focusables();
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    container.addEventListener('keydown', this._modalKeydown);
   }
 
   closeModal() {
     const backdrop = document.getElementById('modalBackdrop');
-    if (backdrop) backdrop.classList.remove('show');
+    if (!backdrop) return;
+    const container = document.getElementById('modalContainer');
+    if (container && this._modalKeydown) {
+      container.removeEventListener('keydown', this._modalKeydown);
+      this._modalKeydown = null;
+    }
+    backdrop.classList.remove('show');
+    // Hand focus back to whatever opened the dialog.
+    this._modalReturnFocus?.focus?.();
+    this._modalReturnFocus = null;
+  }
+
+  /**
+   * Announces something to screen readers. View changes and toasts are purely
+   * visual otherwise — a screen reader user gets no signal that anything
+   * happened at all.
+   */
+  announce(message) {
+    let region = document.getElementById('a11yLiveRegion');
+    if (!region) {
+      region = document.createElement('div');
+      region.id = 'a11yLiveRegion';
+      region.setAttribute('aria-live', 'polite');
+      region.setAttribute('aria-atomic', 'true');
+      region.style.cssText =
+        'position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;';
+      document.body.appendChild(region);
+    }
+    // Clearing first forces re-announcement of an identical message.
+    region.textContent = '';
+    setTimeout(() => { region.textContent = message; }, 60);
+  }
+
+  /* ════════════════════════════════════════════════════════════════════
+     MEMBERSHIP FORM DRAFT
+     Eighteen fields, thirteen required. Losing that to a stray refresh,
+     a dropped connection or a phone switching apps is the worst thing
+     the form can do to someone, so it is kept locally as they type.
+     ════════════════════════════════════════════════════════════════════ */
+
+  get DRAFT_KEY() { return 'bcci_membership_draft'; }
+  get DRAFT_TTL_MS() { return 24 * 60 * 60 * 1000; }
+
+  _saveDraft(form) {
+    try {
+      const data = {};
+      form.querySelectorAll('input, select, textarea').forEach((el) => {
+        // The payment receipt is far too large for localStorage, and the
+        // file input cannot be repopulated programmatically anyway.
+        if (!el.name || el.type === 'file' || el.type === 'password') return;
+        if (el.type === 'checkbox' || el.type === 'radio') {
+          if (el.checked) data[el.name] = el.value;
+        } else if (el.value) {
+          data[el.name] = el.value;
+        }
+      });
+      if (!Object.keys(data).length) return this._clearDraft();
+      localStorage.setItem(this.DRAFT_KEY, JSON.stringify({ savedAt: Date.now(), data }));
+    } catch {
+      // Private browsing or a full quota — drafts are a convenience, not a
+      // requirement, so failing here must never block the form.
+    }
+  }
+
+  _clearDraft() {
+    try { localStorage.removeItem(this.DRAFT_KEY); } catch {}
+    document.getElementById('draftRestoredNotice')?.remove();
+  }
+
+  _restoreDraft(form) {
+    let saved;
+    try {
+      const raw = localStorage.getItem(this.DRAFT_KEY);
+      if (!raw) return;
+      saved = JSON.parse(raw);
+    } catch {
+      return this._clearDraft();
+    }
+
+    if (!saved?.data || Date.now() - (saved.savedAt || 0) > this.DRAFT_TTL_MS) {
+      return this._clearDraft();
+    }
+
+    let restored = 0;
+    Object.entries(saved.data).forEach(([name, value]) => {
+      const el = form.querySelector(`[name="${CSS.escape(name)}"]`);
+      if (el && !el.value) { el.value = value; restored++; }
+    });
+    if (!restored) return;
+
+    // Say so plainly, and offer a way out — a silently pre-filled form is
+    // unsettling, and the draft holds details like PAN and GSTIN.
+    if (document.getElementById('draftRestoredNotice')) return;
+    const notice = document.createElement('div');
+    notice.id = 'draftRestoredNotice';
+    notice.className = 'draft-notice';
+    notice.setAttribute('role', 'status');
+    notice.innerHTML = `
+      <span><i class="fas fa-rotate-left" aria-hidden="true"></i>
+        We restored ${restored} field${restored === 1 ? '' : 's'} from your unfinished application.</span>
+      <button type="button" class="draft-notice-clear">Start fresh</button>
+    `;
+    form.prepend(notice);
+    notice.querySelector('.draft-notice-clear').addEventListener('click', () => {
+      form.reset();
+      form.querySelectorAll('.is-valid, .is-invalid').forEach((el) => el.classList.remove('is-valid', 'is-invalid'));
+      this._clearDraft();
+      this.showToast('Draft cleared.', 'info');
+    });
+    this.announce(`${restored} fields restored from your unfinished application.`);
+  }
+
+  setupDraftPersistence() {
+    const form = document.getElementById('membershipForm');
+    if (!form) return;
+
+    this._restoreDraft(form);
+
+    let timer = null;
+    const queueSave = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => this._saveDraft(form), 500);
+    };
+    form.addEventListener('input', queueSave);
+    form.addEventListener('change', queueSave);
+    // A phone backgrounding the tab may never fire another input event.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') this._saveDraft(form);
+    });
+  }
+
+  /**
+   * A dropped connection mid-application is common on mobile. Say so, rather
+   * than letting the submit fail with a generic error.
+   */
+  setupConnectivityWatch() {
+    const render = () => {
+      const offline = !navigator.onLine;
+      let banner = document.getElementById('offlineBanner');
+      if (offline && !banner) {
+        banner = document.createElement('div');
+        banner.id = 'offlineBanner';
+        banner.className = 'offline-banner';
+        banner.setAttribute('role', 'status');
+        banner.innerHTML = '<i class="fas fa-wifi" aria-hidden="true"></i> You are offline. Your application is saved on this device and will be here when you reconnect.';
+        document.body.appendChild(banner);
+        this.announce('You are offline.');
+      } else if (!offline && banner) {
+        banner.remove();
+        this.announce('Back online.');
+      }
+
+      if (offline) {
+        document.querySelectorAll('form button[type="submit"]').forEach((btn) => {
+          btn.disabled = true;
+        });
+      } else {
+        // Never blanket-enable: the membership submit stays disabled until the
+        // applicant has verified their email. Let that logic decide.
+        this.updateApplicantAuthUI();
+      }
+    };
+    window.addEventListener('online', render);
+    window.addEventListener('offline', render);
+    render();
   }
 
   setupModalEvents() {
@@ -2388,6 +2600,7 @@ class App {
   }
 
   showToast(message, type = 'info') {
+    this.announce(message);
     const toast = document.createElement('div');
     const bgColor = type === 'success' ? '#10B981' : type === 'warning' ? '#F59E0B' : type === 'error' ? '#EF4444' : '#1E3E62';
     const icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle';

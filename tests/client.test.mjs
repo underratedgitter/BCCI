@@ -95,5 +95,24 @@ ck('pending members get "My Application"', SRC.includes('My Application'));
 ck('everyone else keeps "Apply for Membership"', /innerHTML = '<i class="fas fa-building"><\/i> Apply for Membership'/.test(SRC));
 ck('the mobile tab flips to My Card when approved', SRC.includes('My Card'));
 
+console.log('\nAccessibility and form resilience');
+console.log('─────────────────────────────────');
+ck('validation errors are tied to their field', SRC.includes("setAttribute('aria-describedby'") && SRC.includes("setAttribute('aria-invalid'"));
+ck('errors are announced as alerts', /errorDiv.setAttribute\('role', 'alert'\)/.test(SRC));
+ck('a live region announces view changes', SRC.includes('aria-live') && SRC.includes('page loaded'));
+ck('toasts are announced too', /showToast\(message[\s\S]{0,80}this.announce\(message\)/.test(SRC));
+ck('modals trap Tab', SRC.includes('_modalKeydown') && SRC.includes("e.key !== 'Tab'"));
+ck('modals return focus on close', SRC.includes('_modalReturnFocus'));
+ck('reduced motion is honoured in script-driven scrolling', SRC.includes('prefersReducedMotion') && !SRC.includes("behavior: 'smooth'"));
+
+ck('the 18-field form saves a draft', SRC.includes('_saveDraft') && SRC.includes('DRAFT_KEY'));
+ck('the draft is restored on return', SRC.includes('_restoreDraft'));
+ck('the draft expires', SRC.includes('DRAFT_TTL_MS'));
+ck('the draft clears on successful submit', /_clearDraft\(\);[\s\S]{0,120}membershipForm.reset\(\)/.test(SRC));
+ck('the payment receipt is excluded from the draft', /type === 'file'/.test(SRC));
+ck('restoring a draft is disclosed, not silent', SRC.includes('draftRestoredNotice') && SRC.includes('Start fresh'));
+ck('offline is surfaced', SRC.includes('setupConnectivityWatch') && SRC.includes('offlineBanner'));
+ck('coming back online does not blanket-enable submit', SRC.includes('Never blanket-enable'));
+
 console.log(`\n${'═'.repeat(52)}\n  ${pass} passed, ${fail} failed\n${'═'.repeat(52)}`);
 process.exit(fail?1:0);

@@ -2325,3 +2325,74 @@ footer h4 {
   .bcci-card-actions { flex-wrap: wrap; }
   .bcci-card-action-btn { flex: 1 1 auto; min-width: 120px; }
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   DRAFT NOTICE + OFFLINE BANNER
+   ══════════════════════════════════════════════════════════════════ */
+
+.draft-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  background: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  border-left: 4px solid #2563EB;
+  border-radius: 8px;
+  padding: 0.85rem 1.1rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+  color: #1E3A5F;
+}
+
+.draft-notice i { color: #2563EB; margin-right: 0.4rem; }
+
+.draft-notice-clear {
+  background: none;
+  border: 1px solid #93C5FD;
+  border-radius: 6px;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #1D4ED8;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.draft-notice-clear:hover { background: #DBEAFE; }
+
+.offline-banner {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 4000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  background: #7C2D12;
+  color: #FFEDD5;
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 0.75rem 1rem;
+  text-align: center;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.25);
+}
+
+@media (max-width: 768px) {
+  /* Sit above the fixed bottom navigation rather than under it. */
+  .offline-banner { bottom: 4.25rem; }
+  .draft-notice { font-size: 0.85rem; }
+}
+
+/* Respect a reduced-motion preference across the whole site. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
