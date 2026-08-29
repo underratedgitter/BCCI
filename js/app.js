@@ -508,9 +508,26 @@ class App {
     }
   }
 
+  /**
+   * The mobile bottom bar has no room for the member badge, so the "Apply"
+   * tab becomes "My Card" once membership is approved — otherwise a member on
+   * a phone has no route to their card at all.
+   */
+  _updateMobileMembershipTab(memberApp) {
+    const tab = document.getElementById('mobileTabMembership');
+    if (!tab) return;
+    const approved = memberApp && memberApp.status === 'Approved';
+    tab.setAttribute('data-view-nav', approved ? 'card' : 'membership');
+    tab.innerHTML = approved
+      ? '<i class="fas fa-id-card"></i><span>My Card</span>'
+      : '<i class="fas fa-file-signature"></i><span>Apply</span>';
+  }
+
   updateHeaderMemberBadge(memberApp, validity) {
     const desktopAuthContainer = document.getElementById('navAuthContainer');
     let badgeEl = document.getElementById('navHeaderMemberBadge');
+
+    this._updateMobileMembershipTab(memberApp);
 
     if (!memberApp || memberApp.status !== 'Approved') {
       if (badgeEl) badgeEl.remove();
@@ -525,33 +542,23 @@ class App {
       }
     }
 
-    let starColor = '#FFD700';
-    let badgeBg = 'linear-gradient(135deg, #0F2C59 0%, #1E3E62 100%)';
-    let badgeBorder = '#D4AF37';
-    let badgeText = '#FFFFFF';
-
-    if (validity && validity.state === 'EXPIRED') {
-      starColor = '#EF4444';
-      badgeBg = '#7F1D1D';
-      badgeBorder = '#FCA5A5';
-    }
-
-    badgeEl.style.cssText = `
-      display: inline-flex;
-      align-items: center;
-      gap: 0.45rem;
-      background: ${badgeBg};
-      border: 1px solid ${badgeBorder};
-      color: ${badgeText};
-      padding: 0.4rem 0.85rem;
-      border-radius: 20px;
-      font-size: 0.82rem;
-      font-weight: 700;
-      cursor: pointer;
-      box-shadow: 0 4px 12px rgba(15, 44, 89, 0.25);
+    // Styling lives in css/styles.css so the badge can truncate and shed its
+    // less important parts as the viewport narrows. Inline styles could not be
+    // overridden by the media queries that do that.
+    const expired = validity && validity.state === 'EXPIRED';
+    badgeEl.className = `nav-member-badge${expired ? ' is-expired' : ''}`;
+    badgeEl.innerHTML = `
+      <i class="fas fa-award badge-icon" aria-hidden="true"></i>
+      <span class="badge-label">OFFICIAL MEMBER:</span>
+      <span class="badge-company">${escapeHtml(memberApp.company)}</span>
+      <span class="badge-id">${escapeHtml(memberApp.id)}</span>
     `;
-    badgeEl.innerHTML = `<i class="fas fa-award" style="color: ${starColor}; font-size: 0.95rem;"></i> OFFICIAL MEMBER: ${escapeHtml(memberApp.company)} <span style="color: #FFD700; font-family: monospace; font-size: 0.75rem; background: rgba(255,215,0,0.15); padding: 1px 6px; border-radius: 8px;">${escapeHtml(memberApp.id)}</span>`;
-    badgeEl.title = `Official Member ID: ${memberApp.id} - Tap to view Digital Membership Pass`;
+    badgeEl.title = `${memberApp.company} — member ${memberApp.id}. Tap to view your digital membership pass.`;
+    badgeEl.setAttribute('role', 'button');
+    badgeEl.setAttribute('tabindex', '0');
+    badgeEl.onkeydown = (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); badgeEl.click(); }
+    };
 
     badgeEl.onclick = () => this.showDigitalMemberCardModal(memberApp);
   }

@@ -333,7 +333,70 @@ small, .mono {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  /* Must be allowed to shrink. With flex-shrink:0 and body{overflow-x:hidden},
+     a long member badge pushed the avatar off-screen instead of wrapping. */
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.nav-links { min-width: 0; }
+.navbar-inner > * { min-width: 0; }
+
+/* ── Member badge in the header ─────────────────────────────────
+   Built in js/app.js. The company name truncates; the member ID and the
+   "OFFICIAL MEMBER" label drop away as the viewport narrows, so the badge
+   can never crowd out the avatar beside it. */
+.nav-member-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  max-width: min(340px, 26vw);
+  padding: 0.4rem 0.85rem;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  color: #FFFFFF;
+  background: linear-gradient(135deg, #0F2C59 0%, #1E3E62 100%);
+  border: 1px solid var(--gold, #D4AF37);
+  box-shadow: 0 4px 12px rgba(15, 44, 89, 0.25);
+}
+
+.nav-member-badge.is-expired {
+  background: #7F1D1D;
+  border-color: #FCA5A5;
+}
+
+.nav-member-badge .badge-icon { color: #FFD700; font-size: 0.95rem; flex-shrink: 0; }
+.nav-member-badge.is-expired .badge-icon { color: #EF4444; }
+.nav-member-badge .badge-label { flex-shrink: 0; }
+
+.nav-member-badge .badge-company {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.nav-member-badge .badge-id {
   flex-shrink: 0;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.75rem;
+  color: #FFD700;
+  background: rgba(255, 215, 0, 0.15);
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+
+@media (max-width: 1280px) {
+  .nav-member-badge .badge-id { display: none; }
+}
+@media (max-width: 1120px) {
+  .nav-member-badge .badge-label { display: none; }
+  .nav-member-badge { max-width: 200px; }
 }
 
 /* ── Buttons ───────────────────────────────────────────────────── */
@@ -2192,4 +2255,73 @@ footer h4 {
   .top-bar, .navbar, .mobile-bottom-nav, .mobile-drawer-backdrop, .mobile-drawer, #scrollToTopBtn { display: none !important; }
   body { background: white; }
   * { box-shadow: none !important; }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   RESPONSIVE HARDENING
+   Member IDs like BCCI-1787984537976-017a066d have no break
+   opportunity, so they used to force a container wider than the
+   viewport. body{overflow-x:hidden} then clipped it rather than
+   letting it scroll, which is how content vanished off the edge.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Long unbroken tokens wrap instead of pushing the layout wide. */
+.admin-card-id,
+.admin-card-company,
+.admin-card-meta,
+.profile-dropdown-info .info-value,
+.bcci-card-detail-value,
+.data-table td,
+.modal-box {
+  overflow-wrap: anywhere;
+}
+
+/* Tables scroll inside their own container, never the page. */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 900px) {
+  /* Below this the desktop tables are unreadable; the card layout takes over. */
+  .table-responsive { display: none; }
+  .admin-mobile-cards { display: block; }
+}
+
+@media (min-width: 901px) {
+  .admin-mobile-cards { display: none; }
+}
+
+@media (max-width: 768px) {
+  /* Comfortable tap targets. */
+  .btn-primary,
+  .btn-secondary,
+  .btn-nav-cta,
+  .mobile-bottom-tab,
+  .btn-action-approve,
+  .btn-action-reject {
+    min-height: 44px;
+  }
+
+  /* Modals get the full width they need, minus a small gutter. */
+  .modal-box {
+    width: calc(100vw - 2rem);
+    max-width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+
+  /* Two-column detail grids collapse rather than squeeze. */
+  .modal-box [style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Clear the fixed bottom bar so it never covers the last control. */
+  .view-page { padding-bottom: 4.5rem; }
+}
+
+@media (max-width: 480px) {
+  /* The membership card keeps its aspect ratio; only the chrome shrinks. */
+  .bcci-card-actions { flex-wrap: wrap; }
+  .bcci-card-action-btn { flex: 1 1 auto; min-width: 120px; }
 }

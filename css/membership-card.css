@@ -123,6 +123,10 @@
 
 .bcci-card-type {
   text-align: right;
+  /* Clears the absolutely-positioned "MEMBER" pill at top:14px, which was
+     landing directly on top of this label. */
+  padding-top: 20px;
+  min-width: 0;
 }
 
 .bcci-card-type-label {
@@ -137,6 +141,9 @@
   font-family: 'DM Serif Display', Georgia, serif;
   font-size: 15px;
   color: #d4af37;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── Middle Section ─────────────────────────────────────────────── */

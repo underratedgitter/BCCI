@@ -37,6 +37,8 @@ function run(cmd) {
     }
     case 'GET':
       return store.has(key) ? store.get(key) : null;
+    case 'EXISTS':
+      return cmd.slice(1).filter((k) => alive(k) && (store.has(k) || zsets.has(k))).length;
     case 'MGET':
       return cmd.slice(1).map((k) => (alive(k) && store.has(k) ? store.get(k) : null));
     case 'DEL': {
@@ -77,6 +79,17 @@ function run(cmd) {
     }
     case 'ZCARD':
       return (zsets.get(key) || new Map()).size;
+    case 'SCAN': {
+      // [SCAN, cursor, MATCH, pattern, COUNT, n] — one page, always complete.
+      const args = cmd.slice(2).map((a) => String(a).toUpperCase());
+      const mi = args.indexOf('MATCH');
+      const pattern = mi === -1 ? '*' : String(cmd[2 + mi + 1]);
+      const rx = new RegExp(
+        '^' + pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.') + '$'
+      );
+      const all = [...new Set([...store.keys(), ...zsets.keys()])].filter((k) => alive(k) && rx.test(k));
+      return ['0', all];
+    }
     case 'ZREM': {
       const z = zsets.get(key) || new Map();
       let n = 0;
