@@ -245,8 +245,104 @@ export class Store {
   }
 
   /* ════════════════════════════════════════════════════════════════════
-     APPLICANT SESSION — token issued by /api/verify-otp
+     APPLICANT SESSION & AUTHENTICATION
      ════════════════════════════════════════════════════════════════════ */
+
+  async applicantLogin(email, password) {
+    try {
+      const result = await this.apiCall('/api/applicant-auth', {
+        method: 'POST',
+        body: { action: 'login', email, password },
+      });
+
+      if (result.success && result.session) {
+        this.setApplicantSession(result.session);
+        return { success: true, session: result.session };
+      }
+      return {
+        success: false,
+        code: result.code,
+        error: result.error || 'Sign-in failed.',
+      };
+    } catch (err) {
+      return {
+        success: false,
+        code: err.data?.code,
+        error: err.data?.error || err.message || 'Sign-in failed.',
+      };
+    }
+  }
+
+  async applicantRegister(email, code, password) {
+    try {
+      const result = await this.apiCall('/api/applicant-auth', {
+        method: 'POST',
+        body: { action: 'register', email, code, password },
+      });
+
+      if (result.success && result.session) {
+        this.setApplicantSession(result.session);
+        return { success: true, session: result.session };
+      }
+      return {
+        success: false,
+        error: result.error || 'Registration failed.',
+      };
+    } catch (err) {
+      return {
+        success: false,
+        error: err.data?.error || err.message || 'Registration failed.',
+      };
+    }
+  }
+
+  async applicantForgotPasswordRequest(email) {
+    try {
+      const result = await this.apiCall('/api/applicant-auth', {
+        method: 'POST',
+        body: { action: 'forgot-password-request', email },
+      });
+
+      if (result.success) {
+        return {
+          success: true,
+          message: result.message || 'Password reset code sent to your email.',
+        };
+      }
+      return {
+        success: false,
+        error: result.error || 'Failed to send reset code.',
+      };
+    } catch (err) {
+      return {
+        success: false,
+        error: err.data?.error || err.message || 'Failed to send reset code.',
+      };
+    }
+  }
+
+  async applicantResetPassword(email, code, newPassword) {
+    try {
+      const result = await this.apiCall('/api/applicant-auth', {
+        method: 'POST',
+        body: { action: 'reset-password', email, code, newPassword },
+      });
+
+      if (result.success && result.session) {
+        this.setApplicantSession(result.session);
+        return { success: true, session: result.session };
+      }
+      return {
+        success: false,
+        error: result.error || 'Password reset failed.',
+      };
+    } catch (err) {
+      return {
+        success: false,
+        error: err.data?.error || err.message || 'Password reset failed.',
+      };
+    }
+  }
 
   getApplicantSession() {
     return this._readSession(STORAGE_KEYS.APPLICANT_SESSION);

@@ -148,5 +148,220 @@ ck('the card states the date when active', SRC.includes('VALID TILL ${validity.v
 ck('the card states the date when renewal is due', SRC.includes('RENEW BY ${validity.validUntilDate'));
 ck('the card states the date when expired', SRC.includes('EXPIRED ${validity.validUntilDate'));
 
+console.log('\nApplicant Authentication Store Methods');
+console.log('──────────────────────────────────────');
+
+const { Store } = await import('../js/store.js');
+
+if (typeof globalThis.localStorage === 'undefined') {
+  const _storage = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => _storage.get(k) ?? null,
+    setItem: (k, v) => _storage.set(k, String(v)),
+    removeItem: (k) => _storage.delete(k),
+    clear: () => _storage.clear(),
+  };
+}
+
+const origFetch = globalThis.fetch;
+let lastRequest = null;
+let mockResponse = null;
+
+globalThis.fetch = async (url, opts) => {
+  lastRequest = { url, ...opts, body: opts?.body ? JSON.parse(opts.body) : null };
+  return {
+    ok: mockResponse.status >= 200 && mockResponse.status < 300,
+    status: mockResponse.status,
+    headers: { get: () => 'application/json' },
+    async json() { return mockResponse.body; },
+    async text() { return JSON.stringify(mockResponse.body); },
+  };
+};
+
+const store = new Store();
+
+// Test 1: Store has applicant auth methods
+ck('store has applicantLogin method', typeof store.applicantLogin === 'function');
+ck('store has applicantRegister method', typeof store.applicantRegister === 'function');
+ck('store has applicantForgotPasswordRequest method', typeof store.applicantForgotPasswordRequest === 'function');
+ck('store has applicantResetPassword method', typeof store.applicantResetPassword === 'function');
+
+// Test 2: applicantLogin success
+localStorage.clear();
+mockResponse = {
+  status: 200,
+  body: {
+    success: true,
+    session: { token: 'login-token-123', email: 'user@example.com', expiresIn: 86400 },
+  },
+};
+const loginRes = typeof store.applicantLogin === 'function'
+  ? await store.applicantLogin('user@example.com', 'Secret123')
+  : null;
+ck('applicantLogin sends POST to /api/applicant-auth with action: login',
+  lastRequest?.url === '/api/applicant-auth' &&
+  lastRequest?.method === 'POST' &&
+  lastRequest?.body?.action === 'login' &&
+  lastRequest?.body?.email === 'user@example.com' &&
+  lastRequest?.body?.password === 'Secret123'
+);
+ck('applicantLogin returns success and session', loginRes?.success === true && loginRes?.session?.token === 'login-token-123');
+ck('applicantLogin persists applicant session in storage', store.getApplicantSession()?.token === 'login-token-123');
+
+// Test 3: applicantLogin with PASSWORD_NOT_SET
+localStorage.clear();
+mockResponse = {
+  status: 400,
+  body: {
+    success: false,
+    code: 'PASSWORD_NOT_SET',
+    error: 'No password set for this account yet. Please register or reset password using OTP.',
+  },
+};
+const loginNoPassRes = typeof store.applicantLogin === 'function'
+  ? await store.applicantLogin('legacy@example.com', 'Secret123')
+  : null;
+ck('applicantLogin handles PASSWORD_NOT_SET returning code and error',
+  loginNoPassRes?.success === false &&
+  loginNoPassRes?.code === 'PASSWORD_NOT_SET' &&
+  typeof loginNoPassRes?.error === 'string'
+);
+ck('applicantLogin on error does not persist session', store.getApplicantSession() === null);
+
+// Test 4: applicantLogin invalid credentials (401)
+localStorage.clear();
+mockResponse = {
+  status: 401,
+  body: {
+    success: false,
+    error: 'Invalid email or password.',
+  },
+};
+const loginInvalidRes = typeof store.applicantLogin === 'function'
+  ? await store.applicantLogin('user@example.com', 'WrongPass')
+  : null;
+ck('applicantLogin handles 401 invalid credentials',
+  loginInvalidRes?.success === false && loginInvalidRes?.error === 'Invalid email or password.'
+);
+
+// Test 5: applicantRegister success
+localStorage.clear();
+mockResponse = {
+  status: 201,
+  body: {
+    success: true,
+    message: 'Account created successfully.',
+    session: { token: 'reg-token-456', email: 'reg@example.com', expiresIn: 86400 },
+  },
+};
+const regRes = typeof store.applicantRegister === 'function'
+  ? await store.applicantRegister('reg@example.com', '654321', 'NewPassword123')
+  : null;
+ck('applicantRegister sends POST to /api/applicant-auth with action: register',
+  lastRequest?.url === '/api/applicant-auth' &&
+  lastRequest?.method === 'POST' &&
+  lastRequest?.body?.action === 'register' &&
+  lastRequest?.body?.email === 'reg@example.com' &&
+  lastRequest?.body?.code === '654321' &&
+  lastRequest?.body?.password === 'NewPassword123'
+);
+ck('applicantRegister returns success and session', regRes?.success === true && regRes?.session?.token === 'reg-token-456');
+ck('applicantRegister persists applicant session in storage', store.getApplicantSession()?.token === 'reg-token-456');
+
+// Test 6: applicantRegister error (invalid OTP)
+localStorage.clear();
+mockResponse = {
+  status: 400,
+  body: {
+    success: false,
+    error: 'Incorrect code. 4 attempts remaining.',
+  },
+};
+const regErrRes = typeof store.applicantRegister === 'function'
+  ? await store.applicantRegister('reg@example.com', '000000', 'NewPassword123')
+  : null;
+ck('applicantRegister handles error gracefully', regErrRes?.success === false && regErrRes?.error === 'Incorrect code. 4 attempts remaining.');
+ck('applicantRegister on error does not persist session', store.getApplicantSession() === null);
+
+// Test 7: applicantForgotPasswordRequest success
+mockResponse = {
+  status: 200,
+  body: {
+    success: true,
+    message: 'Password reset code sent to your email.',
+  },
+};
+const forgotRes = typeof store.applicantForgotPasswordRequest === 'function'
+  ? await store.applicantForgotPasswordRequest('reset@example.com')
+  : null;
+ck('applicantForgotPasswordRequest sends POST to /api/applicant-auth with action: forgot-password-request',
+  lastRequest?.url === '/api/applicant-auth' &&
+  lastRequest?.method === 'POST' &&
+  lastRequest?.body?.action === 'forgot-password-request' &&
+  lastRequest?.body?.email === 'reset@example.com'
+);
+ck('applicantForgotPasswordRequest returns success and message',
+  forgotRes?.success === true && forgotRes?.message === 'Password reset code sent to your email.'
+);
+
+// Test 8: applicantForgotPasswordRequest rate limited (429)
+mockResponse = {
+  status: 429,
+  body: {
+    success: false,
+    error: 'Please wait 60s before requesting another reset code.',
+  },
+};
+const forgotLimitRes = typeof store.applicantForgotPasswordRequest === 'function'
+  ? await store.applicantForgotPasswordRequest('reset@example.com')
+  : null;
+ck('applicantForgotPasswordRequest handles rate limit error',
+  forgotLimitRes?.success === false && forgotLimitRes?.error === 'Please wait 60s before requesting another reset code.'
+);
+
+// Test 9: applicantResetPassword success
+localStorage.clear();
+mockResponse = {
+  status: 200,
+  body: {
+    success: true,
+    message: 'Password reset successful.',
+    session: { token: 'reset-token-789', email: 'reset@example.com', expiresIn: 86400 },
+  },
+};
+const resetRes = typeof store.applicantResetPassword === 'function'
+  ? await store.applicantResetPassword('reset@example.com', '112233', 'BrandNewPass123')
+  : null;
+ck('applicantResetPassword sends POST to /api/applicant-auth with action: reset-password',
+  lastRequest?.url === '/api/applicant-auth' &&
+  lastRequest?.method === 'POST' &&
+  lastRequest?.body?.action === 'reset-password' &&
+  lastRequest?.body?.email === 'reset@example.com' &&
+  lastRequest?.body?.code === '112233' &&
+  lastRequest?.body?.newPassword === 'BrandNewPass123'
+);
+ck('applicantResetPassword returns success and session', resetRes?.success === true && resetRes?.session?.token === 'reset-token-789');
+ck('applicantResetPassword persists applicant session in storage', store.getApplicantSession()?.token === 'reset-token-789');
+
+// Test 10: applicantResetPassword error
+localStorage.clear();
+mockResponse = {
+  status: 400,
+  body: {
+    success: false,
+    error: 'That code has expired or was already used. Please request a new one.',
+  },
+};
+const resetErrRes = typeof store.applicantResetPassword === 'function'
+  ? await store.applicantResetPassword('reset@example.com', '112233', 'BrandNewPass123')
+  : null;
+ck('applicantResetPassword handles error gracefully',
+  resetErrRes?.success === false && resetErrRes?.error === 'That code has expired or was already used. Please request a new one.'
+);
+ck('applicantResetPassword on error does not persist session', store.getApplicantSession() === null);
+
+// Restore fetch
+globalThis.fetch = origFetch;
+
 console.log(`\n${'═'.repeat(52)}\n  ${pass} passed, ${fail} failed\n${'═'.repeat(52)}`);
 process.exit(fail?1:0);
