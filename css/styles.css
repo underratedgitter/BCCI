@@ -2495,3 +2495,93 @@ footer h4 {
   .form-progress { flex-direction: column; align-items: stretch; gap: 0.5rem; }
   .form-progress-label { white-space: normal; text-align: center; }
 }
+
+/* ── Applicant Authentication Cards & Password Input Groups ─────── */
+.auth-card {
+  text-align: left;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.password-input-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--gray-500, #64748B);
+  cursor: pointer;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.95rem;
+  line-height: 1;
+  transition: color 0.15s ease;
+  z-index: 2;
+}
+
+.password-toggle-btn:hover {
+  color: var(--primary, #0F2C59);
+}
+
+.password-toggle-btn:focus-visible {
+  outline: 2px solid var(--primary, #0F2C59);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.auth-text-link {
+  background: none;
+  border: none;
+  color: var(--primary, #0F2C59);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.15s ease;
+}
+
+.auth-text-link:hover {
+  color: #D97706;
+}
+
+.auth-inline-alert {
+  background: #FFFBEB;
+  border: 1px solid #FCD34D;
+  border-left: 4px solid #F59E0B;
+  border-radius: 6px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1.25rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #92400E;
+  text-align: left;
+}
+
+.auth-notice-banner {
+  background: #F0FDF4;
+  border: 1px solid #86EFAC;
+  color: #166534;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1.25rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.otp-input {
+  letter-spacing: 6px;
+  font-size: 1.5rem;
+  font-weight: 800;
+  text-align: center;
+  font-family: var(--font-mono, monospace);
+}
+

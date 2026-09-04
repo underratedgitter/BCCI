@@ -132,6 +132,42 @@ ck('skeleton shimmer is disabled under reduced motion', /prefers-reduced-motion[
 ck('progress bar has a complete state', CSS.includes('.form-progress.is-complete'));
 ck('progress bar stacks on narrow screens', /max-width: 560px[\s\S]{0,140}flex-direction: column/.test(CSS));
 
+console.log('\nApplicant Authentication UI (index.html & css)');
+console.log('───────────────────────────────────────────────');
+ck('#authCardSignIn exists in index.html', /id=["']authCardSignIn["']/.test(HTML));
+ck('#applicantEmail exists in index.html', /id=["']applicantEmail["']/.test(HTML));
+ck('#applicantPassword has type="password" and autocomplete="current-password"',
+  /<input[^>]*id=["']applicantPassword["'][^>]*type=["']password["'][^>]*autocomplete=["']current-password["']|<input[^>]*id=["']applicantPassword["'][^>]*autocomplete=["']current-password["']|<input[^>]*autocomplete=["']current-password["'][^>]*id=["']applicantPassword["']/.test(HTML)
+);
+ck('#toggleApplicantPassword exists with aria-label="Toggle password visibility"',
+  /<button[^>]*id=["']toggleApplicantPassword["'][^>]*aria-label=["']Toggle password visibility["']|<button[^>]*aria-label=["']Toggle password visibility["'][^>]*id=["']toggleApplicantPassword["']/.test(HTML)
+);
+ck('#applicantSignInBtn exists', /id=["']applicantSignInBtn["']/.test(HTML));
+ck('#switchToRegister and #switchToForgot exist', /id=["']switchToRegister["']/.test(HTML) && /id=["']switchToForgot["']/.test(HTML));
+ck('#passwordNotSetAlert exists and is initially hidden', /id=["']passwordNotSetAlert["'][^>]*style=["'][^"']*display:\s*none/.test(HTML));
+
+ck('#authCardRegister exists and is initially hidden', /id=["']authCardRegister["'][^>]*style=["'][^"']*display:\s*none/.test(HTML));
+ck('#applicantRegEmail and #applicantSendRegOtpBtn exist', /id=["']applicantRegEmail["']/.test(HTML) && /id=["']applicantSendRegOtpBtn["']/.test(HTML));
+ck('#applicantRegOtp exists', /id=["']applicantRegOtp["']/.test(HTML));
+ck('#applicantRegPassword and confirm have autocomplete="new-password"',
+  (/id=["']applicantRegPassword["'][^>]*autocomplete=["']new-password["']|autocomplete=["']new-password["'][^>]*id=["']applicantRegPassword["']/.test(HTML)) &&
+  (/id=["']applicantRegPasswordConfirm["'][^>]*autocomplete=["']new-password["']|autocomplete=["']new-password["'][^>]*id=["']applicantRegPasswordConfirm["']/.test(HTML))
+);
+ck('#applicantRegisterBtn and #switchToSignInFromReg exist', /id=["']applicantRegisterBtn["']/.test(HTML) && /id=["']switchToSignInFromReg["']/.test(HTML));
+
+ck('#authCardForgot exists and is initially hidden', /id=["']authCardForgot["'][^>]*style=["'][^"']*display:\s*none/.test(HTML));
+ck('#applicantForgotEmail and #applicantSendForgotOtpBtn exist', /id=["']applicantForgotEmail["']/.test(HTML) && /id=["']applicantSendForgotOtpBtn["']/.test(HTML));
+ck('#applicantForgotOtp exists', /id=["']applicantForgotOtp["']/.test(HTML));
+ck('#applicantNewPassword and confirm have autocomplete="new-password"',
+  (/id=["']applicantNewPassword["'][^>]*autocomplete=["']new-password["']|autocomplete=["']new-password["'][^>]*id=["']applicantNewPassword["']/.test(HTML)) &&
+  (/id=["']applicantNewPasswordConfirm["'][^>]*autocomplete=["']new-password["']|autocomplete=["']new-password["'][^>]*id=["']applicantNewPasswordConfirm["']/.test(HTML))
+);
+ck('#applicantResetPasswordBtn and #switchToSignInFromForgot exist', /id=["']applicantResetPasswordBtn["']/.test(HTML) && /id=["']switchToSignInFromForgot["']/.test(HTML));
+
+ck('password input group styles exist in CSS', CSS.includes('.password-input-group') && CSS.includes('.password-toggle-btn'));
+ck('auth inline alert styles exist in CSS', CSS.includes('.auth-inline-alert'));
+
+
 console.log('\nRenewal: card-only, no scheduled job');
 console.log('────────────────────────────────────');
 import('node:fs').then(() => {});
