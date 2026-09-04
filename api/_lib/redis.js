@@ -29,6 +29,9 @@ export const KEYS = {
   adminSession: (token) => `admin:${token}`,
   applicantSession: (token) => `applicant:${token}`,
 
+  account: (email) => `bcci:account:${String(email).trim().toLowerCase()}`,
+  otpReset: (email) => `bcci:otp:reset:${String(email).trim().toLowerCase()}`,
+
   migrated: (what) => `bcci:migrated:${what}`,
 };
 
