@@ -8,5 +8,6 @@ node_modules/
 # Tooling
 .vercel/
 .freebuff/
+.superpowers/
 .DS_Store
 *.log
