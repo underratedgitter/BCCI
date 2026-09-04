@@ -187,19 +187,59 @@ class App {
   }
 
   /* ════════════════════════════════════════════════════════════════════
-     APPLICANT OTP AUTHENTICATION
+  /* ════════════════════════════════════════════════════════════════════
+     APPLICANT AUTHENTICATION — Password & OTP Gates
      ════════════════════════════════════════════════════════════════════ */
 
+  showAuthMode(mode = 'signin') {
+    const cardSignIn = document.getElementById('authCardSignIn');
+    const cardRegister = document.getElementById('authCardRegister');
+    const cardForgot = document.getElementById('authCardForgot');
+
+    const emailSignIn = document.getElementById('applicantEmail');
+    const emailReg = document.getElementById('applicantRegEmail');
+    const emailForgot = document.getElementById('applicantForgotEmail');
+
+    // Propagate entered email across modes, prioritizing the currently active card
+    let currentEmail = '';
+    if (cardSignIn && cardSignIn.style.display !== 'none' && emailSignIn?.value) {
+      currentEmail = emailSignIn.value.trim();
+    } else if (cardRegister && cardRegister.style.display !== 'none' && emailReg?.value) {
+      currentEmail = emailReg.value.trim();
+    } else if (cardForgot && cardForgot.style.display !== 'none' && emailForgot?.value) {
+      currentEmail = emailForgot.value.trim();
+    }
+    if (!currentEmail) {
+      currentEmail = (emailSignIn?.value || emailReg?.value || emailForgot?.value || '').trim();
+    }
+
+    if (currentEmail) {
+      if (emailSignIn) emailSignIn.value = currentEmail;
+      if (emailReg) emailReg.value = currentEmail;
+      if (emailForgot) emailForgot.value = currentEmail;
+    }
+
+    // Toggle card visibility
+    if (cardSignIn) cardSignIn.style.display = mode === 'signin' ? 'block' : 'none';
+    if (cardRegister) cardRegister.style.display = mode === 'register' ? 'block' : 'none';
+    if (cardForgot) cardForgot.style.display = mode === 'forgot' ? 'block' : 'none';
+
+    // Reset any error alerts or step 2 states when switching
+    const passAlert = document.getElementById('passwordNotSetAlert');
+    if (passAlert) passAlert.style.display = 'none';
+
+    const regStep1 = document.getElementById('applicantRegStep1');
+    if (regStep1) regStep1.style.display = 'block';
+    const regStep2 = document.getElementById('applicantRegStep2');
+    if (regStep2) regStep2.style.display = 'none';
+
+    const forgotStep1 = document.getElementById('applicantForgotStep1');
+    if (forgotStep1) forgotStep1.style.display = 'block';
+    const forgotStep2 = document.getElementById('applicantForgotStep2');
+    if (forgotStep2) forgotStep2.style.display = 'none';
+  }
+
   setupApplicantAuthHandlers() {
-    const otpStep1Form = document.getElementById('otpStep1Form');
-    const otpStep2Form = document.getElementById('otpStep2Form');
-    const otpSendBtn = document.getElementById('otpSendBtn');
-    const otpVerifyBtn = document.getElementById('otpVerifyBtn');
-    const otpResendBtn = document.getElementById('otpResendBtn');
-    const otpBackBtn = document.getElementById('otpBackBtn');
-
-    let pendingSession = null;
-
     const setLoading = (btn, loading, label, icon) => {
       if (!btn) return;
       btn.disabled = loading;
@@ -208,110 +248,315 @@ class App {
         : `<i class="${icon}"></i> ${label}`;
     };
 
-    const sendOtp = async (email, name) => {
-      setLoading(otpSendBtn, true, 'Sending Code…', 'fas fa-spinner fa-spin');
-      try {
-        const result = await this.callOtpApi('/api/send-otp', { email, name });
-        if (result.success) {
-          pendingSession = { email, name };
-          otpStep1Form.style.display = 'none';
-          otpStep2Form.style.display = 'block';
-          const noticeBanner = document.getElementById('otpNoticeBanner');
-          if (noticeBanner) {
-            noticeBanner.innerHTML = `<i class="fas fa-envelope-open-text"></i> Verification code sent to <strong>${escapeHtml(email)}</strong>. Check your inbox (and spam folder).`;
-          }
-          this.showToast(`Verification code sent to ${email}`, 'success');
+    // ── 1. Password Visibility Toggling ─────────────────────────────
+    const togglePasswordVisibility = (btn) => {
+      const group = btn.closest('.password-input-group');
+      const input = group?.querySelector('input') || btn.parentElement?.querySelector('input');
+      if (!input) return;
+      const isPassword = input.type === 'password';
+      input.type = isPassword ? 'text' : 'password';
+      btn.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
+      const icon = btn.querySelector('i');
+      if (icon) {
+        if (isPassword) {
+          icon.classList.remove('fa-eye');
+          icon.classList.add('fa-eye-slash');
         } else {
-          this.showToast(result.error || 'Failed to send code. Please try again.', 'error');
+          icon.classList.remove('fa-eye-slash');
+          icon.classList.add('fa-eye');
         }
-      } catch (err) {
-        console.error('[OTP Send Error]', err);
-        this.showToast('Network error. Please check your connection and try again.', 'error');
-      } finally {
-        setLoading(otpSendBtn, false, 'Send Verification Code', 'fas fa-paper-plane');
       }
     };
 
-    if (otpStep1Form) {
-      otpStep1Form.addEventListener('submit', async (e) => {
+    document.querySelectorAll('.password-toggle-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
         e.preventDefault();
-        const email = document.getElementById('otpEmailInput').value.trim().toLowerCase();
-        const name = document.getElementById('otpNameInput').value.trim();
-        if (!email || !name) return;
-        await sendOtp(email, name);
+        togglePasswordVisibility(btn);
       });
-    }
+    });
 
-    if (otpResendBtn) {
-      otpResendBtn.addEventListener('click', async () => {
-        if (!pendingSession) return;
-        otpResendBtn.disabled = true;
-        otpResendBtn.textContent = 'Sending…';
-        await sendOtp(pendingSession.email, pendingSession.name);
-        const codeInput = document.getElementById('otpCodeInput');
-        if (codeInput) codeInput.value = '';
-        otpResendBtn.disabled = false;
-        otpResendBtn.textContent = 'Resend Code';
-      });
-    }
-
-    if (otpBackBtn) {
-      otpBackBtn.addEventListener('click', () => {
-        pendingSession = null;
-        otpStep2Form.style.display = 'none';
-        otpStep1Form.style.display = 'block';
-        const codeInput = document.getElementById('otpCodeInput');
-        if (codeInput) codeInput.value = '';
-      });
-    }
-
-    if (otpStep2Form) {
-      otpStep2Form.addEventListener('submit', async (e) => {
+    // ── 2. Mode Toggle Buttons ───────────────────────────────────────
+    const switchToRegisterBtn = document.getElementById('switchToRegister');
+    if (switchToRegisterBtn) {
+      switchToRegisterBtn.addEventListener('click', (e) => {
         e.preventDefault();
-        if (!pendingSession) return;
-        const code = document.getElementById('otpCodeInput').value.trim();
-        if (!code || code.length !== 6) {
-          this.showToast('Please enter the full 6-digit verification code.', 'warning');
+        this.showAuthMode('register');
+      });
+    }
+
+    const legacySwitchBtn = document.getElementById('legacySwitchToRegister');
+    if (legacySwitchBtn) {
+      legacySwitchBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.showAuthMode('register');
+      });
+    }
+
+    const switchToForgotBtn = document.getElementById('switchToForgot');
+    if (switchToForgotBtn) {
+      switchToForgotBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.showAuthMode('forgot');
+      });
+    }
+
+    const switchFromRegBtn = document.getElementById('switchToSignInFromReg');
+    if (switchFromRegBtn) {
+      switchFromRegBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.showAuthMode('signin');
+      });
+    }
+
+    const switchFromForgotBtn = document.getElementById('switchToSignInFromForgot');
+    if (switchFromForgotBtn) {
+      switchFromForgotBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.showAuthMode('signin');
+      });
+    }
+
+    // ── 3. Sign In Handling ──────────────────────────────────────────
+    const signInForm = document.getElementById('applicantSignInForm');
+    const signInBtn = document.getElementById('applicantSignInBtn');
+
+    const handleSignIn = async (e) => {
+      if (e && e.preventDefault) e.preventDefault();
+      const emailInput = document.getElementById('applicantEmail');
+      const passInput = document.getElementById('applicantPassword');
+      const email = (emailInput?.value || '').trim().toLowerCase();
+      const password = passInput?.value || '';
+
+      const alertNotSet = document.getElementById('passwordNotSetAlert');
+      if (alertNotSet) alertNotSet.style.display = 'none';
+
+      if (!email || !password) {
+        this.showToast('Please enter both email and password.', 'warning');
+        return;
+      }
+
+      setLoading(signInBtn, true, 'Signing In…', 'fas fa-spinner fa-spin');
+      try {
+        const result = await this.store.applicantLogin(email, password);
+        if (result.code === 'PASSWORD_NOT_SET') {
+          if (alertNotSet) alertNotSet.style.display = 'block';
+          const regEmail = document.getElementById('applicantRegEmail');
+          if (regEmail) regEmail.value = email;
           return;
         }
 
-        setLoading(otpVerifyBtn, true, 'Verifying…', 'fas fa-spinner fa-spin');
-        try {
-          const result = await this.callOtpApi('/api/verify-otp', {
-            email: pendingSession.email,
-            name: pendingSession.name,
-            code
-          });
+        if (result.success && result.session) {
+          this.showToast(result.message || 'Signed in successfully.', 'success');
+          this.updateNavAuthUI();
+          await this.updateApplicantAuthUI();
 
-          if (result.success && result.session) {
-            this.store.setApplicantSession(result.session);
-            // Both, and in this order: updateNavAuthUI swaps the "Sign In"
-            // button for the profile avatar, updateApplicantAuthUI inserts the
-            // member badge beside it. Without the first, the header sat in its
-            // signed-out state until the next page load.
-            this.updateNavAuthUI();
-            this.updateApplicantAuthUI();
-            this.showToast(`Welcome, ${result.session.name}! Identity verified successfully.`, 'success');
-            pendingSession = null;
+          const memberApp = await this.store.getApplicationByEmail(result.session.email);
+          if (memberApp && memberApp.status === 'Approved') {
+            await this.renderView('card');
           } else {
-            this.showToast(result.error || 'Invalid code. Please try again.', 'error');
-            const codeInput = document.getElementById('otpCodeInput');
-            if (codeInput) {
-              codeInput.style.borderColor = '#EF4444';
-              codeInput.value = '';
-              setTimeout(() => { codeInput.style.borderColor = ''; }, 2000);
+            await this.renderView('membership');
+          }
+        } else {
+          this.showToast(result.error || 'Invalid email or password.', 'error');
+        }
+      } catch (err) {
+        console.error('[Sign In Error]', err);
+        this.showToast('Network error. Please try again.', 'error');
+      } finally {
+        setLoading(signInBtn, false, 'Sign In', 'fas fa-sign-in-alt');
+      }
+    };
+
+    if (signInForm) {
+      signInForm.addEventListener('submit', handleSignIn);
+    }
+    if (signInBtn) {
+      signInBtn.addEventListener('click', (e) => {
+        if (!signInForm) handleSignIn(e);
+      });
+    }
+
+    // ── 4. Registration Handling ─────────────────────────────────────
+    // Step 1: Request OTP
+    const sendRegOtpBtn = document.getElementById('applicantSendRegOtpBtn');
+    if (sendRegOtpBtn) {
+      sendRegOtpBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const emailInput = document.getElementById('applicantRegEmail');
+        const email = (emailInput?.value || '').trim().toLowerCase();
+        if (!email || !email.includes('@')) {
+          this.showToast('Please enter a valid email address.', 'warning');
+          return;
+        }
+
+        setLoading(sendRegOtpBtn, true, 'Sending Code…', 'fas fa-spinner fa-spin');
+        try {
+          const result = await this.callOtpApi('/api/send-otp', { email });
+          if (result.success) {
+            const step2 = document.getElementById('applicantRegStep2');
+            if (step2) step2.style.display = 'block';
+            const noticeBanner = document.getElementById('applicantRegNoticeBanner');
+            if (noticeBanner) {
+              noticeBanner.innerHTML = `<i class="fas fa-envelope-open-text"></i> Verification code sent to <strong>${escapeHtml(email)}</strong>. Check your inbox and enter the 6-digit code below.`;
             }
+            this.showToast(result.message || `Verification code sent to ${email}`, 'success');
+          } else {
+            this.showToast(result.error || 'Failed to send verification code.', 'error');
           }
         } catch (err) {
-          console.error('[OTP Verify Error]', err);
-          this.showToast('Network error. Please check your connection and try again.', 'error');
+          console.error('[Reg Send OTP Error]', err);
+          this.showToast('Network error. Please try again.', 'error');
         } finally {
-          setLoading(otpVerifyBtn, false, 'Verify & Access Application', 'fas fa-check-shield');
+          setLoading(sendRegOtpBtn, false, 'Send Verification Code', 'fas fa-paper-plane');
         }
       });
     }
 
-    // Delegated event listeners
+    // Step 2: Register Form Submit
+    const regForm = document.getElementById('applicantRegisterForm');
+    const regBtn = document.getElementById('applicantRegisterBtn');
+
+    const handleRegister = async (e) => {
+      if (e && e.preventDefault) e.preventDefault();
+      const email = (document.getElementById('applicantRegEmail')?.value || '').trim().toLowerCase();
+      const code = (document.getElementById('applicantRegOtp')?.value || '').trim();
+      const password = document.getElementById('applicantRegPassword')?.value || '';
+      const passwordConfirm = document.getElementById('applicantRegPasswordConfirm')?.value || '';
+
+      if (!email) {
+        this.showToast('Please enter your email address.', 'warning');
+        return;
+      }
+      if (!code || code.length !== 6) {
+        this.showToast('Please enter the 6-digit verification code.', 'warning');
+        return;
+      }
+      if (!password || password.length < 8) {
+        this.showToast('Password must be at least 8 characters.', 'warning');
+        return;
+      }
+      if (password !== passwordConfirm) {
+        this.showToast('Passwords do not match.', 'warning');
+        return;
+      }
+
+      setLoading(regBtn, true, 'Verifying…', 'fas fa-spinner fa-spin');
+      try {
+        const result = await this.store.applicantRegister(email, code, password);
+        if (result.success && result.session) {
+          this.showToast(result.message || 'Account created successfully! Welcome.', 'success');
+          this.updateNavAuthUI();
+          await this.updateApplicantAuthUI();
+          await this.renderView('membership');
+        } else {
+          this.showToast(result.error || 'Registration failed. Please check your verification code.', 'error');
+        }
+      } catch (err) {
+        console.error('[Register Error]', err);
+        this.showToast('Network error. Please try again.', 'error');
+      } finally {
+        setLoading(regBtn, false, 'Verify & Create Account', 'fas fa-user-check');
+      }
+    };
+
+    if (regForm) {
+      regForm.addEventListener('submit', handleRegister);
+    }
+
+    // ── 5. Forgot Password Handling ──────────────────────────────────
+    // Step 1: Request Reset OTP
+    const sendForgotOtpBtn = document.getElementById('applicantSendForgotOtpBtn');
+    if (sendForgotOtpBtn) {
+      sendForgotOtpBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const emailInput = document.getElementById('applicantForgotEmail');
+        const email = (emailInput?.value || '').trim().toLowerCase();
+        if (!email || !email.includes('@')) {
+          this.showToast('Please enter a valid email address.', 'warning');
+          return;
+        }
+
+        setLoading(sendForgotOtpBtn, true, 'Sending Code…', 'fas fa-spinner fa-spin');
+        try {
+          const result = await this.store.applicantForgotPasswordRequest(email);
+          if (result.success) {
+            const step2 = document.getElementById('applicantForgotStep2');
+            if (step2) step2.style.display = 'block';
+            const noticeBanner = document.getElementById('applicantForgotNoticeBanner');
+            if (noticeBanner) {
+              noticeBanner.innerHTML = `<i class="fas fa-envelope-open-text"></i> Reset code sent to <strong>${escapeHtml(email)}</strong>. Check your inbox and enter the 6-digit code below.`;
+            }
+            this.showToast(result.message || `Reset code sent to ${email}`, 'success');
+          } else {
+            this.showToast(result.error || 'Failed to send reset code.', 'error');
+          }
+        } catch (err) {
+          console.error('[Forgot OTP Error]', err);
+          this.showToast('Network error. Please try again.', 'error');
+        } finally {
+          setLoading(sendForgotOtpBtn, false, 'Send Reset Code', 'fas fa-paper-plane');
+        }
+      });
+    }
+
+    // Step 2: Reset Password Form Submit
+    const forgotForm = document.getElementById('applicantForgotForm');
+    const resetBtn = document.getElementById('applicantResetPasswordBtn');
+
+    const handleResetPassword = async (e) => {
+      if (e && e.preventDefault) e.preventDefault();
+      const email = (document.getElementById('applicantForgotEmail')?.value || '').trim().toLowerCase();
+      const code = (document.getElementById('applicantForgotOtp')?.value || '').trim();
+      const newPassword = document.getElementById('applicantNewPassword')?.value || '';
+      const newPasswordConfirm = document.getElementById('applicantNewPasswordConfirm')?.value || '';
+
+      if (!email) {
+        this.showToast('Please enter your email address.', 'warning');
+        return;
+      }
+      if (!code || code.length !== 6) {
+        this.showToast('Please enter the 6-digit reset code.', 'warning');
+        return;
+      }
+      if (!newPassword || newPassword.length < 8) {
+        this.showToast('Password must be at least 8 characters.', 'warning');
+        return;
+      }
+      if (newPassword !== newPasswordConfirm) {
+        this.showToast('Passwords do not match.', 'warning');
+        return;
+      }
+
+      setLoading(resetBtn, true, 'Resetting…', 'fas fa-spinner fa-spin');
+      try {
+        const result = await this.store.applicantResetPassword(email, code, newPassword);
+        if (result.success && result.session) {
+          this.showToast(result.message || 'Password reset successful! Welcome.', 'success');
+          this.updateNavAuthUI();
+          await this.updateApplicantAuthUI();
+
+          const memberApp = await this.store.getApplicationByEmail(result.session.email);
+          if (memberApp && memberApp.status === 'Approved') {
+            await this.renderView('card');
+          } else {
+            await this.renderView('membership');
+          }
+        } else {
+          this.showToast(result.error || 'Password reset failed. Please check your reset code.', 'error');
+        }
+      } catch (err) {
+        console.error('[Reset Password Error]', err);
+        this.showToast('Network error. Please try again.', 'error');
+      } finally {
+        setLoading(resetBtn, false, 'Reset Password & Sign In', 'fas fa-save');
+      }
+    };
+
+    if (forgotForm) {
+      forgotForm.addEventListener('submit', handleResetPassword);
+    }
+
+    // ── 6. Delegated Event Listeners ─────────────────────────────────
     document.addEventListener('click', (e) => {
       const signOutBtn = e.target.closest('#applicantSignOutBtn') || e.target.closest('.btnUserSignOut');
       const cardBtn = e.target.closest('.btnViewDigitalCard');
@@ -319,11 +564,10 @@ class App {
       const session = this.store.getApplicantSession();
 
       if (signOutBtn) {
-        this.closeModal();
-        // Clear locally first so the UI never looks signed-in after a click,
-        // then invalidate the token server-side.
+        this.closeModal?.();
         this.store.forgetApplicantSession();
         this.updateNavAuthUI();
+        this.showAuthMode('signin');
         this.updateApplicantAuthUI();
         this.showToast('Signed out.', 'info');
         this.store.clearApplicantSession().catch(() => {});
@@ -341,8 +585,6 @@ class App {
         });
       }
     });
-
-    // Profile button handler removed — now handled by profile dropdown
 
     this.updateApplicantAuthUI();
   }
@@ -2945,6 +3187,11 @@ class App {
 }
 
 // Bootstrap
-document.addEventListener('DOMContentLoaded', () => {
-  window.bcciApp = new App();
-});
+if (typeof document !== 'undefined' && document.addEventListener) {
+  document.addEventListener('DOMContentLoaded', () => {
+    window.bcciApp = new App();
+  });
+}
+
+export { App };
+

@@ -177,6 +177,59 @@ ck('admin sees the enquiry', (r.json?.enquiries || []).length === 1);
 r = await req('/api/enquiries');
 ck('the public cannot list enquiries', r.status === 401);
 
+sec('Applicant password authentication & recovery');
+const NEW_APPLICANT = 'kavita@sunrisechem.example';
+
+// 1. Send OTP for registration
+r = await req('/api/send-otp', { method: 'POST', body: { email: NEW_APPLICANT } });
+ck('registration OTP requested', r.status === 200, JSON.stringify(r.json));
+const regCode = String(JSON.parse(redis.store.get(`bcci:otp:${NEW_APPLICANT}`)));
+ck('registration OTP generated in redis', typeof regCode === 'string' && regCode.length === 6);
+
+// 2. Register with OTP & password
+r = await req('/api/applicant-auth', {
+  method: 'POST',
+  body: { action: 'register', email: NEW_APPLICANT, code: regCode, password: 'SecurePassword123' },
+});
+ck('applicant registers with password and receives session', r.status === 201 && !!r.json?.session?.token, JSON.stringify(r.json));
+
+// 3. Login with password
+r = await req('/api/applicant-auth', {
+  method: 'POST',
+  body: { action: 'login', email: NEW_APPLICANT, password: 'SecurePassword123' },
+});
+ck('applicant signs in with password', r.status === 200 && !!r.json?.session?.token);
+
+// 4. Login with wrong password fails
+r = await req('/api/applicant-auth', {
+  method: 'POST',
+  body: { action: 'login', email: NEW_APPLICANT, password: 'WrongPassword' },
+});
+ck('login with wrong password rejected with 401', r.status === 401);
+
+// 5. Request forgot password reset OTP
+r = await req('/api/applicant-auth', {
+  method: 'POST',
+  body: { action: 'forgot-password-request', email: NEW_APPLICANT },
+});
+ck('forgot password request succeeds', r.status === 200);
+const resetCode = String(JSON.parse(redis.store.get(`bcci:otp:reset:${NEW_APPLICANT}`)));
+ck('reset OTP generated in redis', typeof resetCode === 'string' && resetCode.length === 6);
+
+// 6. Reset password with code
+r = await req('/api/applicant-auth', {
+  method: 'POST',
+  body: { action: 'reset-password', email: NEW_APPLICANT, code: resetCode, newPassword: 'BrandNewPassword456' },
+});
+ck('reset password succeeds and issues session', r.status === 200 && !!r.json?.session?.token);
+
+// 7. Login with newly reset password
+r = await req('/api/applicant-auth', {
+  method: 'POST',
+  body: { action: 'login', email: NEW_APPLICANT, password: 'BrandNewPassword456' },
+});
+ck('login with newly reset password succeeds', r.status === 200 && !!r.json?.session?.token);
+
 sec('Load: a month of traffic in one burst');
 // 30 members a month is the expected volume; fire that at once.
 const t0 = Date.now();

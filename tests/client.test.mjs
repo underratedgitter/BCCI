@@ -399,5 +399,626 @@ ck('applicantResetPassword on error does not persist session', store.getApplican
 // Restore fetch
 globalThis.fetch = origFetch;
 
+console.log('\nTask 5: Client Application Logic & DOM Events');
+console.log('─────────────────────────────────────────────');
+
+// 1. Static HTML check: tabindex="-1" removed from .password-toggle-btn
+const toggleButtonsWithTabindex = [...HTML.matchAll(/<button[^>]*class=["'][^"']*password-toggle-btn[^"']*["'][^>]*tabindex=["']-1["']|<button[^>]*tabindex=["']-1["'][^>]*class=["'][^"']*password-toggle-btn/g)];
+ck('password toggle buttons in index.html do not have tabindex="-1"', toggleButtonsWithTabindex.length === 0, `found ${toggleButtonsWithTabindex.length} with tabindex="-1"`);
+
+// 2. DOM Mock Harness
+class MockElement {
+  constructor(tag, id = '', className = '') {
+    this.tagName = tag.toUpperCase();
+    this.id = id;
+    this._classes = new Set(className ? className.split(/\s+/).filter(Boolean) : []);
+    this.style = {};
+    this.attributes = new Map();
+    this.children = [];
+    this.parentElement = null;
+    this.listeners = new Map();
+    this.value = '';
+    this.type = tag.toLowerCase() === 'input' ? 'text' : '';
+    this.disabled = false;
+    this._innerHTML = '';
+    this._textContent = '';
+  }
+
+  get className() { return Array.from(this._classes || []).join(' '); }
+  set className(v) { this._classes = new Set(v ? v.split(/\s+/).filter(Boolean) : []); }
+
+  get textContent() { return this._textContent; }
+  set textContent(v) { this._textContent = String(v); }
+
+  get innerHTML() { return this._innerHTML; }
+  set innerHTML(v) { this._innerHTML = String(v); }
+
+  get classList() {
+    return {
+      add: (c) => this._classes.add(c),
+      remove: (c) => this._classes.delete(c),
+      contains: (c) => this._classes.has(c),
+      toggle: (c, force) => {
+        if (force !== undefined) {
+          if (force) this._classes.add(c); else this._classes.delete(c);
+          return force;
+        }
+        if (this._classes.has(c)) { this._classes.delete(c); return false; }
+        this._classes.add(c); return true;
+      }
+    };
+  }
+
+  setAttribute(k, v) { this.attributes.set(k, String(v)); }
+  getAttribute(k) { return this.attributes.get(k) || null; }
+  removeAttribute(k) { this.attributes.delete(k); }
+  hasAttribute(k) { return this.attributes.has(k); }
+
+  appendChild(child) {
+    child.parentElement = this;
+    this.children.push(child);
+    return child;
+  }
+
+  addEventListener(event, fn) {
+    if (!this.listeners.has(event)) this.listeners.set(event, []);
+    this.listeners.get(event).push(fn);
+  }
+
+  removeEventListener(event, fn) {
+    const list = this.listeners.get(event) || [];
+    this.listeners.set(event, list.filter(f => f !== fn));
+  }
+
+  async dispatchEvent(event) {
+    if (!event.target) event.target = this;
+    const handlers = this.listeners.get(event.type) || [];
+    for (const h of handlers) {
+      await h(event);
+    }
+    if (!event.defaultPrevented && this.parentElement) {
+      await this.parentElement.dispatchEvent(event);
+    } else if (!event.defaultPrevented && !this.parentElement && globalDocListeners.has(event.type)) {
+      for (const h of globalDocListeners.get(event.type)) {
+        await h(event);
+      }
+    }
+    return !event.defaultPrevented;
+  }
+
+  async click() {
+    const event = {
+      type: 'click',
+      target: this,
+      defaultPrevented: false,
+      preventDefault() { this.defaultPrevented = true; }
+    };
+    return await this.dispatchEvent(event);
+  }
+
+  async submit() {
+    const event = {
+      type: 'submit',
+      target: this,
+      defaultPrevented: false,
+      preventDefault() { this.defaultPrevented = true; }
+    };
+    return await this.dispatchEvent(event);
+  }
+
+  closest(selector) {
+    let el = this;
+    while (el) {
+      if (matches(el, selector)) return el;
+      el = el.parentElement;
+    }
+    return null;
+  }
+
+  querySelector(selector) {
+    for (const child of this.children) {
+      if (matches(child, selector)) return child;
+      const sub = child.querySelector(selector);
+      if (sub) return sub;
+    }
+    return null;
+  }
+
+  querySelectorAll(selector) {
+    const results = [];
+    for (const child of this.children) {
+      if (matches(child, selector)) results.push(child);
+      results.push(...child.querySelectorAll(selector));
+    }
+    return results;
+  }
+}
+
+function matches(el, selector) {
+  if (!el || !selector) return false;
+  selector = selector.trim();
+  if (selector.startsWith('#')) return el.id === selector.slice(1);
+  if (selector.startsWith('.')) return el.classList.contains(selector.slice(1));
+  if (selector.includes('[')) {
+    const tagMatch = selector.match(/^([a-zA-Z0-9_-]+)?\[([a-zA-Z0-9_-]+)(?:=["']?([^"']+)["']?)?\]/);
+    if (tagMatch) {
+      const [, tag, attr, val] = tagMatch;
+      if (tag && el.tagName !== tag.toUpperCase()) return false;
+      if (!el.hasAttribute(attr) && el[attr] === undefined) return false;
+      if (val !== undefined) return el.getAttribute(attr) === val || String(el[attr]) === val;
+      return true;
+    }
+  }
+  return el.tagName === selector.toUpperCase();
+}
+
+const globalDocElements = new Map();
+const globalDocListeners = new Map();
+
+function regEl(el) {
+  if (el.id) globalDocElements.set(el.id, el);
+  for (const c of el.children) regEl(c);
+  return el;
+}
+
+globalThis.window = {
+  location: { pathname: '/', hash: '' },
+  history: { pushState: () => {} },
+  scrollTo: () => {},
+  matchMedia: () => ({ matches: false }),
+};
+
+globalThis.document = {
+  getElementById: (id) => globalDocElements.get(id) || null,
+  querySelector: (sel) => {
+    if (sel.startsWith('#')) return globalDocElements.get(sel.slice(1)) || null;
+    for (const el of globalDocElements.values()) {
+      if (matches(el, sel)) return el;
+      const found = el.querySelector(sel);
+      if (found) return found;
+    }
+    return null;
+  },
+  querySelectorAll: (sel) => {
+    const res = [];
+    for (const el of globalDocElements.values()) {
+      if (matches(el, sel)) res.push(el);
+      res.push(...el.querySelectorAll(sel));
+    }
+    return [...new Set(res)];
+  },
+  addEventListener: (event, fn) => {
+    if (!globalDocListeners.has(event)) globalDocListeners.set(event, []);
+    globalDocListeners.get(event).push(fn);
+  },
+  removeEventListener: (event, fn) => {
+    const list = globalDocListeners.get(event) || [];
+    globalDocListeners.set(event, list.filter(f => f !== fn));
+  },
+  createElement: (tag) => new MockElement(tag),
+};
+
+// Build the Auth DOM elements
+function buildAuthDOM() {
+  globalDocElements.clear();
+  globalDocListeners.clear();
+
+  const gate = new MockElement('div', 'applicantAuthGate');
+  const banner = new MockElement('div', 'applicantAuthBanner');
+  banner.style.display = 'none';
+
+  // 1. Sign In Card
+  const cardSignIn = new MockElement('div', 'authCardSignIn', 'auth-card');
+  const alertNotSet = new MockElement('div', 'passwordNotSetAlert', 'auth-inline-alert');
+  alertNotSet.style.display = 'none';
+  const legacySwitchBtn = new MockElement('button', 'legacySwitchToRegister', 'auth-text-link');
+  alertNotSet.appendChild(legacySwitchBtn);
+  cardSignIn.appendChild(alertNotSet);
+
+  const signInForm = new MockElement('form', 'applicantSignInForm');
+  const emailIn = new MockElement('input', 'applicantEmail');
+  emailIn.type = 'email';
+  signInForm.appendChild(emailIn);
+
+  const passGroup = new MockElement('div', '', 'password-input-group');
+  const passIn = new MockElement('input', 'applicantPassword');
+  passIn.type = 'password';
+  const passToggle = new MockElement('button', 'toggleApplicantPassword', 'password-toggle-btn');
+  passToggle.setAttribute('aria-label', 'Toggle password visibility');
+  const passIcon = new MockElement('i', '', 'fas fa-eye');
+  passToggle.appendChild(passIcon);
+  passGroup.appendChild(passIn);
+  passGroup.appendChild(passToggle);
+  signInForm.appendChild(passGroup);
+
+  const forgotLink = new MockElement('button', 'switchToForgot', 'auth-text-link');
+  signInForm.appendChild(forgotLink);
+
+  const signInBtn = new MockElement('button', 'applicantSignInBtn', 'btn-primary');
+  signInBtn.type = 'submit';
+  signInForm.appendChild(signInBtn);
+
+  const regLink = new MockElement('button', 'switchToRegister', 'auth-text-link');
+  signInForm.appendChild(regLink);
+  cardSignIn.appendChild(signInForm);
+
+  // 2. Register Card
+  const cardRegister = new MockElement('div', 'authCardRegister', 'auth-card');
+  cardRegister.style.display = 'none';
+  const regForm = new MockElement('form', 'applicantRegisterForm');
+  const regStep1 = new MockElement('div', 'applicantRegStep1');
+  const regEmailIn = new MockElement('input', 'applicantRegEmail');
+  regEmailIn.type = 'email';
+  const sendRegOtpBtn = new MockElement('button', 'applicantSendRegOtpBtn', 'btn-primary');
+  regStep1.appendChild(regEmailIn);
+  regStep1.appendChild(sendRegOtpBtn);
+  regForm.appendChild(regStep1);
+
+  const regStep2 = new MockElement('div', 'applicantRegStep2');
+  regStep2.style.display = 'none';
+  const regNotice = new MockElement('div', 'applicantRegNoticeBanner');
+  const regOtpIn = new MockElement('input', 'applicantRegOtp');
+  const regPassGroup = new MockElement('div', '', 'password-input-group');
+  const regPassIn = new MockElement('input', 'applicantRegPassword');
+  regPassIn.type = 'password';
+  const regPassToggle = new MockElement('button', 'toggleApplicantRegPassword', 'password-toggle-btn');
+  regPassToggle.setAttribute('aria-label', 'Toggle password visibility');
+  const regPassIcon = new MockElement('i', '', 'fas fa-eye');
+  regPassToggle.appendChild(regPassIcon);
+  regPassGroup.appendChild(regPassIn);
+  regPassGroup.appendChild(regPassToggle);
+
+  const regConfGroup = new MockElement('div', '', 'password-input-group');
+  const regConfIn = new MockElement('input', 'applicantRegPasswordConfirm');
+  regConfIn.type = 'password';
+  const regConfToggle = new MockElement('button', 'toggleApplicantRegPasswordConfirm', 'password-toggle-btn');
+  regConfToggle.setAttribute('aria-label', 'Toggle password visibility');
+  const regConfIcon = new MockElement('i', '', 'fas fa-eye');
+  regConfToggle.appendChild(regConfIcon);
+  regConfGroup.appendChild(regConfIn);
+  regConfGroup.appendChild(regConfToggle);
+
+  const regBtn = new MockElement('button', 'applicantRegisterBtn', 'btn-primary');
+  regBtn.type = 'submit';
+
+  regStep2.appendChild(regNotice);
+  regStep2.appendChild(regOtpIn);
+  regStep2.appendChild(regPassGroup);
+  regStep2.appendChild(regConfGroup);
+  regStep2.appendChild(regBtn);
+  regForm.appendChild(regStep2);
+
+  const backToSignInFromReg = new MockElement('button', 'switchToSignInFromReg', 'auth-text-link');
+  regForm.appendChild(backToSignInFromReg);
+  cardRegister.appendChild(regForm);
+
+  // 3. Forgot Card
+  const cardForgot = new MockElement('div', 'authCardForgot', 'auth-card');
+  cardForgot.style.display = 'none';
+  const forgotForm = new MockElement('form', 'applicantForgotForm');
+  const forgotStep1 = new MockElement('div', 'applicantForgotStep1');
+  const forgotEmailIn = new MockElement('input', 'applicantForgotEmail');
+  forgotEmailIn.type = 'email';
+  const sendForgotOtpBtn = new MockElement('button', 'applicantSendForgotOtpBtn', 'btn-primary');
+  forgotStep1.appendChild(forgotEmailIn);
+  forgotStep1.appendChild(sendForgotOtpBtn);
+  forgotForm.appendChild(forgotStep1);
+
+  const forgotStep2 = new MockElement('div', 'applicantForgotStep2');
+  forgotStep2.style.display = 'none';
+  const forgotNotice = new MockElement('div', 'applicantForgotNoticeBanner');
+  const forgotOtpIn = new MockElement('input', 'applicantForgotOtp');
+
+  const newPassGroup = new MockElement('div', '', 'password-input-group');
+  const newPassIn = new MockElement('input', 'applicantNewPassword');
+  newPassIn.type = 'password';
+  const newPassToggle = new MockElement('button', 'toggleApplicantNewPassword', 'password-toggle-btn');
+  newPassToggle.setAttribute('aria-label', 'Toggle password visibility');
+  const newPassIcon = new MockElement('i', '', 'fas fa-eye');
+  newPassToggle.appendChild(newPassIcon);
+  newPassGroup.appendChild(newPassIn);
+  newPassGroup.appendChild(newPassToggle);
+
+  const newConfGroup = new MockElement('div', '', 'password-input-group');
+  const newConfIn = new MockElement('input', 'applicantNewPasswordConfirm');
+  newConfIn.type = 'password';
+  const newConfToggle = new MockElement('button', 'toggleApplicantNewPasswordConfirm', 'password-toggle-btn');
+  newConfToggle.setAttribute('aria-label', 'Toggle password visibility');
+  const newConfIcon = new MockElement('i', '', 'fas fa-eye');
+  newConfToggle.appendChild(newConfIcon);
+  newConfGroup.appendChild(newConfIn);
+  newConfGroup.appendChild(newConfToggle);
+
+  const resetBtn = new MockElement('button', 'applicantResetPasswordBtn', 'btn-primary');
+  resetBtn.type = 'submit';
+
+  forgotStep2.appendChild(forgotNotice);
+  forgotStep2.appendChild(forgotOtpIn);
+  forgotStep2.appendChild(newPassGroup);
+  forgotStep2.appendChild(newConfGroup);
+  forgotStep2.appendChild(resetBtn);
+  forgotForm.appendChild(forgotStep2);
+
+  const backToSignInFromForgot = new MockElement('button', 'switchToSignInFromForgot', 'auth-text-link');
+  forgotForm.appendChild(backToSignInFromForgot);
+  cardForgot.appendChild(forgotForm);
+
+  gate.appendChild(cardSignIn);
+  gate.appendChild(cardRegister);
+  gate.appendChild(cardForgot);
+
+  regEl(gate);
+  regEl(banner);
+
+  return {
+    gate, banner,
+    cardSignIn, alertNotSet, legacySwitchBtn, signInForm, emailIn, passIn, passToggle, passIcon, forgotLink, signInBtn, regLink,
+    cardRegister, regForm, regStep1, regEmailIn, sendRegOtpBtn, regStep2, regOtpIn, regPassIn, regPassToggle, regPassIcon, regConfIn, regConfToggle, regBtn, backToSignInFromReg,
+    cardForgot, forgotForm, forgotStep1, forgotEmailIn, sendForgotOtpBtn, forgotStep2, forgotOtpIn, newPassIn, newPassToggle, newPassIcon, newConfIn, newConfToggle, resetBtn, backToSignInFromForgot
+  };
+}
+
+const { App } = await import('../js/app.js');
+
+ck('App prototype has showAuthMode method', typeof App?.prototype?.showAuthMode === 'function');
+ck('App prototype has setupApplicantAuthHandlers method', typeof App?.prototype?.setupApplicantAuthHandlers === 'function');
+
+// Helper to create test App instance
+function createTestApp(dom, testStore) {
+  const app = Object.create(App.prototype);
+  app.store = testStore;
+  app.toasts = [];
+  app.showToast = (msg, type) => { app.toasts.push({ msg, type }); };
+  app.viewsRendered = [];
+  app.renderView = async (v) => { app.viewsRendered.push(v); };
+  app.navAuthUpdated = 0;
+  app.updateNavAuthUI = () => { app.navAuthUpdated++; };
+  app.applicantAuthUpdated = 0;
+  app.updateApplicantAuthUI = async () => { app.applicantAuthUpdated++; };
+  app.callOtpApi = async (endpoint, payload) => {
+    return { success: true, message: 'Code sent successfully.' };
+  };
+  app.announce = () => {};
+  return app;
+}
+
+// Mode switching & email propagation tests
+{
+  const dom = buildAuthDOM();
+  const testApp = createTestApp(dom, store);
+
+  if (typeof testApp.showAuthMode === 'function') {
+    dom.emailIn.value = 'user@example.com';
+    testApp.showAuthMode('register');
+    ck('showAuthMode("register") shows register card, hides others',
+      dom.cardSignIn.style.display === 'none' &&
+      dom.cardRegister.style.display === 'block' &&
+      dom.cardForgot.style.display === 'none'
+    );
+    ck('showAuthMode("register") propagates email to register form', dom.regEmailIn.value === 'user@example.com');
+
+    dom.regEmailIn.value = 'updated@example.com';
+    testApp.showAuthMode('forgot');
+    ck('showAuthMode("forgot") shows forgot card, hides others',
+      dom.cardSignIn.style.display === 'none' &&
+      dom.cardRegister.style.display === 'none' &&
+      dom.cardForgot.style.display === 'block'
+    );
+    ck('showAuthMode("forgot") propagates email to forgot form', dom.forgotEmailIn.value === 'updated@example.com');
+
+    dom.alertNotSet.style.display = 'block';
+    dom.regStep2.style.display = 'block';
+    dom.forgotStep2.style.display = 'block';
+    testApp.showAuthMode('signin');
+    ck('showAuthMode("signin") shows signin card',
+      dom.cardSignIn.style.display === 'block' &&
+      dom.cardRegister.style.display === 'none' &&
+      dom.cardForgot.style.display === 'none'
+    );
+    ck('showAuthMode resets error alert and step 2 displays',
+      dom.alertNotSet.style.display === 'none' &&
+      dom.regStep2.style.display === 'none' &&
+      dom.forgotStep2.style.display === 'none'
+    );
+  } else {
+    ck('showAuthMode("register") shows register card, hides others', false, 'showAuthMode not implemented');
+    ck('showAuthMode("register") propagates email to register form', false, 'showAuthMode not implemented');
+    ck('showAuthMode("forgot") shows forgot card, hides others', false, 'showAuthMode not implemented');
+    ck('showAuthMode("forgot") propagates email to forgot form', false, 'showAuthMode not implemented');
+    ck('showAuthMode("signin") shows signin card', false, 'showAuthMode not implemented');
+    ck('showAuthMode resets error alert and step 2 displays', false, 'showAuthMode not implemented');
+  }
+}
+
+// Password toggle test
+{
+  const dom = buildAuthDOM();
+  const testApp = createTestApp(dom, store);
+  if (typeof testApp.setupApplicantAuthHandlers === 'function') {
+    testApp.setupApplicantAuthHandlers();
+
+    // Click toggle once -> text
+    dom.passToggle.click();
+    ck('clicking password toggle changes type to text', dom.passIn.type === 'text');
+    ck('clicking password toggle changes aria-label to Hide password', dom.passToggle.getAttribute('aria-label') === 'Hide password');
+    ck('clicking password toggle updates icon to fa-eye-slash', dom.passIcon.classList.contains('fa-eye-slash'));
+
+    // Click toggle again -> password
+    dom.passToggle.click();
+    ck('clicking password toggle second time changes type back to password', dom.passIn.type === 'password');
+    ck('clicking password toggle changes aria-label to Show password', dom.passToggle.getAttribute('aria-label') === 'Show password');
+    ck('clicking password toggle updates icon back to fa-eye', dom.passIcon.classList.contains('fa-eye'));
+  } else {
+    ck('clicking password toggle changes type to text', false, 'setupApplicantAuthHandlers not implemented');
+    ck('clicking password toggle changes aria-label to Hide password', false, 'setupApplicantAuthHandlers not implemented');
+    ck('clicking password toggle updates icon to fa-eye-slash', false, 'setupApplicantAuthHandlers not implemented');
+    ck('clicking password toggle second time changes type back to password', false, 'setupApplicantAuthHandlers not implemented');
+    ck('clicking password toggle changes aria-label to Show password', false, 'setupApplicantAuthHandlers not implemented');
+    ck('clicking password toggle updates icon back to fa-eye', false, 'setupApplicantAuthHandlers not implemented');
+  }
+}
+
+// Sign In with PASSWORD_NOT_SET banner test
+{
+  const dom = buildAuthDOM();
+  const mockStore = {
+    ...store,
+    applicantLogin: async () => ({
+      success: false,
+      code: 'PASSWORD_NOT_SET',
+      error: 'No password set for this account yet.',
+    }),
+    getApplicantSession: () => null,
+  };
+  const testApp = createTestApp(dom, mockStore);
+  if (typeof testApp.setupApplicantAuthHandlers === 'function') {
+    testApp.setupApplicantAuthHandlers();
+    dom.emailIn.value = 'legacy@example.com';
+    dom.passIn.value = 'SomePass123';
+    await dom.signInForm.submit();
+    ck('Sign in with PASSWORD_NOT_SET displays #passwordNotSetAlert banner', dom.alertNotSet.style.display !== 'none');
+
+    // Clicking legacySwitchToRegister inside banner switches to register
+    dom.legacySwitchBtn.click();
+    ck('legacySwitchToRegister switches to register mode', dom.cardRegister.style.display === 'block');
+    ck('legacySwitchToRegister carries email over', dom.regEmailIn.value === 'legacy@example.com');
+  } else {
+    ck('Sign in with PASSWORD_NOT_SET displays #passwordNotSetAlert banner', false);
+    ck('legacySwitchToRegister switches to register mode', false);
+    ck('legacySwitchToRegister carries email over', false);
+  }
+}
+
+// Sign In success test
+{
+  const dom = buildAuthDOM();
+  const mockStore = {
+    ...store,
+    applicantLogin: async () => ({
+      success: true,
+      session: { email: 'valid@example.com', token: 'tok-123' },
+    }),
+    getApplicationByEmail: async () => null,
+    getApplicantSession: () => ({ email: 'valid@example.com', token: 'tok-123' }),
+  };
+  const testApp = createTestApp(dom, mockStore);
+  if (typeof testApp.setupApplicantAuthHandlers === 'function') {
+    testApp.setupApplicantAuthHandlers();
+    dom.emailIn.value = 'valid@example.com';
+    dom.passIn.value = 'ValidPass123';
+    await dom.signInForm.submit();
+    ck('Sign in success calls updateNavAuthUI', testApp.navAuthUpdated >= 1);
+    ck('Sign in success transitions to membership view', testApp.viewsRendered.includes('membership'));
+    ck('Sign in success shows success toast', testApp.toasts.some(t => t.type === 'success'));
+  } else {
+    ck('Sign in success calls updateNavAuthUI', false);
+    ck('Sign in success transitions to membership view', false);
+    ck('Sign in success shows success toast', false);
+  }
+}
+
+// Registration handling test
+{
+  const dom = buildAuthDOM();
+  let regPayload = null;
+  const mockStore = {
+    ...store,
+    applicantRegister: async (email, code, password) => {
+      regPayload = { email, code, password };
+      return { success: true, session: { email, token: 'reg-tok-456' } };
+    },
+    getApplicationByEmail: async () => null,
+    getApplicantSession: () => ({ email: 'new@example.com', token: 'reg-tok-456' }),
+  };
+  const testApp = createTestApp(dom, mockStore);
+  if (typeof testApp.setupApplicantAuthHandlers === 'function') {
+    testApp.setupApplicantAuthHandlers();
+
+    // Step 1: Send OTP
+    dom.regEmailIn.value = 'new@example.com';
+    await dom.sendRegOtpBtn.click();
+    ck('applicantSendRegOtpBtn shows applicantRegStep2 on success', dom.regStep2.style.display === 'block');
+
+    // Step 2: Validation of password match
+    dom.regOtpIn.value = '123456';
+    dom.regPassIn.value = 'Password123';
+    dom.regConfIn.value = 'MismatchPass';
+    testApp.toasts = [];
+    await dom.regForm.submit();
+    ck('Registration rejects mismatched passwords', regPayload === null && testApp.toasts.some(t => t.type === 'warning' || t.type === 'error'));
+
+    // Step 2: Validation of password length >= 8
+    dom.regPassIn.value = 'short';
+    dom.regConfIn.value = 'short';
+    testApp.toasts = [];
+    await dom.regForm.submit();
+    ck('Registration rejects short passwords (< 8 chars)', regPayload === null && testApp.toasts.some(t => t.type === 'warning' || t.type === 'error'));
+
+    // Step 2: Successful registration
+    dom.regPassIn.value = 'ValidPass123';
+    dom.regConfIn.value = 'ValidPass123';
+    await dom.regForm.submit();
+    ck('Registration submits to applicantRegister with valid inputs', regPayload?.email === 'new@example.com' && regPayload?.code === '123456' && regPayload?.password === 'ValidPass123');
+    ck('Registration success updates nav auth UI and transitions to membership', testApp.navAuthUpdated >= 1 && testApp.viewsRendered.includes('membership'));
+  } else {
+    ck('applicantSendRegOtpBtn shows applicantRegStep2 on success', false);
+    ck('Registration rejects mismatched passwords', false);
+    ck('Registration rejects short passwords (< 8 chars)', false);
+    ck('Registration submits to applicantRegister with valid inputs', false);
+    ck('Registration success updates nav auth UI and transitions to membership', false);
+  }
+}
+
+// Forgot password handling test
+{
+  const dom = buildAuthDOM();
+  let forgotRequestEmail = null;
+  let resetPayload = null;
+  const mockStore = {
+    ...store,
+    applicantForgotPasswordRequest: async (email) => {
+      forgotRequestEmail = email;
+      return { success: true, message: 'Reset code sent.' };
+    },
+    applicantResetPassword: async (email, code, newPassword) => {
+      resetPayload = { email, code, newPassword };
+      return { success: true, session: { email, token: 'reset-tok-789' } };
+    },
+    getApplicationByEmail: async () => null,
+    getApplicantSession: () => ({ email: 'reset@example.com', token: 'reset-tok-789' }),
+  };
+  const testApp = createTestApp(dom, mockStore);
+  if (typeof testApp.setupApplicantAuthHandlers === 'function') {
+    testApp.setupApplicantAuthHandlers();
+
+    // Step 1: Send Forgot OTP
+    dom.forgotEmailIn.value = 'reset@example.com';
+    await dom.sendForgotOtpBtn.click();
+    ck('applicantSendForgotOtpBtn calls applicantForgotPasswordRequest', forgotRequestEmail === 'reset@example.com');
+    ck('applicantSendForgotOtpBtn shows applicantForgotStep2', dom.forgotStep2.style.display === 'block');
+
+    // Step 2: Reset password validation
+    dom.forgotOtpIn.value = '654321';
+    dom.newPassIn.value = 'NewPassword123';
+    dom.newConfIn.value = 'WrongConfirm';
+    testApp.toasts = [];
+    await dom.forgotForm.submit();
+    ck('Reset password rejects mismatched passwords', resetPayload === null && testApp.toasts.some(t => t.type === 'warning' || t.type === 'error'));
+
+    // Step 2: Successful reset
+    dom.newConfIn.value = 'NewPassword123';
+    await dom.forgotForm.submit();
+    ck('Reset password submits to applicantResetPassword with valid inputs', resetPayload?.email === 'reset@example.com' && resetPayload?.code === '654321' && resetPayload?.newPassword === 'NewPassword123');
+    ck('Reset password success updates nav auth UI and transitions view', testApp.navAuthUpdated >= 1 && testApp.viewsRendered.includes('membership'));
+  } else {
+    ck('applicantSendForgotOtpBtn calls applicantForgotPasswordRequest', false);
+    ck('applicantSendForgotOtpBtn shows applicantForgotStep2', false);
+    ck('Reset password rejects mismatched passwords', false);
+    ck('Reset password submits to applicantResetPassword with valid inputs', false);
+    ck('Reset password success updates nav auth UI and transitions view', false);
+  }
+}
+
 console.log(`\n${'═'.repeat(52)}\n  ${pass} passed, ${fail} failed\n${'═'.repeat(52)}`);
 process.exit(fail?1:0);
+
