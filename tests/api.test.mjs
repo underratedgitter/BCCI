@@ -290,6 +290,20 @@ check('invalid enquiry → 400', r.statusCode === 400, `got ${r.statusCode}`);
 r = await call(sendOtp, { method: 'POST', body: { email: 'not-an-email' } });
 check('invalid email for OTP → 400', r.statusCode === 400, `got ${r.statusCode}`);
 
+const { cleanPhone } = await import(`${BCCI}/_lib/http.js`);
+check('cleanPhone strips +91 country code', cleanPhone('+91 98250 12345') === '9825012345');
+check('cleanPhone strips 91 country code prefix', cleanPhone('919825012345') === '9825012345');
+check('cleanPhone strips trunk 0 prefix', cleanPhone('09825012345') === '9825012345');
+check('cleanPhone preserves 10-digit number', cleanPhone('9825012345') === '9825012345');
+
+r = await call(enquiries, {
+  method: 'POST',
+  ip: '203.0.113.199',
+  body: { name: 'Prefix User', email: 'prefix@example.com', phone: '+91 9898123456', subject: 'Inquiry', message: 'Hello BCCI' },
+});
+check('enquiry with +91 phone succeeds (201)', r.statusCode === 201, `got ${r.statusCode}`);
+check('enquiry phone is normalized to 10 digits', r.body?.enquiry?.phone === '9898123456', `got ${r.body?.enquiry?.phone}`);
+
 // ── Report ──────────────────────────────────────────────────────────
 process.on("exit",()=>{});
 console.log(results.join('\n'));

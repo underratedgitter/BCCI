@@ -148,6 +148,17 @@ export function str(value, maxLen = 500) {
 export const isEmail = (v) =>
   typeof v === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()) && v.length <= 254;
 
+/**
+ * Normalises an Indian mobile number to 10 digits, stripping +91, 91, or leading 0 prefixes.
+ */
+export function cleanPhone(value) {
+  if (value === null || value === undefined) return '';
+  let digits = String(value).replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('91')) digits = digits.slice(2);
+  else if (digits.length === 11 && digits.startsWith('0')) digits = digits.slice(1);
+  return digits;
+}
+
 // ── Error handling ─────────────────────────────────────────────────
 
 /**

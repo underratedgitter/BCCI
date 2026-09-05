@@ -12,6 +12,7 @@ import {
   clientIp,
   str,
   isEmail,
+  cleanPhone,
   withErrorHandling,
 } from './_lib/http.js';
 
@@ -42,7 +43,7 @@ async function handler(req, res) {
     const body = req.body || {};
     const name = str(body.name, 120);
     const email = str(body.email, 254).toLowerCase();
-    const phone = str(body.phone, 20).replace(/\D/g, '');
+    const phone = cleanPhone(body.phone);
     const subject = str(body.subject, 200);
     const message = str(body.message, 4000);
 

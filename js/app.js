@@ -82,10 +82,11 @@ const PAGE_TITLES = {
 
 /** Resolves the view for the current URL, tolerating the old #hash links. */
 function viewFromLocation() {
-  const hash = (window.location.hash || '').toLowerCase().replace('#', '');
+  const hash = (window.location.hash || '').toLowerCase().replace(/^#/, '');
   if (hash === 'admin' || hash === 'secret-admin') return 'admin';
   if (hash === 'signin' || hash === 'login') return 'signin';
-  if (hash === 'events') return 'events';
+  if (hash === 'qr') return 'qrcode';
+  if (hash && VIEW_PATHS[hash]) return hash;
 
   const path = window.location.pathname.replace(/\/+$/, '') || '/';
   return PATH_VIEWS[path] || 'home';
@@ -1086,28 +1087,38 @@ class App {
       `
     });
 
-    setTimeout(() => {
-      const renForm = document.getElementById('renewalForm');
-      if (renForm) {
-        renForm.addEventListener('submit', async (e) => {
-          e.preventDefault();
-          const utr = document.getElementById('renewalUtrInput').value.trim();
-          if (!utr) return;
+    const renForm = document.getElementById('renewalForm');
+    const utrInput = document.getElementById('renewalUtrInput');
+    const submitBtn = renForm?.querySelector('button[type="submit"]');
 
-          try {
-            await this.store.renewMembership(app.id, utr);
-            this.closeModal();
-            this.showToast(`Membership ${app.id} successfully renewed for +1 Year!`, 'success');
-            this.updateApplicantAuthUI();
-            if (this.currentView === 'card') {
-              this.renderMembershipCard();
-            }
-          } catch (err) {
-            this.showToast(err?.message || 'Failed to renew membership. Please try again.', 'error');
+    if (renForm && utrInput) {
+      renForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const utr = utrInput.value.trim();
+        if (!utr) return;
+
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing Renewal...';
+        }
+
+        try {
+          await this.store.renewMembership(app.id, utr);
+          this.closeModal();
+          this.showToast(`Membership ${app.id} successfully renewed for +1 Year!`, 'success');
+          this.updateApplicantAuthUI();
+          if (this.currentView === 'card') {
+            this.renderMembershipCard();
           }
-        });
-      }
-    }, 100);
+        } catch (err) {
+          this.showToast(err?.message || 'Failed to renew membership. Please try again.', 'error');
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Confirm 1-Year Membership Renewal';
+          }
+        }
+      });
+    }
   }
 
   /* ════════════════════════════════════════════════════════════════════
@@ -2267,7 +2278,14 @@ class App {
       const employeesInput = form.querySelector('input[name="employees"]');
 
       if (phoneInput) {
-        phoneInput.addEventListener('input', (e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10); this.validateField(phoneInput); });
+        phoneInput.addEventListener('input', (e) => {
+          let val = e.target.value;
+          let digits = val.replace(/\D/g, '');
+          if (digits.length === 12 && digits.startsWith('91')) digits = digits.slice(2);
+          else if (digits.length === 11 && digits.startsWith('0')) digits = digits.slice(1);
+          e.target.value = digits.slice(0, 10);
+          this.validateField(phoneInput);
+        });
         phoneInput.addEventListener('blur', () => this.validateField(phoneInput));
       }
       if (panInput) {
@@ -3151,7 +3169,7 @@ class App {
     });
 
     const exportBtn = document.getElementById('btnExportCSV');
-    if (exportBtn) exportBtn.addEventListener('click', () => this.exportApplicationsCSV());
+    if (exportBtn) exportBtn.onclick = () => this.exportApplicationsCSV();
 
     const switchToTab = (tabName) => {
       const targetMenu = document.querySelector(`.admin-menu-item[data-tab="${tabName}"]`);
@@ -3374,8 +3392,10 @@ class App {
                       <thead>
                         <tr>
                           <th>Attendee</th>
+                          <th>Ticket ID</th>
                           <th>Contact</th>
                           <th>Company</th>
+                          <th>Payment / Admission</th>
                           <th>Registered At</th>
                         </tr>
                       </thead>
@@ -3383,8 +3403,10 @@ class App {
                         ${attendees.map(a => `
                           <tr>
                             <td><strong>${escapeHtml(a.name)}</strong></td>
+                            <td><code style="font-size:0.75rem;background:#F1F5F9;padding:2px 6px;border-radius:4px;color:var(--primary);font-weight:700;">${escapeHtml(a.ticketId || '-')}</code></td>
                             <td>${escapeHtml(a.email)}<br/><small style="color:#64748B;">${escapeHtml(a.phone)}</small></td>
                             <td>${escapeHtml(a.company || '-')}</td>
+                            <td>${a.paymentRef ? `<span style="color:#059669;font-weight:700;">PAID</span><br/><small style="color:#64748B;font-family:monospace;">UTR: ${escapeHtml(a.paymentRef)}</small>` : '<span style="color:#64748B;font-weight:600;">Complimentary</span>'}</td>
                             <td><small>${escapeHtml(formatDate(a.registeredAt))}</small></td>
                           </tr>
                         `).join('')}
@@ -3737,7 +3759,7 @@ class App {
 
           <div class="form-group" style="margin-bottom: 1rem;">
             <label class="form-label" for="joinPhoneInput">10-Digit Indian Mobile Number <span class="req">*</span></label>
-            <input type="tel" id="joinPhoneInput" class="form-control" placeholder="e.g. 9825012345" maxlength="10" required />
+            <input type="tel" id="joinPhoneInput" class="form-control" placeholder="e.g. 9825012345" maxlength="16" required />
           </div>
 
           <div class="form-group" style="margin-bottom: 1.25rem;">
@@ -3799,7 +3821,9 @@ class App {
 
       const name = (document.getElementById('joinNameInput')?.value || '').trim();
       const email = (document.getElementById('joinEmailInput')?.value || '').trim().toLowerCase();
-      const phone = (document.getElementById('joinPhoneInput')?.value || '').trim().replace(/\D/g, '');
+      let phone = (document.getElementById('joinPhoneInput')?.value || '').trim().replace(/\D/g, '');
+      if (phone.length === 12 && phone.startsWith('91')) phone = phone.slice(2);
+      else if (phone.length === 11 && phone.startsWith('0')) phone = phone.slice(1);
       const company = (document.getElementById('joinCompanyInput')?.value || '').trim();
 
       if (name.length < 2) {
@@ -3962,6 +3986,7 @@ class App {
       <div>${content}</div>
     `;
     backdrop.classList.add('show');
+    if (typeof document !== 'undefined' && document.body) document.body.classList.add('modal-open');
     document.getElementById('modalCloseIcon')?.addEventListener('click', () => this.closeModal());
     document.getElementById('modalCloseBtn')?.addEventListener('click', () => this.closeModal());
 
@@ -3994,6 +4019,7 @@ class App {
       this._modalKeydown = null;
     }
     backdrop.classList.remove('show');
+    if (typeof document !== 'undefined' && document.body) document.body.classList.remove('modal-open');
     // Hand focus back to whatever opened the dialog.
     this._modalReturnFocus?.focus?.();
     this._modalReturnFocus = null;

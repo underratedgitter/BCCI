@@ -2293,6 +2293,10 @@ footer h4 {
   }
 }
 
+body.modal-open {
+  overflow: hidden;
+}
+
 /* ==========================================================================
    PRINT
    ========================================================================== */
@@ -2306,6 +2310,14 @@ footer h4 {
   * { box-shadow: none !important; }
 
   /* When modal is open for digital pass or event ticket, print only the pass */
+  body.modal-open main,
+  body:has(.modal-backdrop.show) main,
+  body.modal-open header,
+  body:has(.modal-backdrop.show) header,
+  #view-card .section-header {
+    display: none !important;
+  }
+
   .modal-backdrop.show {
     position: static !important;
     background: transparent !important;

@@ -586,6 +586,7 @@ globalThis.window = {
 };
 
 globalThis.document = {
+  body: new MockElement('body'),
   getElementById: (id) => globalDocElements.get(id) || null,
   querySelector: (sel) => {
     if (sel.startsWith('#')) return globalDocElements.get(sel.slice(1)) || null;
@@ -1366,6 +1367,17 @@ ck('index.html contains metricEnquiries element', indexHtml.includes('id="metric
 ck('app.js sets metricEnquiries on dashboard', SRC.includes("setMetric('metricEnquiries'"));
 ck('app.js wires data-admin-tab click handlers', SRC.includes("card.getAttribute('data-admin-tab')"));
 
+console.log('\nModal Open State & Print Isolation');
+console.log('──────────────────────────────────────');
+ck('showModal adds modal-open class to body', SRC.includes("document.body.classList.add('modal-open')"));
+ck('closeModal removes modal-open class from body', SRC.includes("document.body.classList.remove('modal-open')"));
+const cssContent = fs.readFileSync(new URL('../css/styles.css', import.meta.url), 'utf8');
+ck('styles.css has body.modal-open overflow hidden', cssContent.includes('body.modal-open') && cssContent.includes('overflow: hidden'));
+ck('styles.css hides main on print when modal-open', cssContent.includes('body.modal-open main') || cssContent.includes('body:has(.modal-backdrop.show) main'));
+ck('index.html favicon uses relative assets/ path', indexHtml.includes('href="assets/favicon-32.png"'));
+ck('index.html apple-touch-icon uses relative assets/ path', indexHtml.includes('href="assets/apple-touch-icon.png"'));
+
 console.log(`\n${'═'.repeat(52)}\n  ${pass} passed, ${fail} failed\n${'═'.repeat(52)}`);
 process.exit(fail?1:0);
+
 

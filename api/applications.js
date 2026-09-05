@@ -21,6 +21,7 @@ import {
   clientIp,
   str,
   isEmail,
+  cleanPhone,
   withErrorHandling,
 } from './_lib/http.js';
 import { sendEmail, adminRecipients } from './_lib/email.js';
@@ -101,7 +102,7 @@ async function handler(req, res) {
 
     const repName = str(body.repName, 120);
     const company = str(body.company, 200);
-    const phone = str(body.phone, 20).replace(/\D/g, '');
+    const phone = cleanPhone(body.phone);
     const membershipType = str(body.businessServices, 120);
     const applicantAddress = str(body.address, 500);
 

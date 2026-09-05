@@ -20,6 +20,7 @@ import {
   clientIp,
   str,
   isEmail,
+  cleanPhone,
   withErrorHandling,
 } from './_lib/http.js';
 import { sendEmail } from './_lib/email.js';
@@ -82,7 +83,7 @@ async function handler(req, res) {
       const eventId = str(body.eventId, 100);
       const name = str(body.name, 120);
       const email = str(body.email, 254).toLowerCase();
-      const phone = str(body.phone, 20).replace(/\D/g, '');
+      const phone = cleanPhone(body.phone);
       const company = str(body.company, 200) || 'Delegate / Independent';
       const paymentRef = str(body.paymentRef, 100);
 
