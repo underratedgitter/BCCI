@@ -6,11 +6,13 @@ const run = promisify(exec);   // async — the mock server lives in THIS proces
 const mock = await startMockRedis();
 process.env.UPSTASH_REDIS_REST_URL = mock.url;
 process.env.UPSTASH_REDIS_REST_TOKEN = 't';
-const { redis, putApplication, putEnquiry, listApplications, listEnquiries } =
+const { redis, putApplication, putEnquiry, putEvent, listApplications, listEnquiries, listEvents } =
   await import(new URL('../api/_lib/redis.js', import.meta.url).href);
 
 for (let i=0;i<4;i++) await putApplication({ id:`BCCI-${i}`, company:`Co ${i}`, email:`m${i}@x.com`, repName:'R', status:'Pending', submittedAt:new Date(Date.now()+i).toISOString() });
 for (let i=0;i<3;i++) await putEnquiry({ id:`ENQ-${i}`, name:`N${i}`, email:`e${i}@x.com`, submittedAt:new Date().toISOString() });
+await putEvent({ id: 'evt-1', title: 'Tech Expo', date: '2026-10-01' });
+await redis.set('bcci:account:m1@x.com', { email: 'm1@x.com' });
 await redis.set('admin:tok1','admin@x.com');
 await redis.set('applicant:tok2','m1@x.com');
 await redis.set('bcci:otp:m1@x.com','123456');
@@ -22,12 +24,14 @@ const purge = (args='') => run(`node scripts/purge-data.mjs ${args}`,
 let pass=0, fail=0;
 const ck=(n,c,d='')=>{c?(pass++,console.log('  PASS  '+n)):(fail++,console.log('  FAIL  '+n+(d?' — '+d:'')));};
 
-console.log(`\nSeeded: ${(await listApplications()).length} applications, ${(await listEnquiries()).length} enquiries\n`);
+console.log(`\nSeeded: ${(await listApplications()).length} applications, ${(await listEnquiries()).length} enquiries, ${(await listEvents()).length} events\n`);
 
 console.log('Dry run is the default'); console.log('──────────────────────');
 let out = (await purge()).stdout;
 ck('says DRY RUN', out.includes('DRY RUN'));
 ck('lists the applications', /applications/.test(out));
+ck('lists the events', /events/.test(out));
+ck('lists applicant accounts', /applicant accounts/.test(out));
 ck('tells you how to proceed', out.includes('--confirm'));
 ck('deleted NOTHING', (await listApplications()).length === 4, `${(await listApplications()).length} left`);
 
@@ -35,6 +39,8 @@ console.log('\nLive purge, member data only'); console.log('──────�
 out = (await purge('--confirm')).stdout;
 ck('applications gone', (await listApplications()).length === 0);
 ck('enquiries gone', (await listEnquiries()).length === 0);
+ck('events gone', (await listEvents()).length === 0);
+ck('account gone', (await redis.get('bcci:account:m1@x.com')) === null);
 ck('email index gone', (await redis.get('bcci:app_email:m1@x.com')) === null);
 ck('admin session PRESERVED', (await redis.get('admin:tok1')) === 'admin@x.com', 'should not touch sessions');
 ck('email log PRESERVED', (await redis.get('bcci:email_log')) !== null);

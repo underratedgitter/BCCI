@@ -25,6 +25,10 @@ const MEMBER_DATA = [
   ['bcci:app_index', 'application ordering index'],
   ['bcci:enq:*', 'enquiries'],
   ['bcci:enq_index', 'enquiry ordering index'],
+  ['bcci:account:*', 'applicant accounts'],
+  ['bcci:event:*', 'events'],
+  ['bcci:event_index', 'event ordering index'],
+  ['bcci:event_attendees:*', 'event attendee rosters'],
   ['bcci:applications', 'legacy applications blob'],
   ['bcci:enquiries', 'legacy enquiries blob'],
   ['bcci:migrated:*', 'migration markers'],
@@ -38,6 +42,7 @@ const OPERATIONAL = [
   ['bcci:attempts:*', 'legacy OTP attempt counters'],
   ['bcci:ratelimit:*', 'legacy rate-limit counters'],
   ['bcci:email_log', 'email audit log'],
+  ['bcci:health:*', 'health check probes'],
 ];
 
 async function keysMatching(pattern) {
