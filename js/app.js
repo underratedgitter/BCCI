@@ -142,11 +142,18 @@ class App {
 
   _refreshScrollReveal() {
     if (!this._revealObserver) return;
-    setTimeout(() => {
-      document.querySelectorAll('.reveal:not(.visible), .stagger-children:not(.visible)').forEach(el => {
-        this._revealObserver.observe(el);
-      });
-    }, 100);
+    const windowH = typeof window !== 'undefined' ? (window.innerHeight || document.documentElement?.clientHeight || 800) : 800;
+    document.querySelectorAll('.reveal:not(.visible), .stagger-children:not(.visible)').forEach(el => {
+      // If the element is within the initial viewport, make it visible immediately to prevent blank pop-in
+      if (typeof el.getBoundingClientRect === 'function') {
+        const rect = el.getBoundingClientRect();
+        if (rect.top < windowH + 40 && rect.bottom > -40) {
+          el.classList.add('visible');
+          return;
+        }
+      }
+      this._revealObserver.observe(el);
+    });
   }
 
   setupScrollToTop() {
@@ -1550,16 +1557,18 @@ class App {
     // Show/hide scroll-to-top button
     this._updateScrollToTopBtn();
 
-    // Refresh scroll reveal for new content
-    this._refreshScrollReveal();
-
     document.querySelectorAll('.view-page').forEach(page => { page.style.display = 'none'; });
 
     const targetPage = document.getElementById(`view-${viewId}`);
     if (targetPage) {
       targetPage.style.display = 'block';
-      window.scrollTo({ top: 0, behavior: scrollBehavior() });
+      if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      }
     }
+
+    // Refresh scroll reveal for new content after mounting active view
+    this._refreshScrollReveal();
 
     if (viewId === 'home' || viewId === 'about') this.renderLeadership();
     if (viewId === 'services') this.renderServicesAndFaqs();

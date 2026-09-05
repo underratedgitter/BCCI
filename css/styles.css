@@ -86,8 +86,8 @@
   --rule-dark: 1px solid var(--gray-300);
   --rule-accent: 1px solid var(--black);
 
-  --transition: all 0.2s ease;
-  --transition-slow: all 0.4s cubic-bezier(0.25, 0.1, 0.25, 1);
+  --transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-slow: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   --max-width: 1200px;
 }
 
@@ -182,11 +182,12 @@ a.link-underline::after {
 a.link-underline:hover::after { width: 100%; }
 a.link-underline:hover { opacity: 1; }
 
-/* ── Scroll Reveal Animations ────────────────────────────────── */
+/* ── Scroll Reveal & Fluid View Animations ────────────────────── */
 .reveal {
   opacity: 0;
-  transform: translateY(20px);
-  transition: opacity 0.6s cubic-bezier(0.25, 0.1, 0.25, 1), transform 0.6s cubic-bezier(0.25, 0.1, 0.25, 1);
+  transform: translateY(14px);
+  transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
 }
 
 .reveal.visible {
@@ -194,27 +195,61 @@ a.link-underline:hover { opacity: 1; }
   transform: translateY(0);
 }
 
-.reveal-delay-1 { transition-delay: 0.1s; }
-.reveal-delay-2 { transition-delay: 0.2s; }
-.reveal-delay-3 { transition-delay: 0.3s; }
-.reveal-delay-4 { transition-delay: 0.4s; }
+.reveal-delay-1 { transition-delay: 0.06s; }
+.reveal-delay-2 { transition-delay: 0.12s; }
+.reveal-delay-3 { transition-delay: 0.18s; }
+.reveal-delay-4 { transition-delay: 0.24s; }
 
 /* Staggered children */
 .stagger-children > * {
   opacity: 0;
-  transform: translateY(12px);
-  transition: opacity 0.4s ease, transform 0.4s ease;
+  transform: translateY(10px);
+  transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
 }
 
-.stagger-children.visible > *:nth-child(1) { transition-delay: 0.05s; }
-.stagger-children.visible > *:nth-child(2) { transition-delay: 0.1s; }
-.stagger-children.visible > *:nth-child(3) { transition-delay: 0.15s; }
-.stagger-children.visible > *:nth-child(4) { transition-delay: 0.2s; }
-.stagger-children.visible > *:nth-child(5) { transition-delay: 0.25s; }
-.stagger-children.visible > *:nth-child(6) { transition-delay: 0.3s; }
-.stagger-children.visible > *:nth-child(7) { transition-delay: 0.35s; }
-.stagger-children.visible > *:nth-child(8) { transition-delay: 0.4s; }
+.stagger-children.visible > *:nth-child(1) { transition-delay: 0.04s; }
+.stagger-children.visible > *:nth-child(2) { transition-delay: 0.08s; }
+.stagger-children.visible > *:nth-child(3) { transition-delay: 0.12s; }
+.stagger-children.visible > *:nth-child(4) { transition-delay: 0.16s; }
+.stagger-children.visible > *:nth-child(5) { transition-delay: 0.20s; }
+.stagger-children.visible > *:nth-child(6) { transition-delay: 0.24s; }
+.stagger-children.visible > *:nth-child(7) { transition-delay: 0.28s; }
+.stagger-children.visible > *:nth-child(8) { transition-delay: 0.32s; }
 .stagger-children.visible > * { opacity: 1; transform: translateY(0); }
+
+/* Smooth SPA View Transitions */
+@keyframes viewEnter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.view-page {
+  animation: viewEnter 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: opacity, transform;
+}
+
+@keyframes paneEnter {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.admin-tab-pane {
+  animation: paneEnter 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: opacity, transform;
+}
 
 small, .mono {
   font-family: var(--font-mono);
@@ -1378,9 +1413,29 @@ small, .mono {
   justify-content: center;
   padding: var(--space-xl);
   backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
-.modal-backdrop.show { display: flex; }
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalBoxEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.modal-backdrop.show {
+  display: flex;
+  animation: modalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
 
 .modal-box {
   background: var(--white);
@@ -1390,6 +1445,11 @@ small, .mono {
   overflow-y: auto;
   padding: var(--space-2xl);
   position: relative;
+}
+
+.modal-backdrop.show .modal-box {
+  animation: modalBoxEnter 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
 }
 
 .modal-close {
