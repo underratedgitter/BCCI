@@ -149,7 +149,7 @@ async function handler(req, res) {
     const employees = str(body.employees, 30);
     if (employees) {
       const empCount = parseInt(employees, 10);
-      if (isNaN(empCount) || empCount < 1) {
+      if (isNaN(empCount) || empCount < 1 || !/^\d+$/.test(employees)) {
         return res.status(400).json({ error: 'Employee count must be a number greater than or equal to 1.' });
       }
     }

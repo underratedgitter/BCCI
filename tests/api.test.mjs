@@ -141,19 +141,25 @@ check('a second application from the same email → 409', r.statusCode === 409, 
 
 // Server-side validation checks
 r = await call(applications, {
-  method: 'POST', token: applicantToken,
+  method: 'POST', token: applicantToken, ip: '203.0.113.11',
   body: { repName: 'Rajesh Shah', company: 'Test Ltd', phone: '9876543210', businessServices: 'Chemicals', employees: 'abc' },
 });
 check('POST with invalid employees → 400', r.statusCode === 400, `got ${r.statusCode}`);
 
 r = await call(applications, {
-  method: 'POST', token: applicantToken,
+  method: 'POST', token: applicantToken, ip: '203.0.113.12',
+  body: { repName: 'Rajesh Shah', company: 'Test Ltd', phone: '9876543210', businessServices: 'Chemicals', employees: '150abc' },
+});
+check('POST with alphanumeric employees (150abc) → 400', r.statusCode === 400, `got ${r.statusCode}`);
+
+r = await call(applications, {
+  method: 'POST', token: applicantToken, ip: '203.0.113.13',
   body: { repName: 'Rajesh Shah', company: 'Test Ltd', phone: '9876543210', businessServices: 'Chemicals', address: 'Plot' },
 });
 check('POST with short address (<5 chars) → 400', r.statusCode === 400, `got ${r.statusCode}`);
 
 r = await call(applications, {
-  method: 'POST', token: applicantToken,
+  method: 'POST', token: applicantToken, ip: '203.0.113.14',
   body: { repName: 'Rajesh Shah', company: 'Test Ltd', phone: '9876543210', businessServices: 'Chemicals', annualTurnover: '1' },
 });
 check('POST with short annualTurnover (<2 chars) → 400', r.statusCode === 400, `got ${r.statusCode}`);
