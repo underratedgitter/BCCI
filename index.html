@@ -1036,11 +1036,10 @@
               </div>
               <div class="form-group">
                 <label class="form-label" for="annualTurnover">Annual Turnover (INR) <span class="req">*</span></label>
-                <input type="text" id="annualTurnover" class="form-control" name="annualTurnover"
-                  placeholder="e.g. 25 Crore, 50 Lakh, or 50,00,000"
-                  pattern="^(?:(?:₹|[Rr][Ss]\.?|[Ii][Nn][Rr])\s*)?\d[\d,]*(?:\.\d+)?(?:\s*(?:-|to|[Tt][Oo])\s*\d[\d,]*(?:\.\d+)?)?\s*(?:[Cc][Rr](?:[Oo][Rr][Ee][Ss]?)?|[Ll](?:[Aa][Kk][Hh][Ss]?|[Aa][Cc][Ss]?)?|[Kk]|[Tt][Hh][Oo][Uu][Ss][Aa][Nn][Dd]|[Mm][Ii][Ll][Ll][Ii][Oo][Nn]|[Bb](?:[Nn]|[Ii][Ll][Ll][Ii][Oo][Nn])?)?\.?\s*$"
+                <input type="number" id="annualTurnover" class="form-control" name="annualTurnover"
+                  placeholder="e.g. 50000000" min="1" step="1"
                   autocomplete="off" required />
-                <small class="form-hint">Enter positive turnover in INR (e.g. 25 Crore, 50 Lakh, or 50,00,000)</small>
+                <small class="form-hint">Enter numbers only in INR (e.g. 50000000)</small>
               </div>
               <div class="form-group">
                 <label class="form-label">Total Employee Headcount <span class="req">*</span></label>

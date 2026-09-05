@@ -107,7 +107,7 @@ const application = {
   repName: 'Priya Shah', repDesignation: 'Director',
   company: 'Sunrise Chemicals Pvt Ltd', legalStatus: 'Private Limited',
   enterpriseType: 'Medium', businessServices: 'Chemicals & Petrochemicals',
-  annualTurnover: '5-10 Cr', employees: '85', cin: 'U24100GJ2015PTC012345',
+  annualTurnover: '75000000', employees: '85', cin: 'U24100GJ2015PTC012345',
   phone: '9825012345', address: 'Plot 42, GIDC Estate, Ankleshwar',
   district: 'Bharuch', pincode: '393002',
   gstNo: '24AABCS1234F1Z5', panNo: 'AABCS1234F',

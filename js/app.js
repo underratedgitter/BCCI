@@ -2274,7 +2274,10 @@ class App {
         pincodeInput.addEventListener('blur', () => this.validateField(pincodeInput));
       }
       if (turnoverInput) {
-        turnoverInput.addEventListener('input', () => { if (turnoverInput.classList.contains('is-invalid')) this.validateField(turnoverInput); });
+        turnoverInput.addEventListener('input', (e) => {
+          if (e.target.value) e.target.value = e.target.value.replace(/\D/g, '');
+          this.validateField(turnoverInput);
+        });
         turnoverInput.addEventListener('blur', () => this.validateField(turnoverInput));
       }
       if (employeesInput) {
@@ -2357,12 +2360,10 @@ class App {
           if (val.length < 5) { isValid = false; errorMsg = 'Address must be at least 5 characters.'; }
           break;
         case 'annualTurnover': {
-          const turnoverRegex = /^(?:(?:₹|Rs\.?|INR)\s*)?\d[\d,]*(?:\.\d+)?(?:\s*(?:-|to)\s*\d[\d,]*(?:\.\d+)?)?\s*(?:(?:Cr(?:ore|ores)?|L(?:akh|akhs|ac|acs)?|K|Thousand|Million|B(?:n|illion)?)\.?)?\s*$/i;
-          const numbers = val.replace(/,/g, '').match(/\d+(?:\.\d+)?/g);
-          const hasPositive = numbers && numbers.some(n => parseFloat(n) > 0);
-          if (val.length < 2 || !turnoverRegex.test(val) || !hasPositive) {
+          const turnoverNum = Number(val);
+          if (!val || val.length < 2 || !/^\d+$/.test(val) || isNaN(turnoverNum) || turnoverNum <= 0) {
             isValid = false;
-            errorMsg = 'Enter valid annual turnover in INR (e.g. 25 Crore, 50 Lakh, or 50,00,000).';
+            errorMsg = 'Enter valid annual turnover in numbers only (e.g. 50000000).';
           }
           break;
         }

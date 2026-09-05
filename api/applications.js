@@ -139,11 +139,9 @@ async function handler(req, res) {
 
     const annualTurnover = str(body.annualTurnover, 60);
     if (annualTurnover) {
-      const turnoverRegex = /^(?:(?:₹|Rs\.?|INR)\s*)?\d[\d,]*(?:\.\d+)?(?:\s*(?:-|to)\s*\d[\d,]*(?:\.\d+)?)?\s*(?:(?:Cr(?:ore|ores)?|L(?:akh|akhs|ac|acs)?|K|Thousand|Million|B(?:n|illion)?)\.?)?\s*$/i;
-      const turnoverNumbers = annualTurnover.replace(/,/g, '').match(/\d+(?:\.\d+)?/g);
-      const hasPositiveTurnover = turnoverNumbers && turnoverNumbers.some(n => parseFloat(n) > 0);
-      if (annualTurnover.length < 2 || !turnoverRegex.test(annualTurnover) || !hasPositiveTurnover) {
-        return res.status(400).json({ error: 'Enter a valid annual turnover in INR (e.g. 25 Crore, 50 Lakh, or 50,00,000).' });
+      const turnoverNum = Number(annualTurnover);
+      if (annualTurnover.length < 2 || !/^\d+$/.test(annualTurnover) || isNaN(turnoverNum) || turnoverNum <= 0) {
+        return res.status(400).json({ error: 'Annual turnover must contain numbers only (e.g. 50000000).' });
       }
     }
 

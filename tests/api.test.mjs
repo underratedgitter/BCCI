@@ -160,19 +160,19 @@ check('POST with short annualTurnover (<2 chars) → 400', r.statusCode === 400,
 
 r = await call(applications, {
   method: 'POST', token: applicantToken, ip: '203.0.113.21',
-  body: { repName: 'Rajesh Shah', company: 'Test Ltd', phone: '9876543210', businessServices: 'Chemicals', annualTurnover: 'InvalidText' },
+  body: { repName: 'Rajesh Shah', company: 'Test Ltd', phone: '9876543210', businessServices: 'Chemicals', annualTurnover: '25 Crore' },
 });
 check('POST with non-numeric annualTurnover → 400', r.statusCode === 400, `got ${r.statusCode}`);
 
 r = await call(applications, {
   method: 'POST', token: applicantToken, ip: '203.0.113.22',
-  body: { repName: 'Rajesh Shah', company: 'Test Ltd', phone: '9876543210', businessServices: 'Chemicals', annualTurnover: '0 Crore' },
+  body: { repName: 'Rajesh Shah', company: 'Test Ltd', phone: '9876543210', businessServices: 'Chemicals', annualTurnover: '0' },
 });
 check('POST with zero annualTurnover → 400', r.statusCode === 400, `got ${r.statusCode}`);
 
 r = await call(applications, {
   method: 'POST', token: applicantToken, ip: '203.0.113.23',
-  body: { repName: 'Rajesh Shah', company: 'Test Ltd', phone: '9876543210', businessServices: 'Chemicals', annualTurnover: '-25 Crore' },
+  body: { repName: 'Rajesh Shah', company: 'Test Ltd', phone: '9876543210', businessServices: 'Chemicals', annualTurnover: '-25000000' },
 });
 check('POST with negative annualTurnover → 400', r.statusCode === 400, `got ${r.statusCode}`);
 

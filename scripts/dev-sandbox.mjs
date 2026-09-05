@@ -52,7 +52,7 @@ for (const [i, s] of samples.entries()) {
     phone: `98250123${10 + i}`,
     businessServices: 'Chemicals & Petrochemicals',
     legalStatus: 'Private Limited',
-    annualTurnover: '5-10 Cr',
+    annualTurnover: '50000000',
     employees: String(20 + i * 15),
     gstNo: `24AABCS123${i}F1Z5`,
     panNo: `AABCS123${i}F`,
