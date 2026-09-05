@@ -2712,6 +2712,7 @@ class App {
     setMetric('metricPending', pendingApps.length);
     setMetric('metricApproved', approvedApps.length);
     setMetric('metricRejected', rejectedApps.length);
+    setMetric('metricEnquiries', enquiries.length);
 
     const emptyState = (icon, text) =>
       `<div style="text-align: center; color: #94A3B8; padding: 2rem;"><i class="fas ${icon}" style="font-size: 1.8rem; margin-bottom: 0.5rem; display: block;"></i>${escapeHtml(text)}</div>`;
@@ -3152,33 +3153,36 @@ class App {
     const exportBtn = document.getElementById('btnExportCSV');
     if (exportBtn) exportBtn.addEventListener('click', () => this.exportApplicationsCSV());
 
+    const switchToTab = (tabName) => {
+      const targetMenu = document.querySelector(`.admin-menu-item[data-tab="${tabName}"]`);
+      document.querySelectorAll('.admin-menu-item').forEach(i => i.classList.remove('active'));
+      if (targetMenu) targetMenu.classList.add('active');
+      document.querySelectorAll('.admin-tab-pane').forEach(pane => pane.style.display = 'none');
+      const targetPane = document.getElementById(`tab-${tabName}`);
+      if (targetPane) {
+        targetPane.style.display = 'block';
+        targetPane.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
+      }
+    };
+
     document.querySelectorAll('.admin-menu-item').forEach(item => {
       item.onclick = () => {
         const tab = item.getAttribute('data-tab');
-        document.querySelectorAll('.admin-menu-item').forEach(i => i.classList.remove('active'));
-        item.classList.add('active');
-        document.querySelectorAll('.admin-tab-pane').forEach(pane => pane.style.display = 'none');
-        const targetPane = document.getElementById(`tab-${tab}`);
-        if (targetPane) targetPane.style.display = 'block';
+        if (tab) switchToTab(tab);
       };
     });
 
-    const switchToTab = (tabName) => {
-      const targetMenu = document.querySelector(`.admin-menu-item[data-tab="${tabName}"]`);
-      if (targetMenu) targetMenu.click();
-    };
-
-    const metricCards = {
-      metricPending: 'pending',
-      metricApproved: 'approved',
-      metricRejected: 'rejected',
-    };
-    Object.entries(metricCards).forEach(([metricId, tabName]) => {
-      const card = document.getElementById(metricId)?.closest('.metric-card');
-      if (card) {
+    document.querySelectorAll('.admin-metrics-grid .metric-card').forEach(card => {
+      const tabName = card.getAttribute('data-admin-tab');
+      if (tabName) {
         card.style.cursor = 'pointer';
-        card.title = `Switch to ${tabName} tab`;
         card.onclick = () => switchToTab(tabName);
+        card.onkeydown = (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            switchToTab(tabName);
+          }
+        };
       }
     });
   }

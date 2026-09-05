@@ -1415,21 +1415,30 @@
           <div class="admin-content">
             <!-- Metrics Bar -->
             <div class="admin-metrics-grid">
-              <div class="metric-card">
+              <div class="metric-card" data-admin-tab="pending" role="button" tabindex="0" title="Click to view Applications">
                 <div class="metric-val" id="metricTotal">0</div>
                 <div class="metric-title">Total Submissions</div>
+                <div class="metric-action-hint"><i class="fas fa-arrow-right"></i> View List</div>
               </div>
-              <div class="metric-card">
+              <div class="metric-card" data-admin-tab="pending" role="button" tabindex="0" title="Click to view Pending Approvals">
                 <div class="metric-val pending" id="metricPending">0</div>
                 <div class="metric-title">Pending Approval</div>
+                <div class="metric-action-hint"><i class="fas fa-arrow-right"></i> Review</div>
               </div>
-              <div class="metric-card">
+              <div class="metric-card" data-admin-tab="approved" role="button" tabindex="0" title="Click to view Active Members">
                 <div class="metric-val approved" id="metricApproved">0</div>
                 <div class="metric-title">Approved Members</div>
+                <div class="metric-action-hint"><i class="fas fa-arrow-right"></i> Directory</div>
               </div>
-              <div class="metric-card">
+              <div class="metric-card" data-admin-tab="rejected" role="button" tabindex="0" title="Click to view Rejected Applications">
                 <div class="metric-val rejected" id="metricRejected">0</div>
                 <div class="metric-title">Rejected</div>
+                <div class="metric-action-hint"><i class="fas fa-arrow-right"></i> Archive</div>
+              </div>
+              <div class="metric-card" data-admin-tab="enquiries" role="button" tabindex="0" title="Click to view Enquiry Inbox">
+                <div class="metric-val" id="metricEnquiries" style="color: var(--primary);">0</div>
+                <div class="metric-title">Enquiry Requests</div>
+                <div class="metric-action-hint"><i class="fas fa-arrow-right"></i> Inbox</div>
               </div>
             </div>
 

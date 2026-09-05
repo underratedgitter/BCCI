@@ -1355,6 +1355,17 @@ ck('employees headcount has required attribute in index.html', /<input[^>]*name=
   ck('modal container contains delegate inputs', modalContainer.innerHTML.includes('id="joinNameInput"') && modalContainer.innerHTML.includes('id="joinPhoneInput"'));
 }
 
+console.log('\nAdmin Dashboard Metric Card Navigation');
+console.log('──────────────────────────────────────');
+const indexHtml = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+ck('index.html contains metric card with data-admin-tab="pending"', indexHtml.includes('data-admin-tab="pending"'));
+ck('index.html contains metric card with data-admin-tab="approved"', indexHtml.includes('data-admin-tab="approved"'));
+ck('index.html contains metric card with data-admin-tab="rejected"', indexHtml.includes('data-admin-tab="rejected"'));
+ck('index.html contains metric card with data-admin-tab="enquiries"', indexHtml.includes('data-admin-tab="enquiries"'));
+ck('index.html contains metricEnquiries element', indexHtml.includes('id="metricEnquiries"'));
+ck('app.js sets metricEnquiries on dashboard', SRC.includes("setMetric('metricEnquiries'"));
+ck('app.js wires data-admin-tab click handlers', SRC.includes("card.getAttribute('data-admin-tab')"));
+
 console.log(`\n${'═'.repeat(52)}\n  ${pass} passed, ${fail} failed\n${'═'.repeat(52)}`);
 process.exit(fail?1:0);
 

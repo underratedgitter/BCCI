@@ -1475,6 +1475,17 @@ small, .mono {
   padding: var(--space-xl);
   text-align: center;
   border-top: 3px solid var(--navy);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  user-select: none;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+}
+
+.metric-card:hover, .metric-card:focus-visible {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 18px rgba(15, 44, 89, 0.12);
+  outline: none;
 }
 
 .metric-val {
@@ -1491,6 +1502,7 @@ small, .mono {
 .metric-card:nth-child(2) { border-top-color: var(--warning); }
 .metric-card:nth-child(3) { border-top-color: var(--success); }
 .metric-card:nth-child(4) { border-top-color: var(--danger); }
+.metric-card:nth-child(5) { border-top-color: var(--primary); }
 
 .metric-title {
   font-family: var(--font-mono);
@@ -1499,6 +1511,24 @@ small, .mono {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   margin-top: 0.25rem;
+}
+
+.metric-action-hint {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--accent-gold-dark, #AA7C11);
+  margin-top: 0.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  opacity: 0.85;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.metric-card:hover .metric-action-hint {
+  opacity: 1;
+  transform: translateX(2px);
 }
 
 /* ── Data Tables ───────────────────────────────────────────────── */
