@@ -619,6 +619,14 @@ function buildAuthDOM() {
   const banner = new MockElement('div', 'applicantAuthBanner');
   banner.style.display = 'none';
 
+  // Segmented mode tabs
+  const tabSignIn = new MockElement('button', 'tabAuthSignIn', 'auth-mode-tab active');
+  const tabRegister = new MockElement('button', 'tabAuthRegister', 'auth-mode-tab');
+  const tabsNav = new MockElement('div', 'authModeTabs', 'auth-mode-tabs');
+  tabsNav.appendChild(tabSignIn);
+  tabsNav.appendChild(tabRegister);
+  gate.appendChild(tabsNav);
+
   // 1. Sign In Card
   const cardSignIn = new MockElement('div', 'authCardSignIn', 'auth-card');
   const alertNotSet = new MockElement('div', 'passwordNotSetAlert', 'auth-inline-alert');
@@ -763,7 +771,7 @@ function buildAuthDOM() {
   regEl(banner);
 
   return {
-    gate, banner,
+    gate, banner, tabSignIn, tabRegister, tabsNav,
     cardSignIn, alertNotSet, legacySwitchBtn, signInForm, emailIn, passIn, passToggle, passIcon, forgotLink, signInBtn, regLink,
     cardRegister, regForm, regStep1, regEmailIn, sendRegOtpBtn, regStep2, regOtpIn, regPassIn, regPassToggle, regPassIcon, regConfIn, regConfToggle, regBtn, backToSignInFromReg,
     cardForgot, forgotForm, forgotStep1, forgotEmailIn, sendForgotOtpBtn, forgotStep2, forgotOtpIn, newPassIn, newPassToggle, newPassIcon, newConfIn, newConfToggle, resetBtn, backToSignInFromForgot
@@ -832,6 +840,13 @@ function createTestApp(dom, testStore) {
       dom.regStep2.style.display === 'none' &&
       dom.forgotStep2.style.display === 'none'
     );
+    ck('showAuthMode("signin") marks tabAuthSignIn active', dom.tabSignIn.classList.contains('active') && !dom.tabRegister.classList.contains('active'));
+    testApp.showAuthMode('register');
+    ck('showAuthMode("register") marks tabAuthRegister active', dom.tabRegister.classList.contains('active') && !dom.tabSignIn.classList.contains('active'));
+    testApp.showAuthMode('forgot');
+    ck('showAuthMode("forgot") hides authModeTabs', dom.tabsNav.style.display === 'none');
+    testApp.showAuthMode('signin');
+    ck('showAuthMode("signin") restores authModeTabs', dom.tabsNav.style.display !== 'none');
   } else {
     ck('showAuthMode("register") shows register card, hides others', false, 'showAuthMode not implemented');
     ck('showAuthMode("register") propagates email to register form', false, 'showAuthMode not implemented');
@@ -922,6 +937,12 @@ function createTestApp(dom, testStore) {
     ck('Sign in success calls updateNavAuthUI', testApp.navAuthUpdated >= 1);
     ck('Sign in success transitions to membership view', testApp.viewsRendered.includes('membership'));
     ck('Sign in success shows success toast', testApp.toasts.some(t => t.type === 'success'));
+
+    // Tab button click interaction test
+    dom.tabRegister.click();
+    ck('clicking tabAuthRegister switches to register mode', dom.cardRegister.style.display === 'block');
+    dom.tabSignIn.click();
+    ck('clicking tabAuthSignIn switches back to signin mode', dom.cardSignIn.style.display === 'block');
   } else {
     ck('Sign in success calls updateNavAuthUI', false);
     ck('Sign in success transitions to membership view', false);

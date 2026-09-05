@@ -2496,36 +2496,174 @@ footer h4 {
   .form-progress-label { white-space: normal; text-align: center; }
 }
 
-/* ── Applicant Authentication Cards & Password Input Groups ─────── */
-.auth-card {
+/* ── Unified Applicant Authentication Suite ────────────────────────── */
+.auth-gate-container {
+  max-width: 520px;
+  margin: 0 auto 2.5rem auto;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-top: 3px solid var(--primary, #0F2C59);
+  border-radius: 12px;
+  padding: 2.25rem 2rem;
+  box-shadow: 0 10px 25px -5px rgba(15, 44, 89, 0.08), 0 8px 10px -6px rgba(15, 44, 89, 0.04);
   text-align: left;
-  transition: opacity 0.25s ease, transform 0.25s ease;
+  position: relative;
 }
 
-.password-input-group {
+.auth-gate-header {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.auth-gate-crest {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 1rem auto;
+  padding: 4px;
+  background: #FFFFFF;
+  border: 2px solid #E2E8F0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(15, 44, 89, 0.08);
+}
+
+.auth-gate-crest img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 50%;
+}
+
+.auth-gate-title {
+  font-family: var(--font-display, serif);
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: var(--primary, #0F2C59);
+  margin-bottom: 0.35rem;
+  letter-spacing: -0.2px;
+}
+
+.auth-gate-subtitle {
+  color: #64748B;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin: 0 auto;
+  max-width: 420px;
+}
+
+/* Mode Switcher Tabs */
+.auth-mode-tabs {
+  display: flex;
+  background: #F1F5F9;
+  padding: 4px;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  border: 1px solid #E2E8F0;
+}
+
+.auth-mode-tab {
+  flex: 1;
+  padding: 0.6rem 0.75rem;
+  border: none;
+  background: transparent;
+  color: #64748B;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.auth-mode-tab.active {
+  background: #FFFFFF;
+  color: var(--primary, #0F2C59);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+}
+
+.auth-mode-tab:hover:not(.active) {
+  color: var(--primary, #0F2C59);
+}
+
+.auth-card {
+  text-align: left;
+}
+
+/* Enclosed Modern Input Group */
+.auth-input-group, .password-input-group {
   position: relative;
   display: flex;
   align-items: center;
+  background: #F8FAFC;
+  border: 1.5px solid #CBD5E1;
+  border-radius: 8px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.auth-input-group:focus-within, .password-input-group:focus-within {
+  background: #FFFFFF;
+  border-color: var(--primary, #0F2C59);
+  box-shadow: 0 0 0 3px rgba(15, 44, 89, 0.12);
 }
 
 .password-input-group .form-control {
   padding-right: 2.5rem;
 }
 
-.password-toggle-btn {
+.auth-input-icon {
   position: absolute;
-  right: 0.75rem;
+  left: 0.85rem;
   top: 50%;
   transform: translateY(-50%);
-  background: transparent;
-  border: none;
-  color: var(--gray-500, #64748B);
+  color: #94A3B8;
+  font-size: 0.95rem;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.auth-input-field, .password-input-group .form-control {
+  width: 100%;
+  border: none !important;
+  background: transparent !important;
+  padding: 0.75rem 2.5rem 0.75rem 2.5rem !important;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  color: #0F172A !important;
+  outline: none !important;
+  box-shadow: none !important;
+  -webkit-appearance: none;
+}
+
+.auth-input-field::placeholder, .password-input-group .form-control::placeholder {
+  color: #94A3B8;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  color: #94A3B8;
   cursor: pointer;
-  padding: 0.35rem 0.5rem;
+  padding: 0.4rem 0.6rem !important;
   font-size: 0.95rem;
   line-height: 1;
+  border-radius: 4px;
   transition: color 0.15s ease;
   z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .password-toggle-btn:hover {
@@ -2533,14 +2671,15 @@ footer h4 {
 }
 
 .password-toggle-btn:focus-visible {
-  outline: 2px solid var(--primary, #0F2C59);
+  outline: 2px solid var(--primary, #0F2C59) !important;
   outline-offset: 2px;
-  border-radius: 4px;
 }
 
 .auth-text-link {
-  background: none;
-  border: none;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
   color: var(--primary, #0F2C59);
   font-family: var(--font-body);
   font-size: 0.85rem;
@@ -2560,7 +2699,7 @@ footer h4 {
   background: #FFFBEB;
   border: 1px solid #FCD34D;
   border-left: 4px solid #F59E0B;
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 0.85rem 1rem;
   margin-bottom: 1.25rem;
   font-size: 0.875rem;
@@ -2582,11 +2721,26 @@ footer h4 {
 }
 
 .otp-input {
-  letter-spacing: 6px;
+  letter-spacing: 8px;
   font-size: 1.5rem;
   font-weight: 800;
   text-align: center;
   font-family: var(--font-mono, monospace);
+  padding-left: 0.75rem !important;
+  padding-right: 0.75rem !important;
+}
+
+.auth-security-footer {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #F1F5F9;
+  font-size: 0.78rem;
+  color: #94A3B8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  text-align: center;
 }
 
 /* ── Public Events & Conclaves Page ─────────────────────────────── */

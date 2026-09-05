@@ -229,6 +229,16 @@ class App {
     if (cardRegister) cardRegister.style.display = mode === 'register' ? 'block' : 'none';
     if (cardForgot) cardForgot.style.display = mode === 'forgot' ? 'block' : 'none';
 
+    // Toggle tab active states
+    const tabSignIn = document.getElementById('tabAuthSignIn');
+    const tabRegister = document.getElementById('tabAuthRegister');
+    const tabsNav = document.getElementById('authModeTabs');
+    if (tabSignIn && tabRegister) {
+      tabSignIn.classList.toggle('active', mode === 'signin');
+      tabRegister.classList.toggle('active', mode === 'register');
+      if (tabsNav) tabsNav.style.display = mode === 'forgot' ? 'none' : 'flex';
+    }
+
     // Reset any error alerts or step 2 states when switching
     const passAlert = document.getElementById('passwordNotSetAlert');
     if (passAlert) passAlert.style.display = 'none';
@@ -281,6 +291,22 @@ class App {
     });
 
     // ── 2. Mode Toggle Buttons ───────────────────────────────────────
+    const tabSignInBtn = document.getElementById('tabAuthSignIn');
+    if (tabSignInBtn) {
+      tabSignInBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.showAuthMode('signin');
+      });
+    }
+
+    const tabRegBtn = document.getElementById('tabAuthRegister');
+    if (tabRegBtn) {
+      tabRegBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.showAuthMode('register');
+      });
+    }
+
     const switchToRegisterBtn = document.getElementById('switchToRegister');
     if (switchToRegisterBtn) {
       switchToRegisterBtn.addEventListener('click', (e) => {

@@ -74,9 +74,9 @@
   <!-- QR Code Library -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
   <!-- Custom Stylesheet -->
-  <link rel="stylesheet" href="css/styles.css?v=2.5.1" />
+  <link rel="stylesheet" href="css/styles.css?v=3.2.0" />
   <!-- Premium Membership Card Styles -->
-  <link rel="stylesheet" href="css/membership-card.css?v=2.5.1" />
+  <link rel="stylesheet" href="css/membership-card.css?v=3.2.0" />
 </head><body>
 
   <!-- Skip to Content (Accessibility) -->
@@ -735,14 +735,26 @@
         </div>
 
         <!-- Unified Executive Authentication Suite (Appears when NOT signed in) -->
-        <div id="applicantAuthGate" style="max-width: 650px; margin: 0 auto 2.5rem auto; background: linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%); border: 1px solid var(--border-color); border-top: 4px solid #D4AF37; border-radius: var(--radius-lg); padding: 2.5rem 2rem; box-shadow: 0 15px 35px rgba(15,44,89,0.1); text-align: center; position: relative; overflow: hidden;">
-          <div style="width: 80px; height: 80px; background: #FFFFFF; border: 3px solid #D4AF37; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 1.25rem; box-shadow: 0 8px 20px rgba(15,44,89,0.15); padding: 6px;" class="bcci-gate-logo-container">
-            <img src="assets/BCCIBHARUCH.webp" alt="BCCI Bharuch Logo" style="width: 100%; height: 100%; object-fit: contain; border-radius: 50%;" />
+        <div id="applicantAuthGate" class="auth-gate-container">
+          <div class="auth-gate-header">
+            <div class="auth-gate-crest">
+              <img src="assets/BCCIBHARUCH.webp" alt="BCCI Bharuch Logo" />
+            </div>
+            <h3 class="auth-gate-title">Applicant Portal</h3>
+            <p class="auth-gate-subtitle" id="authGateSubtitle">
+              Sign in with your email and password, or register as a new applicant to access the BCCI membership application.
+            </p>
           </div>
-          <h3 style="font-size: 1.45rem; font-weight: 800; color: var(--primary); margin-bottom: 0.35rem; letter-spacing: -0.3px;">Applicant Authentication Gate</h3>
-          <p style="color: #64748B; font-size: 0.95rem; margin-bottom: 1.75rem; line-height: 1.55;" id="authGateSubtitle">
-            Sign in with your email and password, or register as a new applicant to access the BCCI membership application.
-          </p>
+
+          <!-- Mode Switcher Tabs (Sign In / Register) -->
+          <div class="auth-mode-tabs" id="authModeTabs">
+            <button type="button" id="tabAuthSignIn" class="auth-mode-tab active">
+              <i class="fas fa-sign-in-alt"></i> Sign In
+            </button>
+            <button type="button" id="tabAuthRegister" class="auth-mode-tab">
+              <i class="fas fa-user-plus"></i> New Registration
+            </button>
+          </div>
 
           <!-- 1. SIGN IN CARD (Default Active) -->
           <div id="authCardSignIn" class="auth-card">
@@ -753,7 +765,7 @@
                 <div style="flex: 1;">
                   <strong>Action Required:</strong> No password is set for this account yet. Please register or verify with OTP to create your password.
                   <div style="margin-top: 0.5rem;">
-                    <button type="button" id="legacySwitchToRegister" class="auth-text-link" style="padding: 0; font-weight: 700; color: var(--primary);">
+                    <button type="button" id="legacySwitchToRegister" class="auth-text-link" style="background: transparent; border: none; padding: 0; font-weight: 700; color: var(--primary); cursor: pointer; text-decoration: underline;">
                       Verify OTP &amp; create password now &rarr;
                     </button>
                   </div>
@@ -764,34 +776,34 @@
             <form id="applicantSignInForm" autocomplete="on">
               <div class="form-group" style="margin-bottom: 1.25rem;">
                 <label class="form-label" for="applicantEmail">Official Business Email Address <span class="req">*</span></label>
-                <div style="position: relative;">
-                  <i class="fas fa-envelope" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #64748B; font-size: 0.9rem;"></i>
-                  <input type="email" id="applicantEmail" class="form-control" placeholder="e.g. delegate@yourcompany.com" autocomplete="email" style="padding-left: 2.5rem;" required />
+                <div class="auth-input-group">
+                  <i class="fas fa-envelope auth-input-icon"></i>
+                  <input type="email" id="applicantEmail" class="form-control auth-input-field" placeholder="e.g. delegate@yourcompany.com" autocomplete="email" required />
                 </div>
               </div>
 
               <div class="form-group" style="margin-bottom: 0.75rem;">
                 <label class="form-label" for="applicantPassword">Account Password <span class="req">*</span></label>
-                <div class="password-input-group" style="position: relative;">
-                  <i class="fas fa-lock" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #64748B; font-size: 0.9rem;"></i>
-                  <input type="password" id="applicantPassword" class="form-control" placeholder="Enter your password" autocomplete="current-password" style="padding-left: 2.5rem; padding-right: 2.75rem;" required />
-                  <button type="button" id="toggleApplicantPassword" class="password-toggle-btn" aria-label="Toggle password visibility">
+                <div class="auth-input-group password-input-group">
+                  <i class="fas fa-lock auth-input-icon"></i>
+                  <input type="password" id="applicantPassword" class="form-control auth-input-field" placeholder="Enter your password" autocomplete="current-password" required />
+                  <button type="button" id="toggleApplicantPassword" class="password-toggle-btn" aria-label="Toggle password visibility" style="position: absolute; right: 0.65rem; top: 50%; transform: translateY(-50%); background: transparent; border: none; padding: 0.4rem 0.5rem; color: #94A3B8; cursor: pointer; font-size: 0.95rem; line-height: 1; border-radius: 4px; z-index: 2;">
                     <i class="fas fa-eye"></i>
                   </button>
                 </div>
               </div>
 
               <div style="text-align: right; margin-bottom: 1.25rem;">
-                <button type="button" id="switchToForgot" class="auth-text-link">Forgot password?</button>
+                <button type="button" id="switchToForgot" class="auth-text-link" style="background: transparent; border: none; padding: 0; color: #0F2C59; font-weight: 600; font-size: 0.85rem; cursor: pointer; text-decoration: underline; text-underline-offset: 3px;">Forgot password?</button>
               </div>
 
-              <button type="submit" id="applicantSignInBtn" class="btn-primary" style="width: 100%; justify-content: center; font-weight: 700; padding: 0.85rem; background: var(--primary);">
+              <button type="submit" id="applicantSignInBtn" class="btn-primary" style="width: 100%; justify-content: center; font-weight: 700; padding: 0.85rem; font-size: 0.95rem; background: var(--primary); border-radius: 8px;">
                 <i class="fas fa-sign-in-alt"></i> Sign In
               </button>
 
               <div style="margin-top: 1.25rem; text-align: center; border-top: 1px solid #F1F5F9; padding-top: 1rem;">
                 <span style="font-size: 0.85rem; color: #64748B;">First time applicant? </span>
-                <button type="button" id="switchToRegister" class="auth-text-link">First time? Register with OTP &amp; create password</button>
+                <button type="button" id="switchToRegister" class="auth-text-link" style="background: transparent; border: none; padding: 0; color: #0F2C59; font-weight: 600; font-size: 0.85rem; cursor: pointer; text-decoration: underline; text-underline-offset: 3px;">Register with OTP &amp; create password</button>
               </div>
             </form>
           </div>
@@ -802,12 +814,12 @@
               <div id="applicantRegStep1">
                 <div class="form-group" style="margin-bottom: 1.25rem;">
                   <label class="form-label" for="applicantRegEmail">Official Business Email Address <span class="req">*</span></label>
-                  <div style="position: relative;">
-                    <i class="fas fa-envelope" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #64748B; font-size: 0.9rem;"></i>
-                    <input type="email" id="applicantRegEmail" class="form-control" placeholder="e.g. delegate@yourcompany.com" autocomplete="email" style="padding-left: 2.5rem;" required />
+                  <div class="auth-input-group">
+                    <i class="fas fa-envelope auth-input-icon"></i>
+                    <input type="email" id="applicantRegEmail" class="form-control auth-input-field" placeholder="e.g. delegate@yourcompany.com" autocomplete="email" required />
                   </div>
                 </div>
-                <button type="button" id="applicantSendRegOtpBtn" class="btn-primary" style="width: 100%; justify-content: center; font-weight: 700; padding: 0.85rem; background: var(--primary);">
+                <button type="button" id="applicantSendRegOtpBtn" class="btn-primary" style="width: 100%; justify-content: center; font-weight: 700; padding: 0.85rem; font-size: 0.95rem; background: var(--primary); border-radius: 8px;">
                   <i class="fas fa-paper-plane"></i> Send Verification Code
                 </button>
               </div>
@@ -824,38 +836,39 @@
                     maxlength="6"
                     inputmode="numeric"
                     pattern="[0-9]{6}"
-                    autocomplete="one-time-code" />
+                    autocomplete="one-time-code"
+                    style="border: 1.5px solid #CBD5E1; border-radius: 8px; background: #F8FAFC;" />
                   <small style="color: #64748B; font-size: 0.8rem; margin-top: 0.35rem; display: block;">
                     <i class="fas fa-clock"></i> Code valid for 10 minutes
                   </small>
                 </div>
                 <div class="form-group" style="margin-bottom: 1.25rem;">
                   <label class="form-label" for="applicantRegPassword">Password (min. 8 characters) <span class="req">*</span></label>
-                  <div class="password-input-group" style="position: relative;">
-                    <i class="fas fa-lock" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #64748B; font-size: 0.9rem;"></i>
-                    <input type="password" id="applicantRegPassword" class="form-control" placeholder="Create new password" autocomplete="new-password" minlength="8" style="padding-left: 2.5rem; padding-right: 2.75rem;" />
-                    <button type="button" id="toggleApplicantRegPassword" class="password-toggle-btn" aria-label="Toggle password visibility">
+                  <div class="auth-input-group password-input-group">
+                    <i class="fas fa-lock auth-input-icon"></i>
+                    <input type="password" id="applicantRegPassword" class="form-control auth-input-field" placeholder="Create new password" autocomplete="new-password" minlength="8" />
+                    <button type="button" id="toggleApplicantRegPassword" class="password-toggle-btn" aria-label="Toggle password visibility" style="position: absolute; right: 0.65rem; top: 50%; transform: translateY(-50%); background: transparent; border: none; padding: 0.4rem 0.5rem; color: #94A3B8; cursor: pointer; font-size: 0.95rem; line-height: 1; border-radius: 4px; z-index: 2;">
                       <i class="fas fa-eye"></i>
                     </button>
                   </div>
                 </div>
                 <div class="form-group" style="margin-bottom: 1.5rem;">
                   <label class="form-label" for="applicantRegPasswordConfirm">Confirm Password <span class="req">*</span></label>
-                  <div class="password-input-group" style="position: relative;">
-                    <i class="fas fa-check-double" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #64748B; font-size: 0.9rem;"></i>
-                    <input type="password" id="applicantRegPasswordConfirm" class="form-control" placeholder="Re-enter password" autocomplete="new-password" minlength="8" style="padding-left: 2.5rem; padding-right: 2.75rem;" />
-                    <button type="button" id="toggleApplicantRegPasswordConfirm" class="password-toggle-btn" aria-label="Toggle password visibility">
+                  <div class="auth-input-group password-input-group">
+                    <i class="fas fa-check-double auth-input-icon"></i>
+                    <input type="password" id="applicantRegPasswordConfirm" class="form-control auth-input-field" placeholder="Re-enter password" autocomplete="new-password" minlength="8" />
+                    <button type="button" id="toggleApplicantRegPasswordConfirm" class="password-toggle-btn" aria-label="Toggle password visibility" style="position: absolute; right: 0.65rem; top: 50%; transform: translateY(-50%); background: transparent; border: none; padding: 0.4rem 0.5rem; color: #94A3B8; cursor: pointer; font-size: 0.95rem; line-height: 1; border-radius: 4px; z-index: 2;">
                       <i class="fas fa-eye"></i>
                     </button>
                   </div>
                 </div>
-                <button type="submit" id="applicantRegisterBtn" class="btn-primary" style="width: 100%; justify-content: center; font-weight: 700; padding: 0.85rem; background: #059669; border-color: #047857;">
+                <button type="submit" id="applicantRegisterBtn" class="btn-primary" style="width: 100%; justify-content: center; font-weight: 700; padding: 0.85rem; font-size: 0.95rem; background: #059669; border-color: #047857; border-radius: 8px;">
                   <i class="fas fa-user-check"></i> Verify &amp; Create Account
                 </button>
               </div>
 
               <div style="margin-top: 1.25rem; text-align: center; border-top: 1px solid #F1F5F9; padding-top: 1rem;">
-                <button type="button" id="switchToSignInFromReg" class="auth-text-link">Already have an account? Sign In</button>
+                <button type="button" id="switchToSignInFromReg" class="auth-text-link" style="background: transparent; border: none; padding: 0; color: #0F2C59; font-weight: 600; font-size: 0.85rem; cursor: pointer; text-decoration: underline; text-underline-offset: 3px;">Already have an account? Sign In</button>
               </div>
             </form>
           </div>
@@ -866,12 +879,12 @@
               <div id="applicantForgotStep1">
                 <div class="form-group" style="margin-bottom: 1.25rem;">
                   <label class="form-label" for="applicantForgotEmail">Official Business Email Address <span class="req">*</span></label>
-                  <div style="position: relative;">
-                    <i class="fas fa-envelope" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #64748B; font-size: 0.9rem;"></i>
-                    <input type="email" id="applicantForgotEmail" class="form-control" placeholder="e.g. delegate@yourcompany.com" autocomplete="email" style="padding-left: 2.5rem;" required />
+                  <div class="auth-input-group">
+                    <i class="fas fa-envelope auth-input-icon"></i>
+                    <input type="email" id="applicantForgotEmail" class="form-control auth-input-field" placeholder="e.g. delegate@yourcompany.com" autocomplete="email" required />
                   </div>
                 </div>
-                <button type="button" id="applicantSendForgotOtpBtn" class="btn-primary" style="width: 100%; justify-content: center; font-weight: 700; padding: 0.85rem; background: var(--primary);">
+                <button type="button" id="applicantSendForgotOtpBtn" class="btn-primary" style="width: 100%; justify-content: center; font-weight: 700; padding: 0.85rem; font-size: 0.95rem; background: var(--primary); border-radius: 8px;">
                   <i class="fas fa-paper-plane"></i> Send Reset Code
                 </button>
               </div>
@@ -888,43 +901,44 @@
                     maxlength="6"
                     inputmode="numeric"
                     pattern="[0-9]{6}"
-                    autocomplete="one-time-code" />
+                    autocomplete="one-time-code"
+                    style="border: 1.5px solid #CBD5E1; border-radius: 8px; background: #F8FAFC;" />
                   <small style="color: #64748B; font-size: 0.8rem; margin-top: 0.35rem; display: block;">
                     <i class="fas fa-clock"></i> Code valid for 10 minutes
                   </small>
                 </div>
                 <div class="form-group" style="margin-bottom: 1.25rem;">
                   <label class="form-label" for="applicantNewPassword">New Password (min. 8 characters) <span class="req">*</span></label>
-                  <div class="password-input-group" style="position: relative;">
-                    <i class="fas fa-key" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #64748B; font-size: 0.9rem;"></i>
-                    <input type="password" id="applicantNewPassword" class="form-control" placeholder="Enter new password" autocomplete="new-password" minlength="8" style="padding-left: 2.5rem; padding-right: 2.75rem;" />
-                    <button type="button" id="toggleApplicantNewPassword" class="password-toggle-btn" aria-label="Toggle password visibility">
+                  <div class="auth-input-group password-input-group">
+                    <i class="fas fa-key auth-input-icon"></i>
+                    <input type="password" id="applicantNewPassword" class="form-control auth-input-field" placeholder="Enter new password" autocomplete="new-password" minlength="8" />
+                    <button type="button" id="toggleApplicantNewPassword" class="password-toggle-btn" aria-label="Toggle password visibility" style="position: absolute; right: 0.65rem; top: 50%; transform: translateY(-50%); background: transparent; border: none; padding: 0.4rem 0.5rem; color: #94A3B8; cursor: pointer; font-size: 0.95rem; line-height: 1; border-radius: 4px; z-index: 2;">
                       <i class="fas fa-eye"></i>
                     </button>
                   </div>
                 </div>
                 <div class="form-group" style="margin-bottom: 1.5rem;">
                   <label class="form-label" for="applicantNewPasswordConfirm">Confirm New Password <span class="req">*</span></label>
-                  <div class="password-input-group" style="position: relative;">
-                    <i class="fas fa-check-double" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #64748B; font-size: 0.9rem;"></i>
-                    <input type="password" id="applicantNewPasswordConfirm" class="form-control" placeholder="Re-enter new password" autocomplete="new-password" minlength="8" style="padding-left: 2.5rem; padding-right: 2.75rem;" />
-                    <button type="button" id="toggleApplicantNewPasswordConfirm" class="password-toggle-btn" aria-label="Toggle password visibility">
+                  <div class="auth-input-group password-input-group">
+                    <i class="fas fa-check-double auth-input-icon"></i>
+                    <input type="password" id="applicantNewPasswordConfirm" class="form-control auth-input-field" placeholder="Re-enter new password" autocomplete="new-password" minlength="8" />
+                    <button type="button" id="toggleApplicantNewPasswordConfirm" class="password-toggle-btn" aria-label="Toggle password visibility" style="position: absolute; right: 0.65rem; top: 50%; transform: translateY(-50%); background: transparent; border: none; padding: 0.4rem 0.5rem; color: #94A3B8; cursor: pointer; font-size: 0.95rem; line-height: 1; border-radius: 4px; z-index: 2;">
                       <i class="fas fa-eye"></i>
                     </button>
                   </div>
                 </div>
-                <button type="submit" id="applicantResetPasswordBtn" class="btn-primary" style="width: 100%; justify-content: center; font-weight: 700; padding: 0.85rem; background: var(--primary);">
+                <button type="submit" id="applicantResetPasswordBtn" class="btn-primary" style="width: 100%; justify-content: center; font-weight: 700; padding: 0.85rem; font-size: 0.95rem; background: var(--primary); border-radius: 8px;">
                   <i class="fas fa-save"></i> Reset Password &amp; Sign In
                 </button>
               </div>
 
               <div style="margin-top: 1.25rem; text-align: center; border-top: 1px solid #F1F5F9; padding-top: 1rem;">
-                <button type="button" id="switchToSignInFromForgot" class="auth-text-link">Back to Sign In</button>
+                <button type="button" id="switchToSignInFromForgot" class="auth-text-link" style="background: transparent; border: none; padding: 0; color: #0F2C59; font-weight: 600; font-size: 0.85rem; cursor: pointer; text-decoration: underline; text-underline-offset: 3px;">Back to Sign In</button>
               </div>
             </form>
           </div>
 
-          <div style="margin-top: 1.25rem; font-size: 0.8rem; color: #94A3B8; display: flex; align-items: center; justify-content: center; gap: 0.4rem; border-top: 1px solid #F1F5F9; padding-top: 1rem;">
+          <div class="auth-security-footer">
             <i class="fas fa-lock"></i> 256-bit Encrypted Identity Protocol &bull; BCCI Chamber Security Policy
           </div>
         </div>
@@ -1648,7 +1662,7 @@
   </nav>
 
   <!-- App Main ES Module -->
-  <script type="module" src="js/app.js?v=4.0.2"></script>
+  <script type="module" src="js/app.js?v=4.2.0"></script>
 </body>
 
 </html>
