@@ -2513,7 +2513,14 @@ class App {
         pincodeInput.addEventListener('input', (e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6); this.validateField(pincodeInput); });
         pincodeInput.addEventListener('blur', () => this.validateField(pincodeInput));
       }
+      const blockNonDigits = (e) => {
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        if (['Backspace', 'Tab', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter', 'Home', 'End'].includes(e.key)) return;
+        if (!/^\d$/.test(e.key)) e.preventDefault();
+      };
+
       if (turnoverInput) {
+        turnoverInput.addEventListener('keydown', blockNonDigits);
         turnoverInput.addEventListener('input', (e) => {
           if (e.target.value) e.target.value = e.target.value.replace(/\D/g, '');
           this.validateField(turnoverInput);
@@ -2521,7 +2528,11 @@ class App {
         turnoverInput.addEventListener('blur', () => this.validateField(turnoverInput));
       }
       if (employeesInput) {
-        employeesInput.addEventListener('input', () => this.validateField(employeesInput));
+        employeesInput.addEventListener('keydown', blockNonDigits);
+        employeesInput.addEventListener('input', (e) => {
+          if (e.target.value) e.target.value = e.target.value.replace(/\D/g, '');
+          this.validateField(employeesInput);
+        });
         employeesInput.addEventListener('blur', () => this.validateField(employeesInput));
       }
 
@@ -2571,6 +2582,9 @@ class App {
         dropzone.classList.toggle('is-invalid', !isValid);
         dropzone.classList.toggle('is-valid', isValid && !!this.currentPaymentProofBase64);
       }
+    } else if (input.validity && input.validity.badInput) {
+      isValid = false;
+      errorMsg = 'Enter valid numbers only.';
     } else if (input.hasAttribute('required') && !val) {
       isValid = false; errorMsg = 'This field is required.';
     } else if (val) {

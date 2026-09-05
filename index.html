@@ -1036,14 +1036,16 @@
               </div>
               <div class="form-group">
                 <label class="form-label" for="annualTurnover">Annual Turnover (INR) <span class="req">*</span></label>
-                <input type="number" id="annualTurnover" class="form-control" name="annualTurnover"
-                  placeholder="e.g. 50000000" min="1" step="1"
+                <input type="text" id="annualTurnover" class="form-control" name="annualTurnover"
+                  placeholder="e.g. 50000000" inputmode="numeric" pattern="[0-9]+"
                   autocomplete="off" required />
                 <small class="form-hint">Enter numbers only in INR (e.g. 50000000)</small>
               </div>
               <div class="form-group">
-                <label class="form-label">Total Employee Headcount <span class="req">*</span></label>
-                <input type="number" class="form-control" name="employees" placeholder="e.g. 150" min="1" required />
+                <label class="form-label" for="employees">Total Employee Headcount <span class="req">*</span></label>
+                <input type="text" id="employees" class="form-control" name="employees"
+                  placeholder="e.g. 150" inputmode="numeric" pattern="[0-9]+"
+                  autocomplete="off" required />
               </div>
               <div class="form-group">
                 <label class="form-label">GSTIN Number <span class="req">*</span></label>

@@ -1448,6 +1448,13 @@ console.log('──────────────────────�
   ck('showMembershipDetailsModal renders print button', modalContent.includes('window.print()'));
 }
 
+console.log('\nNumeric Input Safeguards (Turnover & Employee Headcount)');
+console.log('───────────────────────────────────────────────────────');
+ck('annualTurnover has inputmode="numeric" in index.html', indexHtml.includes('name="annualTurnover"') && indexHtml.includes('inputmode="numeric"'));
+ck('employees has inputmode="numeric" in index.html', indexHtml.includes('name="employees"') && indexHtml.includes('inputmode="numeric"'));
+ck('app.js blocks non-digits on keydown for turnover & employees', SRC.includes('blockNonDigits') && SRC.includes('turnoverInput.addEventListener(\'keydown\', blockNonDigits)'));
+ck('app.js sanitizes non-digits on input for employees', SRC.includes('employeesInput.addEventListener(\'input\', (e) => {') && SRC.includes('replace(/\\D/g, \'\')'));
+
 console.log(`\n${'═'.repeat(52)}\n  ${pass} passed, ${fail} failed\n${'═'.repeat(52)}`);
 process.exit(fail?1:0);
 
