@@ -682,13 +682,7 @@ class App {
       const session = this.store.getApplicantSession();
 
       if (signOutBtn) {
-        this.closeModal?.();
-        this.store.forgetApplicantSession();
-        this.updateNavAuthUI();
-        this.showAuthMode('signin');
-        this.updateApplicantAuthUI();
-        this.showToast('Signed out.', 'info');
-        this.store.clearApplicantSession().catch(() => {});
+        this.handleApplicantSignOut();
       }
 
       if (cardBtn && session) {
@@ -1423,9 +1417,28 @@ class App {
   }
 
   handleApplicantSignOut() {
+    this.closeModal?.();
     this.store.forgetApplicantSession();
+    this._lastMemberApp = null;
+    const cardContainer = document.getElementById('membershipCardContainer');
+    if (cardContainer) {
+      cardContainer.innerHTML = `
+        <div style="text-align: center; padding: 60px 20px; background: var(--white); border: var(--rule);">
+          <i class="fas fa-id-card" style="font-size: 48px; color: var(--gray-300); margin-bottom: 16px;"></i>
+          <p style="color: var(--gray-500); font-size: 14px;">Sign in to view your membership card</p>
+          <button class="btn-primary" style="margin-top: 16px;" data-view-nav="membership">
+            <i class="fas fa-sign-in-alt"></i> Sign In
+          </button>
+        </div>`;
+    }
+    const badgeEl = document.getElementById('navHeaderMemberBadge');
+    if (badgeEl) badgeEl.remove();
     this.updateNavAuthUI();
+    this.showAuthMode?.('signin');
     this.updateApplicantAuthUI();
+    if (this.currentView === 'card') {
+      this.renderView('home');
+    }
     this.showToast('Signed out.', 'info');
     this.store.clearApplicantSession().catch(() => {});
   }
@@ -3728,6 +3741,32 @@ class App {
             <input type="text" id="joinCompanyInput" class="form-control" placeholder="e.g. Gujarat Industries Ltd" />
           </div>
 
+          ${event.pricingType === 'paid' ? `
+            <div style="background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; padding: 1rem; margin-bottom: 1.25rem; text-align: center;">
+              <div style="font-weight: 700; color: #166534; font-size: 0.95rem; margin-bottom: 0.25rem;">
+                <i class="fas fa-qrcode"></i> Official BCCI Scan &amp; Pay QR Code
+              </div>
+              <div style="font-size: 0.85rem; color: #15803D; margin-bottom: 0.75rem;">
+                Ticket Fee: <strong>₹${escapeHtml(String(event.fee))}</strong> per delegate
+              </div>
+              <div style="display: flex; justify-content: center; margin-bottom: 0.75rem;">
+                <img src="assets/banks.webp" alt="BCCI Official Scan and Pay QR Poster" style="max-height: 180px; border-radius: 6px; border: 1px solid #CBD5E1; box-shadow: 0 2px 8px rgba(0,0,0,0.08);" />
+              </div>
+              <div style="font-size: 0.82rem; color: #1E3E62; margin-bottom: 0.35rem;">
+                UPI ID: <code style="font-size: 0.82rem; background: #DBEAFE; padding: 3px 8px; border-radius: 4px; color: #1E40AF; font-weight: 700;">7861906384.eazypay@icici</code>
+              </div>
+              <div style="font-size: 0.75rem; color: #64748B;">
+                Account: <strong>Bharuch Chamber of Commerce &amp; Industry</strong> (ICICI Bank)
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 1.25rem;">
+              <label class="form-label" for="joinPaymentRefInput">Payment UTR / Transaction Reference No. <span class="req">*</span></label>
+              <input type="text" id="joinPaymentRefInput" class="form-control" placeholder="e.g. UPI/123456789012 or IMPS ref" required minlength="4" />
+              <span class="field-hint" style="font-size: 0.75rem; color: #64748B; margin-top: 4px; display: block;">Enter the 12-digit UPI reference / UTR number from your payment app.</span>
+            </div>
+          ` : ''}
+
           <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
             <button type="button" class="btn-outline" id="joinEventCancelBtn">Cancel</button>
             <button type="submit" class="btn-primary" id="btnSubmitJoinRegistration">
@@ -3783,16 +3822,29 @@ class App {
         return;
       }
 
+      let paymentRef = '';
+      if (event.pricingType === 'paid') {
+        paymentRef = (document.getElementById('joinPaymentRefInput')?.value || '').trim();
+        if (!paymentRef || paymentRef.length < 4) {
+          if (errorAlert) {
+            errorAlert.textContent = 'Please enter your payment UTR / transaction reference number.';
+            errorAlert.style.display = 'block';
+          }
+          return;
+        }
+      }
+
       if (submitBtn) {
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Registering...';
       }
 
       try {
-        const result = await this.store.registerForEvent(event.id, { name, email, phone, company });
+        const result = await this.store.registerForEvent(event.id, { name, email, phone, company, paymentRef });
         this.closeModal();
         this.showToast(result.message || 'Registration confirmed! We look forward to seeing you.', 'success');
         await this.renderEventsPage();
+        this.showUniversalEventTicketModal(result.event || event, result.attendee, result.ticketId);
       } catch (err) {
         if (errorAlert) {
           errorAlert.textContent = err.message || 'Failed to complete registration. Please try again.';
@@ -3805,6 +3857,86 @@ class App {
           submitBtn.innerHTML = '<i class="fas fa-ticket-alt"></i> Confirm Registration';
         }
       }
+    });
+  }
+
+  showUniversalEventTicketModal(event, attendee, ticketId) {
+    if (!event || !attendee) return;
+    const tktId = ticketId || attendee.ticketId || `TKT-${event.id.replace(/^EVT-/, '')}`;
+    const feeDisplay = event.pricingType === 'paid'
+      ? `<span style="color: #059669; font-weight: 700;">PAID (₹${escapeHtml(String(event.fee))})</span>${attendee.paymentRef ? ` • <span style="color: #64748B; font-size: 0.78rem;">UTR: ${escapeHtml(attendee.paymentRef)}</span>` : ''}`
+      : `<span style="color: #059669; font-weight: 700;">COMPLIMENTARY PASS</span>`;
+
+    this.showModal({
+      title: `<i class="fas fa-ticket-alt" style="color: var(--accent-gold);"></i> Official BCCI Event Admission Pass`,
+      content: `
+        <div class="universal-ticket-modal-content" style="padding: 0.5rem 0;">
+          <div style="background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px; padding: 0.85rem 1rem; margin-bottom: 1.25rem; font-size: 0.88rem; color: #1E3E62; display: flex; align-items: center; gap: 10px;">
+            <i class="fas fa-check-circle" style="font-size: 1.4rem; color: #10B981; flex-shrink: 0;"></i>
+            <div>
+              <strong>Registration Confirmed!</strong> A confirmation email with this e-ticket has been sent to <strong>${escapeHtml(attendee.email)}</strong>.
+            </div>
+          </div>
+
+          <div class="bcci-ticket-card" style="background: linear-gradient(135deg, #0F2C59 0%, #1E3E62 100%); border: 2px solid #D4AF37; border-radius: 12px; padding: 1.5rem; color: #FFFFFF; box-shadow: 0 8px 24px rgba(15,44,89,0.3); margin-bottom: 1.5rem; position: relative; overflow: hidden;">
+            <div style="position: absolute; right: -20px; bottom: -20px; width: 140px; height: 140px; background: radial-gradient(circle, rgba(212,175,55,0.15) 0%, transparent 70%); border-radius: 50%; pointer-events: none;"></div>
+
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px dashed rgba(255,255,255,0.25); padding-bottom: 1rem; margin-bottom: 1rem;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <img src="assets/BCCIBHARUCH.webp" alt="BCCI" style="height: 38px; width: auto; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));" />
+                <div>
+                  <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1.5px; color: #94A3B8; font-weight: 700;">Bharuch Chamber of Commerce</div>
+                  <div style="font-size: 0.95rem; font-weight: 800; color: #FFD700;">Official Delegate Pass</div>
+                </div>
+              </div>
+              <div style="text-align: right;">
+                <span style="background: rgba(255,215,0,0.15); border: 1px solid #FFD700; color: #FFD700; font-size: 0.75rem; font-weight: 800; padding: 4px 10px; border-radius: 6px; font-family: monospace; display: inline-block;">
+                  ${escapeHtml(tktId)}
+                </span>
+              </div>
+            </div>
+
+            <h3 style="font-size: 1.25rem; font-weight: 800; color: #FFFFFF; margin-bottom: 0.75rem; line-height: 1.3;">${escapeHtml(event.title)}</h3>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.85rem; margin-bottom: 1.25rem; font-size: 0.85rem;">
+              <div>
+                <div style="color: #94A3B8; font-size: 0.72rem; text-transform: uppercase;">Delegate Name</div>
+                <div style="font-weight: 700; color: #FFFFFF; font-size: 0.95rem;">${escapeHtml(attendee.name)}</div>
+              </div>
+              <div>
+                <div style="color: #94A3B8; font-size: 0.72rem; text-transform: uppercase;">Organization / Company</div>
+                <div style="font-weight: 700; color: #FFFFFF; font-size: 0.95rem;">${escapeHtml(attendee.company || 'Delegate / Independent')}</div>
+              </div>
+              <div>
+                <div style="color: #94A3B8; font-size: 0.72rem; text-transform: uppercase;">Date &amp; Time</div>
+                <div style="font-weight: 700; color: #FCD34D;">${escapeHtml(formatDate(event.date) || event.date)} • ${escapeHtml(event.time || '')}</div>
+              </div>
+              <div>
+                <div style="color: #94A3B8; font-size: 0.72rem; text-transform: uppercase;">Venue / Platform</div>
+                <div style="font-weight: 700; color: #FFFFFF;">${escapeHtml(event.venue || '')} (${escapeHtml(event.mode === 'online' ? 'Online' : 'In-Person')})</div>
+              </div>
+            </div>
+
+            <div style="border-top: 1px dashed rgba(255,255,255,0.25); padding-top: 0.85rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+              <div>
+                <div style="color: #94A3B8; font-size: 0.72rem; text-transform: uppercase;">Admission Status</div>
+                <div style="font-size: 0.85rem;">${feeDisplay}</div>
+              </div>
+              <div style="text-align: right;">
+                <div style="color: #94A3B8; font-size: 0.72rem; text-transform: uppercase;">Authorized By</div>
+                <div style="color: #FFD700; font-weight: 700; font-size: 0.85rem;">BCCI Secretariat</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap;">
+            <button type="button" class="btn-primary" onclick="window.print();" style="flex: 1; min-width: 160px; justify-content: center; font-size: 0.88rem;">
+              <i class="fas fa-print"></i> Print / Save Ticket PDF
+            </button>
+            <button type="button" class="btn-secondary" id="modalCloseBtn" style="padding: 0.6rem 1.5rem;">Done</button>
+          </div>
+        </div>
+      `,
     });
   }
 

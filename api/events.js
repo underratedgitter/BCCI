@@ -22,6 +22,7 @@ import {
   isEmail,
   withErrorHandling,
 } from './_lib/http.js';
+import { sendEmail } from './_lib/email.js';
 
 function newEventId() {
   return `EVT-${Date.now().toString(36).toUpperCase()}-${crypto
@@ -83,6 +84,7 @@ async function handler(req, res) {
       const email = str(body.email, 254).toLowerCase();
       const phone = str(body.phone, 20).replace(/\D/g, '');
       const company = str(body.company, 200) || 'Delegate / Independent';
+      const paymentRef = str(body.paymentRef, 100);
 
       if (!eventId) {
         return res.status(400).json({ success: false, error: 'Event ID is required.' });
@@ -97,6 +99,20 @@ async function handler(req, res) {
         return res.status(400).json({ success: false, error: 'Valid 10-digit Indian mobile number is required.' });
       }
 
+      // Verify event exists and enforce payment reference for paid events
+      const targetEvent = await getEvent(eventId);
+      if (!targetEvent) {
+        return res.status(404).json({ success: false, error: 'Event not found.' });
+      }
+      if (targetEvent.pricingType === 'paid' && Number(targetEvent.fee) > 0) {
+        if (!paymentRef || paymentRef.length < 4) {
+          return res.status(400).json({
+            success: false,
+            error: 'Payment UTR / transaction reference is required for paid events.',
+          });
+        }
+      }
+
       // Rate limit registrations by IP
       const ip = clientIp(req);
       const ipLimit = await rateLimit(`eventreg:ip:${ip}`, { max: 10, windowSec: 60 });
@@ -104,17 +120,43 @@ async function handler(req, res) {
         return tooManyRequests(res, ipLimit.retryAfter, 'Too many registration requests. Please wait a moment.');
       }
 
-      const result = await registerForEvent(eventId, { name, email, phone, company });
+      const result = await registerForEvent(eventId, { name, email, phone, company, paymentRef });
       if (!result.success) {
         return res.status(409).json({ success: false, error: result.error || 'Registration could not be completed.' });
       }
 
-      console.log(`[BCCI Event] Registered ${email} for event ${eventId}`);
+      const ticketId = result.ticketId || result.attendee?.ticketId || `TKT-${eventId.slice(-6)}-${Date.now().toString(36).toUpperCase()}`;
+
+      // Dispatch ticket email in background
+      sendEmail({
+        type: 'event_ticket',
+        to: email,
+        data: {
+          ticketId,
+          eventTitle: result.event.title,
+          date: result.event.date,
+          time: result.event.time,
+          venue: result.event.venue,
+          mode: result.event.mode,
+          pricingType: result.event.pricingType,
+          fee: result.event.fee,
+          paymentRef: result.attendee.paymentRef,
+          attendeeName: result.attendee.name,
+          company: result.attendee.company,
+          phone: result.attendee.phone,
+          email: result.attendee.email,
+        },
+      }).catch((err) => {
+        console.warn('[BCCI Event] Failed to dispatch ticket email:', err.message);
+      });
+
+      console.log(`[BCCI Event] Registered ${email} for event ${eventId} (Ticket: ${ticketId})`);
       return res.status(200).json({
         success: true,
-        message: 'Registration confirmed! We look forward to seeing you.',
+        message: 'Registration confirmed! Your official E-Ticket has been sent to your email.',
         event: result.event,
         attendee: result.attendee,
+        ticketId,
       });
     }
 

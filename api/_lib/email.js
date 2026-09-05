@@ -169,6 +169,86 @@ export const TEMPLATES = {
     }),
   }),
 
+  event_ticket: (d) => ({
+    subject: `Official BCCI Event Pass & E-Ticket — ${d.eventTitle || 'BCCI Event'} (${d.ticketId})`,
+    html: shell({
+      accent: '#0F2C59',
+      heading: 'Official Event Pass & E-Ticket',
+      sub: 'Bharuch Chamber of Commerce & Industry',
+      body: `
+        <p style="margin:0 0 8px;font-size:15px;color:#1E293B;">Dear <strong>${esc(d.attendeeName || 'Delegate')}</strong>,</p>
+        <p style="margin:0 0 20px;font-size:14px;color:#475569;line-height:1.6;">
+          Your registration for <strong>${esc(d.eventTitle)}</strong> is confirmed. Below is your official digital admission pass. Please present this ticket at the registration desk.
+        </p>
+
+        <div style="background: linear-gradient(135deg, #0F2C59 0%, #1E3E62 100%); border-radius: 12px; padding: 24px; color: #FFF; border: 2px solid #D4AF37; margin-bottom: 24px; box-shadow: 0 4px 14px rgba(15,44,89,0.25);">
+          <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 16px;">
+            <tr>
+              <td>
+                <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #94A3B8; font-weight: 700;">OFFICIAL DELEGATE PASS</div>
+                <div style="font-size: 17px; font-weight: 800; color: #FFD700; margin-top: 2px;">${esc(d.eventTitle)}</div>
+              </td>
+              <td align="right" valign="top">
+                <div style="background: rgba(255,215,0,0.15); border: 1px solid #FFD700; color: #FFD700; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 6px; display: inline-block; font-family: monospace;">
+                  ${esc(d.ticketId)}
+                </div>
+              </td>
+            </tr>
+          </table>
+
+          <table width="100%" cellpadding="0" cellspacing="0" style="border-top: 1px dashed rgba(255,255,255,0.25); border-bottom: 1px dashed rgba(255,255,255,0.25); padding: 14px 0; margin-bottom: 16px;">
+            <tr>
+              <td width="50%" valign="top" style="padding-bottom: 10px;">
+                <div style="font-size: 11px; color: #94A3B8; text-transform: uppercase;">Delegate Name</div>
+                <div style="font-size: 14px; font-weight: 700; color: #FFF;">${esc(d.attendeeName)}</div>
+              </td>
+              <td width="50%" valign="top" style="padding-bottom: 10px;">
+                <div style="font-size: 11px; color: #94A3B8; text-transform: uppercase;">Organization / Company</div>
+                <div style="font-size: 14px; font-weight: 700; color: #FFF;">${esc(d.company || 'Delegate / Independent')}</div>
+              </td>
+            </tr>
+            <tr>
+              <td width="50%" valign="top">
+                <div style="font-size: 11px; color: #94A3B8; text-transform: uppercase;">Date &amp; Time</div>
+                <div style="font-size: 13px; font-weight: 700; color: #FCD34D;">${esc(d.date)} • ${esc(d.time)}</div>
+              </td>
+              <td width="50%" valign="top">
+                <div style="font-size: 11px; color: #94A3B8; text-transform: uppercase;">Venue / Location</div>
+                <div style="font-size: 13px; font-weight: 700; color: #FFF;">${esc(d.venue)} (${esc(d.mode || 'In-Person')})</div>
+              </td>
+            </tr>
+          </table>
+
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td>
+                <div style="font-size: 11px; color: #94A3B8;">Admission Status</div>
+                <div style="font-size: 12px; font-weight: 700; color: #34D399;">
+                  ${d.pricingType === 'paid' ? `PAID (₹${esc(String(d.fee))}) • Ref: ${esc(d.paymentRef || 'Verified')}` : 'COMPLIMENTARY ADMISSION'}
+                </div>
+              </td>
+              <td align="right">
+                <div style="font-size: 11px; color: #94A3B8;">Issuer</div>
+                <div style="font-size: 12px; font-weight: 700; color: #FFD700;">BCCI Secretariat</div>
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        ${panel(
+          `<tr><td style="font-size:13px;color:#1E3E62;line-height:1.6;">
+            <strong>Important Guidelines:</strong><br>
+            • Please arrive 15 minutes before scheduled start time for badge collection.<br>
+            • Carry a digital or printed copy of this E-Ticket with Ticket ID: <strong>${esc(d.ticketId)}</strong>.<br>
+            • Event venue rules and business networking etiquette apply.
+          </td></tr>`,
+          '#EFF6FF',
+          '#BFDBFE'
+        )}
+        ${helpBox}`,
+    }),
+  }),
+
 };
 
 // ── Delivery ───────────────────────────────────────────────────────

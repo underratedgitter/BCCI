@@ -343,11 +343,14 @@ export async function registerForEvent(id, attendee) {
       return { success: false, error: 'You are already registered for this event.' };
     }
 
+    const ticketId = attendee.ticketId || `TKT-${id.replace(/^EVT-/, '')}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
     const newAttendee = {
+      ticketId,
       name: String(attendee.name || '').trim(),
       email,
       phone: String(attendee.phone || '').trim(),
       company: String(attendee.company || '').trim() || 'Delegate / Independent',
+      paymentRef: String(attendee.paymentRef || '').trim() || null,
       registeredAt: new Date().toISOString(),
     };
 
@@ -357,7 +360,7 @@ export async function registerForEvent(id, attendee) {
     await redis.set(KEYS.eventAttendees(id), attendees);
     await redis.set(KEYS.event(id), event);
 
-    return { success: true, event, attendee: newAttendee };
+    return { success: true, event, attendee: newAttendee, ticketId };
   });
 }
 

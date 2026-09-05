@@ -88,7 +88,7 @@ let createdEventId = null;
   ck('Initial seatsLeft equals capacity', ev?.seatsLeft === 2 && ev?.registeredCount === 0);
 }
 
-// 5. POST /api/events?action=register registers an attendee
+// 5. POST /api/events?action=register on paid event requires paymentRef
 {
   const { req, res, getStatus, getJson } = mockReqRes({
     method: 'POST',
@@ -102,11 +102,34 @@ let createdEventId = null;
     },
   });
   await eventsHandler(req, res);
-  ck('Attendee registration returns 200', getStatus() === 200);
-  ck('Registration confirms success', getJson()?.success === true);
+  ck('Paid event registration without paymentRef returns 400', getStatus() === 400);
+  ck('Error mentions payment reference', getJson()?.error?.toLowerCase().includes('payment'));
 }
 
-// 6. Second registration succeeds (reaching capacity 2 of 2)
+// 5b. POST /api/events?action=register with paymentRef registers an attendee and generates ticket
+let firstTicketId = null;
+{
+  const { req, res, getStatus, getJson } = mockReqRes({
+    method: 'POST',
+    query: { action: 'register' },
+    body: {
+      eventId: createdEventId,
+      name: 'Ramesh Patel',
+      email: 'ramesh@example.com',
+      phone: '9825123456',
+      company: 'Patel Exporters Ltd',
+      paymentRef: 'UPI/982512345678',
+    },
+  });
+  await eventsHandler(req, res);
+  ck('Attendee registration returns 200', getStatus() === 200);
+  ck('Registration confirms success', getJson()?.success === true);
+  ck('Registration returns ticketId', !!getJson()?.ticketId);
+  ck('Attendee record contains paymentRef', getJson()?.attendee?.paymentRef === 'UPI/982512345678');
+  firstTicketId = getJson()?.ticketId;
+}
+
+// 6. Second registration succeeds with paymentRef (reaching capacity 2 of 2)
 {
   const { req, res, getStatus } = mockReqRes({
     method: 'POST',
@@ -117,6 +140,7 @@ let createdEventId = null;
       email: 'deepak@example.com',
       phone: '9825654321',
       company: 'Shah Chemicals',
+      paymentRef: 'UPI/888777666555',
     },
   });
   await eventsHandler(req, res);
@@ -134,6 +158,7 @@ let createdEventId = null;
       email: 'third@example.com',
       phone: '9825999888',
       company: 'Third Corp',
+      paymentRef: 'UPI/999888777666',
     },
   });
   await eventsHandler(req, res);

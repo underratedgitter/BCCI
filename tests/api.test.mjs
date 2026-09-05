@@ -233,6 +233,24 @@ const { TEMPLATES } = await import(`${BCCI}/_lib/email.js`);
 const rendered = TEMPLATES.application_approved({ appId: 'A', company: XSS, repName: 'R', validUntil: 'x' }).html;
 check('applicant text is escaped in email templates', !rendered.includes('<img src=x') && rendered.includes('&lt;img'), 'raw HTML leaked into the template');
 
+const ticketEmail = TEMPLATES.event_ticket?.({
+  ticketId: 'TKT-TEST-1234',
+  eventTitle: `BCCI Summit ${XSS}`,
+  date: '2026-11-20',
+  time: '10:00 AM',
+  venue: 'BCCI Hall, Bharuch',
+  mode: 'offline',
+  attendeeName: 'Suresh Patel',
+  company: 'Patel Mfg',
+  phone: '9825012345',
+  email: 'suresh@example.com',
+  pricingType: 'paid',
+  fee: 500,
+  paymentRef: 'UPI/123456789',
+});
+check('event_ticket template renders valid subject and HTML', Boolean(ticketEmail?.subject?.includes('BCCI Event Pass') && ticketEmail?.html?.includes('TKT-TEST-1234')));
+check('event_ticket template escapes user content', Boolean(ticketEmail?.html && !ticketEmail.html.includes('<img src=x') && ticketEmail.html.includes('&lt;img')));
+
 // ════════════════════════════════════════════════════════════════════
 section('DATA-03  Enquiry IDs are unique');
 
