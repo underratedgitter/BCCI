@@ -2678,11 +2678,11 @@ class App {
           <i class="fas fa-rotate-right"></i> Retry
         </button>
       </div>`;
-      [['pendingAppsBody', 7], ['approvedAppsBody', 6], ['enquiriesBody', 5]].forEach(([id, cols]) => {
+      [['pendingAppsBody', 7], ['approvedAppsBody', 7], ['rejectedAppsBody', 7], ['enquiriesBody', 5]].forEach(([id, cols]) => {
         const el = document.getElementById(id);
         if (el) el.innerHTML = `<tr><td colspan="${cols}" style="padding:0;">${failure}</td></tr>`;
       });
-      ['pendingAppsCards', 'approvedAppsCards', 'enquiriesCards'].forEach((id) => {
+      ['pendingAppsCards', 'approvedAppsCards', 'rejectedAppsCards', 'enquiriesCards'].forEach((id) => {
         const el = document.getElementById(id);
         if (el) el.innerHTML = failure;
       });
@@ -2768,11 +2768,14 @@ class App {
       approvedApps.map(app => `
         <tr>
           <td><strong>${escapeHtml(app.id)}</strong></td>
-          <td><strong style="color: var(--primary);">${escapeHtml(app.company)}</strong></td>
-          <td>${escapeHtml(app.repName)}</td>
-          <td>${escapeHtml(app.email)}</td>
+          <td><div style="font-weight: 600; color: var(--primary);">${escapeHtml(app.company)}</div><small style="color: #64748B;">${escapeHtml(app.legalStatus || '')} &bull; ${escapeHtml(app.businessServices || '')}</small></td>
+          <td>${escapeHtml(app.repName)}<br/><small style="color: #64748B;">${escapeHtml(app.repDesignation || 'Applicant')}</small></td>
+          <td>${escapeHtml(app.email)}<br/><small style="color: #64748B;">${escapeHtml(app.phone || '')}</small></td>
           <td><span class="badge-status badge-approved"><i class="fas fa-check-circle"></i> Active</span></td>
           <td>${escapeHtml(app.approvedAt ? formatDate(app.approvedAt) : 'Active')}</td>
+          <td>
+            <button class="btn-secondary" data-inspect-id="${escapeAttr(app.id)}" style="padding: 0.35rem 0.65rem; font-size: 0.8rem;" aria-label="Inspect application ${escapeAttr(app.id)}"><i class="fas fa-eye"></i> Full Info</button>
+          </td>
         </tr>
       `),
       approvedApps.map(app => `
@@ -2783,13 +2786,57 @@ class App {
           </div>
           <div class="admin-card-meta">
             <div><strong>Rep:</strong> ${escapeHtml(app.repName)}</div>
+            <div><strong>Sector:</strong> ${escapeHtml(app.businessServices || 'N/A')}</div>
             <div><strong>Status:</strong> <span class="badge-status badge-approved"><i class="fas fa-check-circle"></i> Active</span></div>
+            <div><strong>Approved:</strong> ${escapeHtml(app.approvedAt ? formatDate(app.approvedAt) : 'Active')}</div>
+          </div>
+          <div class="admin-card-actions" style="margin-top: 0.75rem;">
+            <button class="btn-secondary" data-inspect-id="${escapeAttr(app.id)}" style="width: 100%; justify-content: center;"><i class="fas fa-eye"></i> Full Info</button>
           </div>
         </div>
       `),
-      6,
+      7,
       'fa-user-group',
       'No approved members yet.'
+    );
+
+    // ── Rejected applications ──────────────────────────────────────
+    fill(
+      'rejectedAppsBody',
+      'rejectedAppsCards',
+      rejectedApps.map(app => `
+        <tr>
+          <td><strong>${escapeHtml(app.id)}</strong></td>
+          <td><div style="font-weight: 600; color: #DC2626;">${escapeHtml(app.company)}</div><small style="color: #64748B;">${escapeHtml(app.legalStatus || '')} &bull; ${escapeHtml(app.enterpriseType || '')}</small></td>
+          <td>${escapeHtml(app.repName)}<br/><small style="color: #64748B;">${escapeHtml(app.repDesignation || 'Applicant')}</small></td>
+          <td>${escapeHtml(app.businessServices || '')}</td>
+          <td><span class="badge-status badge-rejected"><i class="fas fa-times-circle"></i> Rejected</span></td>
+          <td>${escapeHtml(formatDate(app.submittedAt))}</td>
+          <td>
+            <button class="btn-secondary" data-inspect-id="${escapeAttr(app.id)}" style="padding: 0.35rem 0.65rem; font-size: 0.8rem;" aria-label="Inspect application ${escapeAttr(app.id)}"><i class="fas fa-eye"></i> Full Info</button>
+          </td>
+        </tr>
+      `),
+      rejectedApps.map(app => `
+        <div class="admin-mobile-card">
+          <div class="admin-card-header">
+            <div><div class="admin-card-company">${escapeHtml(app.company)}</div><small style="color: #64748B;">${escapeHtml(app.legalStatus || '')} &bull; ${escapeHtml(app.enterpriseType || '')}</small></div>
+            <span class="admin-card-id">${escapeHtml(app.id)}</span>
+          </div>
+          <div class="admin-card-meta">
+            <div><strong>Rep:</strong> ${escapeHtml(app.repName)}</div>
+            <div><strong>Sector:</strong> ${escapeHtml(app.businessServices || 'N/A')}</div>
+            <div><strong>Status:</strong> <span class="badge-status badge-rejected"><i class="fas fa-times-circle"></i> Rejected</span></div>
+            <div><strong>Date:</strong> ${escapeHtml(formatDate(app.submittedAt))}</div>
+          </div>
+          <div class="admin-card-actions" style="margin-top: 0.75rem;">
+            <button class="btn-secondary" data-inspect-id="${escapeAttr(app.id)}" style="width: 100%; justify-content: center;"><i class="fas fa-eye"></i> Full Info</button>
+          </div>
+        </div>
+      `),
+      7,
+      'fa-times-circle',
+      'No rejected applications.'
     );
 
     // ── Enquiries ──────────────────────────────────────────────────
@@ -2958,35 +3005,119 @@ class App {
         }
 
         const field = (label, value) =>
-          `<div><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value || 'N/A')}</div>`;
+          `<div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 6px; padding: 0.6rem 0.8rem;">
+            <span style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #64748B; display: block; margin-bottom: 2px;">${escapeHtml(label)}</span>
+            <span style="font-size: 0.92rem; font-weight: 500; color: #0F172A; word-break: break-word;">${escapeHtml(value || 'N/A')}</span>
+          </div>`;
         const statusSlug = String(app.status || 'pending').toLowerCase();
+        const formattedTurnover = app.annualTurnover
+          ? (isNaN(Number(app.annualTurnover)) ? String(app.annualTurnover) : `₹ ${Number(app.annualTurnover).toLocaleString('en-IN')} (INR ${app.annualTurnover})`)
+          : 'N/A';
+        const utrHtml = app.paymentRef
+          ? `<code style="font-weight: 700; color: #0284C7; font-size: 0.95rem;">${escapeHtml(app.paymentRef)}</code>`
+          : '<span style="color: #94A3B8;">No UTR Reference entered</span>';
+        const approvedField = app.approvedAt ? field('Approved Date', formatDate(app.approvedAt)) : '';
+        const reviewerField = app.reviewedBy ? field('Reviewed By', app.reviewedBy) : '';
+        const termField = app.renewalYears ? field('Membership Term', `${app.renewalYears} Year(s)`) : '';
+        const lastRenewedField = app.lastRenewedAt ? field('Last Renewal', formatDate(app.lastRenewedAt)) : '';
+        const rejectedField = (app.status === 'Rejected' && app.reviewedAt) ? field('Decision Date', formatDate(app.reviewedAt)) : '';
+        const receiptHtml = this._paymentProofHtml(app.paymentProof);
+        const modalTitle = `Application Full Dossier — ${escapeHtml(app.id)}`;
+        const companyName = escapeHtml(app.company);
+        const appId = escapeHtml(app.id);
+        const submittedDate = escapeHtml(formatDate(app.submittedAt));
+        const statusText = escapeHtml(app.status);
+        const isPending = app.status === 'Pending';
 
         this.showModal({
-          title: `Application details — ${escapeHtml(app.id)}`,
+          title: modalTitle,
           content: `
-            <div style="font-size: 0.9rem; line-height: 1.8;">
-              <div style="margin-bottom: 1rem; padding-bottom: 0.8rem; border-bottom: 1px solid #E2E8F0;">
-                <h4 style="color: var(--primary); font-size: 1.2rem;">${escapeHtml(app.company)}</h4>
-                <p style="color: #64748B;">Status: <span class="badge-status badge-${escapeAttr(statusSlug)}">${escapeHtml(app.status)}</span></p>
+            <div style="font-size: 0.88rem; line-height: 1.6; max-height: 75vh; overflow-y: auto; padding-right: 4px;">
+              <!-- Header Bar -->
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.25rem; padding-bottom: 0.75rem; border-bottom: 2px solid #E2E8F0; flex-wrap: wrap; gap: 0.5rem;">
+                <div>
+                  <h4 style="color: var(--primary); font-size: 1.3rem; margin: 0; font-weight: 700;">${companyName}</h4>
+                  <div style="color: #64748B; font-size: 0.82rem; margin-top: 3px;">
+                    Application ID: <strong style="color: var(--primary); font-family: monospace; font-size: 0.9rem;">${appId}</strong> &bull;
+                    Submitted: <strong>${submittedDate}</strong>
+                  </div>
+                </div>
+                <div>
+                  <span class="badge-status badge-${escapeAttr(statusSlug)}" style="font-size: 0.85rem; padding: 0.35rem 0.85rem;">
+                    ${statusText}
+                  </span>
+                </div>
               </div>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
-                ${field('Legal status', app.legalStatus)}
-                ${field('Enterprise scale', app.enterpriseType)}
-                ${field('GST', app.gstNo)}
-                ${field('PAN', app.panNo)}
-                ${field('Turnover', app.annualTurnover)}
-                ${field('Employees', app.employees)}
-                ${field('Contact', app.repName)}
-                ${field('Phone', app.phone)}
-                ${field('Email', app.email)}
-                ${field('Submitted', formatDate(app.submittedAt))}
-                ${app.paymentRef ? `<div style="grid-column: 1 / -1; background: #EFF6FF; border: 1px solid #BFDBFE; padding: 0.5rem 0.8rem; border-radius: 6px; color: #1E3E62;"><strong>UPI UTR:</strong> <code style="font-weight:700; color:#0284C7;">${escapeHtml(app.paymentRef)}</code></div>` : ''}
-                ${this._paymentProofHtml(app.paymentProof)}
+
+              <!-- 1. Enterprise Profile -->
+              <div style="margin-bottom: 1rem; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 1rem;">
+                <h5 style="color: var(--primary); font-size: 0.92rem; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem; border-bottom: 1px solid #CBD5E1; padding-bottom: 0.4rem;">
+                  <i class="fas fa-building" style="color: var(--accent-gold-dark);"></i> Enterprise Profile &amp; Legal Info
+                </h5>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.6rem;">
+                  ${field('Registered Firm Name', app.company)}
+                  ${field('Legal Status', app.legalStatus)}
+                  ${field('Enterprise Category', app.enterpriseType)}
+                  ${field('Primary Business Sector', app.businessServices || app.membershipType)}
+                  ${field('Annual Turnover (INR)', formattedTurnover)}
+                  ${field('Total Employees', app.employees)}
+                  ${field('GSTIN Number', app.gstNo || app.gstin)}
+                  ${field('PAN Number', app.panNo || app.pan)}
+                  ${field('Corporate CIN', app.cin || 'Not Applicable')}
+                </div>
               </div>
-              <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.5rem;">
-                ${app.status === 'Pending' ? `
-                  <button class="btn-action-approve" id="inspectApproveBtn"><i class="fas fa-check"></i> Approve</button>
-                  <button class="btn-action-reject" id="inspectRejectBtn"><i class="fas fa-times"></i> Reject</button>
+
+              <!-- 2. Address & Plant Location -->
+              <div style="margin-bottom: 1rem; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 1rem;">
+                <h5 style="color: var(--primary); font-size: 0.92rem; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem; border-bottom: 1px solid #CBD5E1; padding-bottom: 0.4rem;">
+                  <i class="fas fa-map-marked-alt" style="color: var(--accent-gold-dark);"></i> Registered Address &amp; Location
+                </h5>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.6rem;">
+                  <div style="grid-column: 1 / -1;">
+                    ${field('Office / Plant Address', app.address)}
+                  </div>
+                  ${field('District', app.district || 'Bharuch')}
+                  ${field('State', app.state || 'Gujarat')}
+                  ${field('Postal Pincode', app.pincode)}
+                </div>
+              </div>
+
+              <!-- 3. Authorized Representative -->
+              <div style="margin-bottom: 1rem; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 1rem;">
+                <h5 style="color: var(--primary); font-size: 0.92rem; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem; border-bottom: 1px solid #CBD5E1; padding-bottom: 0.4rem;">
+                  <i class="fas fa-user-tie" style="color: var(--accent-gold-dark);"></i> Authorized Representative
+                </h5>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.6rem;">
+                  ${field('Representative Name', app.repName || app.applicantName)}
+                  ${field('Designation', app.repDesignation || 'Managing Director / CEO')}
+                  ${field('Official Email ID', app.email)}
+                  ${field('Mobile Number', app.phone)}
+                </div>
+              </div>
+
+              <!-- 4. Payment Verification & Audit -->
+              <div style="margin-bottom: 1rem; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 1rem;">
+                <h5 style="color: var(--primary); font-size: 0.92rem; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem; border-bottom: 1px solid #CBD5E1; padding-bottom: 0.4rem;">
+                  <i class="fas fa-file-invoice-dollar" style="color: var(--accent-gold-dark);"></i> Payment &amp; Membership Verification
+                </h5>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.6rem;">
+                  <div style="grid-column: 1 / -1; background: #EFF6FF; border: 1px solid #BFDBFE; padding: 0.65rem 0.85rem; border-radius: 6px; color: #1E3E62;">
+                    <strong>UPI / Bank UTR Reference:</strong> ${utrHtml}
+                  </div>
+                  ${approvedField}
+                  ${reviewerField}
+                  ${termField}
+                  ${lastRenewedField}
+                  ${rejectedField}
+                  ${receiptHtml}
+                </div>
+              </div>
+
+              <!-- Action Buttons -->
+              <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #E2E8F0;">
+                ${isPending ? `
+                  <button class="btn-action-approve" id="inspectApproveBtn"><i class="fas fa-check"></i> Approve Application</button>
+                  <button class="btn-action-reject" id="inspectRejectBtn"><i class="fas fa-times"></i> Reject Application</button>
                 ` : ''}
                 <button class="btn-secondary" id="modalCloseBtn">Close</button>
               </div>
@@ -3018,6 +3149,25 @@ class App {
         if (targetPane) targetPane.style.display = 'block';
       };
     });
+
+    const switchToTab = (tabName) => {
+      const targetMenu = document.querySelector(`.admin-menu-item[data-tab="${tabName}"]`);
+      if (targetMenu) targetMenu.click();
+    };
+
+    const metricCards = {
+      metricPending: 'pending',
+      metricApproved: 'approved',
+      metricRejected: 'rejected',
+    };
+    Object.entries(metricCards).forEach(([metricId, tabName]) => {
+      const card = document.getElementById(metricId)?.closest('.metric-card');
+      if (card) {
+        card.style.cursor = 'pointer';
+        card.title = `Switch to ${tabName} tab`;
+        card.onclick = () => switchToTab(tabName);
+      }
+    });
   }
 
   async exportApplicationsCSV() {
@@ -3043,29 +3193,32 @@ class App {
 
     const headers = [
       'Application ID', 'Company Name', 'Legal Status', 'Enterprise Scale', 'Business Services',
-      'GSTIN', 'PAN', 'CIN', 'Turnover', 'Employees', 'Representative Name', 'Designation',
-      'Email', 'Mobile Number', 'District', 'Address', 'Pincode', 'Payment Ref', 'Status', 'Submitted At'
+      'Annual Turnover (INR)', 'Employees', 'GSTIN', 'PAN', 'CIN',
+      'Address', 'District', 'State', 'Pincode',
+      'Representative Name', 'Designation', 'Official Email', 'Mobile Number',
+      'Payment Ref (UTR)', 'Status', 'Submitted At', 'Approved At', 'Reviewed By', 'Renewal Years'
     ];
 
     const rows = apps.map(a => [
-      a.id, a.company, a.legalStatus, a.enterpriseType, a.businessServices,
-      a.gstNo, a.panNo, a.cin, a.annualTurnover, a.employees,
-      a.repName, a.repDesignation, a.email, a.phone, a.district,
-      a.address, a.pincode, a.paymentRef, a.status, a.submittedAt
+      a.id, a.company, a.legalStatus, a.enterpriseType, a.businessServices || a.membershipType,
+      a.annualTurnover, a.employees, a.gstNo || a.gstin, a.panNo || a.pan, a.cin || 'N/A',
+      a.address, a.district, a.state || 'Gujarat', a.pincode,
+      a.repName || a.applicantName, a.repDesignation, a.email, a.phone,
+      a.paymentRef || 'N/A', a.status, a.submittedAt, a.approvedAt || 'N/A', a.reviewedBy || 'N/A', a.renewalYears || 1
     ].map(cell));
 
     // The BOM keeps Excel from mangling non-ASCII company names.
-    const csvData = '﻿' + [headers.map(cell).join(','), ...rows.map(r => r.join(','))].join('\r\n');
+    const csvData = '\ufeff' + [headers.map(cell).join(','), ...rows.map(r => r.join(','))].join('\r\n');
     const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `BCCI_Backup_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `BCCI_Membership_Full_Data_${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
 
-    this.showToast('CSV exported successfully!', 'success');
+    this.showToast('Full membership data exported successfully!', 'success');
   }
 
   /* ════════════════════════════════════════════════════════════════════

@@ -1399,6 +1399,9 @@
               <li class="admin-menu-item" data-tab="approved">
                 <i class="fas fa-check-circle"></i> Active Members
               </li>
+              <li class="admin-menu-item" data-tab="rejected">
+                <i class="fas fa-times-circle"></i> Rejected
+              </li>
               <li class="admin-menu-item" data-tab="enquiries">
                 <i class="fas fa-envelope-open-text"></i> Enquiry Inbox
               </li>
@@ -1469,12 +1472,37 @@
                       <th>Official Email</th>
                       <th>Status</th>
                       <th>Approved Date</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody id="approvedAppsBody"></tbody>
                 </table>
               </div>
               <div class="admin-mobile-cards" id="approvedAppsCards"></div>
+            </div>
+
+            <!-- Tab: Rejected Applications -->
+            <div id="tab-rejected" class="admin-tab-pane" style="display: none;">
+              <h3 style="margin-bottom: 1.5rem; font-size: 1.2rem; color: #DC2626;">
+                <i class="fas fa-times-circle"></i> Rejected Applications Archive
+              </h3>
+              <div class="table-responsive desktop-only-table">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>App ID</th>
+                      <th>Company Name</th>
+                      <th>Representative</th>
+                      <th>Sector</th>
+                      <th>Status</th>
+                      <th>Submitted Date</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="rejectedAppsBody"></tbody>
+                </table>
+              </div>
+              <div class="admin-mobile-cards" id="rejectedAppsCards"></div>
             </div>
 
             <!-- Tab 3: Enquiry Inbox -->
