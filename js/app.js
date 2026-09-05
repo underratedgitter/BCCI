@@ -2356,9 +2356,16 @@ class App {
         case 'address':
           if (val.length < 5) { isValid = false; errorMsg = 'Address must be at least 5 characters.'; }
           break;
-        case 'annualTurnover':
-          if (val.length < 2) { isValid = false; errorMsg = 'Please enter valid annual turnover (e.g. 25 Crore).'; }
+        case 'annualTurnover': {
+          const turnoverRegex = /^(?:(?:₹|Rs\.?|INR)\s*)?\d[\d,]*(?:\.\d+)?(?:\s*(?:-|to)\s*\d[\d,]*(?:\.\d+)?)?\s*(?:(?:Cr(?:ore|ores)?|L(?:akh|akhs|ac|acs)?|K|Thousand|Million|B(?:n|illion)?)\.?)?\s*$/i;
+          const numbers = val.replace(/,/g, '').match(/\d+(?:\.\d+)?/g);
+          const hasPositive = numbers && numbers.some(n => parseFloat(n) > 0);
+          if (val.length < 2 || !turnoverRegex.test(val) || !hasPositive) {
+            isValid = false;
+            errorMsg = 'Enter valid annual turnover in INR (e.g. 25 Crore, 50 Lakh, or 50,00,000).';
+          }
           break;
+        }
         case 'employees': {
           const empNum = parseInt(val, 10);
           if (isNaN(empNum) || empNum < 1) { isValid = false; errorMsg = 'Must be at least 1.'; }

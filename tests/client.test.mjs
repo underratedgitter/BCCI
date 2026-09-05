@@ -1157,8 +1157,18 @@ ck('employees headcount has required attribute in index.html', /<input[^>]*name=
   ck('annualTurnover rejects empty value', !app.validateField(turnEmpty));
   const turnShort = createInput('annualTurnover', 'A');
   ck('annualTurnover rejects < 2 chars', !app.validateField(turnShort));
+  const turnAlpha = createInput('annualTurnover', 'InvalidText');
+  ck('annualTurnover rejects non-numeric text', !app.validateField(turnAlpha));
+  const turnZero = createInput('annualTurnover', '0 Crore');
+  ck('annualTurnover rejects zero turnover', !app.validateField(turnZero));
+  const turnNegative = createInput('annualTurnover', '-25 Crore');
+  ck('annualTurnover rejects negative turnover', !app.validateField(turnNegative));
   const turnValid = createInput('annualTurnover', '25 Crore');
   ck('annualTurnover accepts valid value', app.validateField(turnValid));
+  const turnRange = createInput('annualTurnover', '5-10 Cr');
+  ck('annualTurnover accepts range like 5-10 Cr', app.validateField(turnRange));
+  const turnLakh = createInput('annualTurnover', '50 Lakh');
+  ck('annualTurnover accepts 50 Lakh', app.validateField(turnLakh));
 
   // employees
   const empZero = createInput('employees', '0');
