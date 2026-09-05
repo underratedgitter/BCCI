@@ -180,15 +180,38 @@ class App {
   get OTP_API_BASE() { return ''; }
 
   async callOtpApi(endpoint, payload) {
-    const res = await fetch(`${this.OTP_API_BASE}${endpoint}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    if (!res.ok && res.status !== 400 && res.status !== 429) {
-      throw new Error(`Server error: ${res.status}`);
+    try {
+      const res = await fetch(`${this.OTP_API_BASE}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      let data = {};
+      try {
+        data = await res.json();
+      } catch {
+        // Non-JSON response (e.g. static server 404 or proxy error)
+      }
+      if (!res.ok) {
+        return {
+          success: false,
+          status: res.status,
+          error: data.error || (res.status === 404
+            ? 'API endpoint not found. Ensure backend server is running.'
+            : res.status === 502
+              ? 'Could not send verification email. Please verify SMTP credentials are configured.'
+              : `Server returned error ${res.status}. Please try again.`)
+        };
+      }
+      return data;
+    } catch (err) {
+      return {
+        success: false,
+        error: err.name === 'TypeError' || err.message?.includes('fetch')
+          ? 'Cannot reach API server. Please check your internet connection or verify the server is running.'
+          : (err.message || 'Network error. Please try again.')
+      };
     }
-    return res.json();
   }
 
   /* ════════════════════════════════════════════════════════════════════
@@ -392,7 +415,7 @@ class App {
         }
       } catch (err) {
         console.error('[Sign In Error]', err);
-        this.showToast('Network error. Please try again.', 'error');
+        this.showToast(err.message || 'Network error. Please try again.', 'error');
       } finally {
         setLoading(signInBtn, false, 'Sign In', 'fas fa-sign-in-alt');
       }
@@ -455,7 +478,7 @@ class App {
           }
         } catch (err) {
           console.error('[Reg Send OTP Error]', err);
-          this.showToast('Network error. Please try again.', 'error');
+          this.showToast(err.message || 'Network error. Please try again.', 'error');
         } finally {
           setLoading(sendRegOtpBtn, false, 'Proceed to OTP Verification', 'fas fa-paper-plane');
         }
@@ -483,7 +506,7 @@ class App {
           }
         } catch (err) {
           console.error('[Resend OTP Error]', err);
-          this.showToast('Network error. Please try again.', 'error');
+          this.showToast(err.message || 'Network error. Please try again.', 'error');
         } finally {
           setLoading(resendRegOtpBtn, false, 'Resend Code', 'fas fa-redo');
         }
@@ -543,7 +566,7 @@ class App {
         }
       } catch (err) {
         console.error('[Register Error]', err);
-        this.showToast('Network error. Please try again.', 'error');
+        this.showToast(err.message || 'Network error. Please try again.', 'error');
       } finally {
         setLoading(regBtn, false, 'Verify & Create Account', 'fas fa-user-check');
       }
@@ -587,7 +610,7 @@ class App {
           }
         } catch (err) {
           console.error('[Forgot OTP Error]', err);
-          this.showToast('Network error. Please try again.', 'error');
+          this.showToast(err.message || 'Network error. Please try again.', 'error');
         } finally {
           setLoading(sendForgotOtpBtn, false, 'Send Reset Code', 'fas fa-paper-plane');
         }
@@ -641,7 +664,7 @@ class App {
         }
       } catch (err) {
         console.error('[Reset Password Error]', err);
-        this.showToast('Network error. Please try again.', 'error');
+        this.showToast(err.message || 'Network error. Please try again.', 'error');
       } finally {
         setLoading(resetBtn, false, 'Reset Password & Sign In', 'fas fa-save');
       }

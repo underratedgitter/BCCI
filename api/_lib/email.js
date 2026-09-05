@@ -181,8 +181,9 @@ let cachedTransport = null;
  * duplicating this logic and drifting from it.
  */
 export function resolveSmtpConfig(env = process.env) {
-  const user = env.SMTP_USER || env.GMAIL_USER || '';
-  const pass = env.SMTP_PASS || env.GMAIL_PASS || '';
+  const user = (env.SMTP_USER || env.GMAIL_USER || '').trim();
+  // Strip any internal or surrounding whitespace (e.g. Google App Passwords shown in 4-character chunks)
+  const pass = (env.SMTP_PASS || env.GMAIL_PASS || '').replace(/\s+/g, '');
   const host = env.SMTP_HOST || 'smtp.gmail.com';
   const port = parseInt(env.SMTP_PORT || '465', 10);
 
@@ -277,6 +278,7 @@ async function deliver({ to, subject, html }) {
     return { success: true, provider: 'smtp' };
   } catch (err) {
     console.error('[Email] SMTP error:', err.message);
+    cachedTransport = null; // Clear transport so stale serverless connections don't hang subsequent attempts
     return { success: false, provider: 'smtp', error: err.message };
   }
 }

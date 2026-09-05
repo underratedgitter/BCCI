@@ -793,6 +793,41 @@ const { App } = await import('../js/app.js');
 
 ck('App prototype has showAuthMode method', typeof App?.prototype?.showAuthMode === 'function');
 ck('App prototype has setupApplicantAuthHandlers method', typeof App?.prototype?.setupApplicantAuthHandlers === 'function');
+ck('App prototype has callOtpApi method', typeof App?.prototype?.callOtpApi === 'function');
+
+// Test callOtpApi error handling
+{
+  const realApp = Object.create(App.prototype);
+  const oldFetch = globalThis.fetch;
+  try {
+    // 1. Test 502 server error with message
+    globalThis.fetch = async () => ({
+      ok: false,
+      status: 502,
+      json: async () => ({ error: 'Could not send verification email.' })
+    });
+    const res502 = await realApp.callOtpApi('/api/send-otp', { email: 'test@example.com' });
+    ck('callOtpApi surfaces 502 server error message without throwing', res502.success === false && res502.error === 'Could not send verification email.');
+
+    // 2. Test 404 endpoint not found
+    globalThis.fetch = async () => ({
+      ok: false,
+      status: 404,
+      json: async () => { throw new Error('Not JSON'); }
+    });
+    const res404 = await realApp.callOtpApi('/api/send-otp', { email: 'test@example.com' });
+    ck('callOtpApi explains 404 when backend is unreachable', res404.success === false && res404.error.includes('Ensure backend server is running'));
+
+    // 3. Test network TypeError rejection
+    globalThis.fetch = async () => {
+      throw new TypeError('Failed to fetch');
+    };
+    const resNet = await realApp.callOtpApi('/api/send-otp', { email: 'test@example.com' });
+    ck('callOtpApi handles fetch TypeError gracefully', resNet.success === false && resNet.error.includes('Cannot reach API server'));
+  } finally {
+    globalThis.fetch = oldFetch;
+  }
+}
 
 // Helper to create test App instance
 function createTestApp(dom, testStore) {
