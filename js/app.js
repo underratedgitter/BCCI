@@ -685,12 +685,20 @@ class App {
     // ── 6. Delegated Event Listeners ─────────────────────────────────
     document.addEventListener('click', (e) => {
       const signOutBtn = e.target.closest('#applicantSignOutBtn') || e.target.closest('.btnUserSignOut');
+      const detailsBtn = e.target.closest('.btnViewMemberDetails');
       const cardBtn = e.target.closest('.btnViewDigitalCard');
       const renewBtn = e.target.closest('.btnRenewMembership');
       const session = this.store.getApplicantSession();
 
       if (signOutBtn) {
         this.handleApplicantSignOut();
+      }
+
+      if (detailsBtn && session) {
+        this.closeModal();
+        this.store.getApplicationByEmail(session.email).then(memberApp => {
+          if (memberApp) this.showMembershipDetailsModal(memberApp);
+        });
       }
 
       if (cardBtn && session) {
@@ -753,8 +761,13 @@ class App {
           </div>
           ${detailsHtml}
           <div style="display: flex; flex-direction: column; gap: 0.6rem; margin-top: 1.5rem;">
+            ${memberApp ? `
+              <button type="button" class="btn-primary btnViewMemberDetails" style="width: 100%; justify-content: center; font-size: 0.85rem;">
+                <i class="fas fa-file-alt"></i> ${memberApp.status === 'Approved' ? 'View Complete Member Details' : 'View Application Details'}
+              </button>
+            ` : ''}
             ${memberApp && memberApp.status === 'Approved' ? `
-              <button type="button" class="btn-primary btnViewDigitalCard" style="width: 100%; justify-content: center; font-size: 0.85rem;">
+              <button type="button" class="btn-secondary btnViewDigitalCard" style="width: 100%; justify-content: center; font-size: 0.85rem;">
                 <i class="fas fa-id-card"></i> View Digital Membership Pass
               </button>
             ` : ''}
@@ -822,6 +835,9 @@ class App {
               <span style="font-size: 0.8rem; font-weight: 700; padding: 4px 12px; border-radius: 20px; ${statusBadgeClass}">
                 ${statusLabel}
               </span>
+              <button type="button" class="btn-secondary btnViewMemberDetails" style="padding: 0.35rem 0.85rem; font-size: 0.78rem; color: #38BDF8; border-color: rgba(56,189,248,0.4); background: rgba(56,189,248,0.1); font-weight: 700;">
+                <i class="fas fa-file-alt"></i> View Details
+              </button>
               <button type="button" class="btn-primary btnViewDigitalCard" style="padding: 0.35rem 0.85rem; font-size: 0.78rem; background: linear-gradient(135deg, #D4AF37 0%, #AA7C11 100%); color: #0F2C59; font-weight: 800; border: none; box-shadow: 0 2px 6px rgba(212, 175, 55, 0.4);">
                 <i class="fas fa-id-card"></i> Digital Membership Pass
               </button>
@@ -1039,11 +1055,14 @@ class App {
               </div>
             </div>
           </div>
-          <div style="display: flex; gap: 0.75rem; justify-content: center;">
-            <button type="button" class="btn-primary" onclick="window.print();" style="flex: 1; justify-content: center; font-size: 0.85rem;">
+          <div style="display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap;">
+            <button type="button" class="btn-primary" onclick="window.print();" style="flex: 1; min-width: 120px; justify-content: center; font-size: 0.85rem;">
               <i class="fas fa-print"></i> Print Card
             </button>
-            <button type="button" class="btn-secondary" id="viewFullCardBtn" style="flex: 1; justify-content: center; font-size: 0.85rem;">
+            <button type="button" class="btn-secondary" id="viewMemberDetailsFromCardBtn" style="flex: 1; min-width: 140px; justify-content: center; font-size: 0.85rem;">
+              <i class="fas fa-file-alt"></i> Member Details
+            </button>
+            <button type="button" class="btn-secondary" id="viewFullCardBtn" style="flex: 1; min-width: 110px; justify-content: center; font-size: 0.85rem;">
               <i class="fas fa-expand-alt"></i> View Full Card
             </button>
             <button type="button" class="btn-secondary" id="modalCloseBtn" style="padding: 0.6rem 1.25rem;">Close</button>
@@ -1052,13 +1071,169 @@ class App {
       `
     });
 
-    // Bind view full card button
+    // Bind action buttons
     setTimeout(() => {
+      document.getElementById('viewMemberDetailsFromCardBtn')?.addEventListener('click', () => {
+        this.closeModal();
+        this.showMembershipDetailsModal(app);
+      });
       document.getElementById('viewFullCardBtn')?.addEventListener('click', () => {
         this.closeModal();
         this.renderView('card');
       });
     }, 100);
+  }
+
+  showMembershipDetailsModal(app) {
+    if (!app) return;
+    const validity = this.store.getMembershipValidity(app);
+    const field = (label, value) => `
+      <div style="background: #FFFFFF; border: 1px solid #E2E8F0; padding: 0.65rem 0.85rem; border-radius: 6px;">
+        <span style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #64748B; display: block; margin-bottom: 2px;">${escapeHtml(label)}</span>
+        <span style="font-size: 0.92rem; font-weight: 500; color: #0F172A; word-break: break-word;">${escapeHtml(value || 'N/A')}</span>
+      </div>`;
+
+    const formattedTurnover = app.annualTurnover
+      ? (isNaN(Number(app.annualTurnover)) ? String(app.annualTurnover) : `₹ ${Number(app.annualTurnover).toLocaleString('en-IN')}`)
+      : 'N/A';
+
+    let statusBadgeText = 'Active Member';
+    let statusBadgeStyle = 'background: #ECFDF5; color: #059669; border: 1px solid #A7F3D0;';
+    if (app.status === 'Pending') {
+      statusBadgeText = 'Pending Approval';
+      statusBadgeStyle = 'background: #FEF3C7; color: #D97706; border: 1px solid #FDE68A;';
+    } else if (app.status === 'Rejected') {
+      statusBadgeText = 'Application Rejected';
+      statusBadgeStyle = 'background: #FEE2E2; color: #DC2626; border: 1px solid #FECACA;';
+    } else if (validity && validity.state === 'RENEWAL_DUE') {
+      statusBadgeText = `Renewal Due (${validity.daysRemaining} days left)`;
+      statusBadgeStyle = 'background: #FEF3C7; color: #D97706; border: 1px solid #FDE68A;';
+    } else if (validity && validity.state === 'EXPIRED') {
+      statusBadgeText = 'Membership Expired';
+      statusBadgeStyle = 'background: #FEE2E2; color: #DC2626; border: 1px solid #FECACA;';
+    }
+
+    const companyName = escapeHtml(app.company || 'BCCI Member');
+    const appId = escapeHtml(app.id || 'N/A');
+    const isApproved = app.status === 'Approved';
+
+    const content = `
+      <div style="font-size: 0.88rem; line-height: 1.6; max-height: 75vh; overflow-y: auto; padding-right: 4px;">
+        <!-- Header Profile Card -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.25rem; padding-bottom: 0.85rem; border-bottom: 2px solid #E2E8F0; flex-wrap: wrap; gap: 0.75rem;">
+          <div style="display: flex; align-items: center; gap: 0.85rem;">
+            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #0F2C59 0%, #1E3E62 100%); color: #FFD700; border: 2px solid #D4AF37; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; font-weight: 800; flex-shrink: 0;">
+              ${escapeHtml((app.company || 'B').charAt(0).toUpperCase())}
+            </div>
+            <div>
+              <h4 style="color: var(--primary); font-size: 1.25rem; margin: 0; font-weight: 700; line-height: 1.3;">${companyName}</h4>
+              <div style="color: #64748B; font-size: 0.82rem; margin-top: 3px;">
+                Membership ID: <strong style="color: var(--primary); font-family: monospace; font-size: 0.92rem;">${appId}</strong>
+              </div>
+            </div>
+          </div>
+          <div>
+            <span style="font-size: 0.82rem; font-weight: 700; padding: 0.35rem 0.85rem; border-radius: 20px; display: inline-flex; align-items: center; gap: 6px; ${statusBadgeStyle}">
+              <i class="fas ${isApproved ? 'fa-check-circle' : app.status === 'Pending' ? 'fa-clock' : 'fa-info-circle'}"></i>
+              ${escapeHtml(statusBadgeText)}
+            </span>
+          </div>
+        </div>
+
+        <!-- 1. Enterprise Profile -->
+        <div style="margin-bottom: 1rem; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 1rem;">
+          <h5 style="color: var(--primary); font-size: 0.92rem; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem; border-bottom: 1px solid #CBD5E1; padding-bottom: 0.4rem;">
+            <i class="fas fa-building" style="color: var(--accent-gold-dark);"></i> Enterprise Profile &amp; Legal Info
+          </h5>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.6rem;">
+            ${field('Registered Firm Name', app.company)}
+            ${field('Legal Status', app.legalStatus)}
+            ${field('Enterprise Category', app.enterpriseType)}
+            ${field('Primary Business Sector', app.businessServices || app.membershipType)}
+            ${field('Annual Turnover (INR)', formattedTurnover)}
+            ${field('Total Employees', app.employees)}
+            ${field('GSTIN Number', app.gstNo || app.gstin)}
+            ${field('PAN Number', app.panNo || app.pan)}
+            ${field('Corporate CIN', app.cin || 'Not Applicable')}
+          </div>
+        </div>
+
+        <!-- 2. Authorized Representative -->
+        <div style="margin-bottom: 1rem; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 1rem;">
+          <h5 style="color: var(--primary); font-size: 0.92rem; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem; border-bottom: 1px solid #CBD5E1; padding-bottom: 0.4rem;">
+            <i class="fas fa-user-tie" style="color: var(--accent-gold-dark);"></i> Authorized Representative
+          </h5>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.6rem;">
+            ${field('Representative Name', app.repName || app.applicantName)}
+            ${field('Designation', app.repDesignation || 'Managing Director / CEO')}
+            ${field('Official Email ID', app.email)}
+            ${field('Mobile Number', app.phone)}
+          </div>
+        </div>
+
+        <!-- 3. Registered Address & Location -->
+        <div style="margin-bottom: 1rem; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 1rem;">
+          <h5 style="color: var(--primary); font-size: 0.92rem; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem; border-bottom: 1px solid #CBD5E1; padding-bottom: 0.4rem;">
+            <i class="fas fa-map-marked-alt" style="color: var(--accent-gold-dark);"></i> Registered Address &amp; Location
+          </h5>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.6rem;">
+            <div style="grid-column: 1 / -1;">
+              ${field('Office / Plant Address', app.address)}
+            </div>
+            ${field('District', app.district || 'Bharuch')}
+            ${field('State', app.state || 'Gujarat')}
+            ${field('Postal Pincode', app.pincode)}
+          </div>
+        </div>
+
+        <!-- 4. Membership Validity & Audit -->
+        <div style="margin-bottom: 1rem; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 1rem;">
+          <h5 style="color: var(--primary); font-size: 0.92rem; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem; border-bottom: 1px solid #CBD5E1; padding-bottom: 0.4rem;">
+            <i class="fas fa-shield-alt" style="color: var(--accent-gold-dark);"></i> Membership Validity &amp; Verification
+          </h5>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.6rem;">
+            ${field('Membership Status', app.status)}
+            ${field('Application Date', formatDate(app.submittedAt))}
+            ${isApproved ? field('Approved Date', formatDate(app.approvedAt || app.submittedAt)) : ''}
+            ${isApproved ? field('Valid Until', validity ? validity.validUntilDate : 'Active') : ''}
+            ${app.paymentRef ? field('Payment Ref / UTR', app.paymentRef) : ''}
+            ${app.renewalYears ? field('Validity Term', `${app.renewalYears} Year(s)`) : ''}
+            ${app.lastRenewedAt ? field('Last Renewed', formatDate(app.lastRenewedAt)) : ''}
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div style="display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.5rem; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #E2E8F0;">
+          ${isApproved ? `
+            <button type="button" class="btn-primary" id="dossierViewPassBtn" style="font-size: 0.85rem; padding: 0.55rem 1rem; background: linear-gradient(135deg, #D4AF37 0%, #AA7C11 100%); color: #0F2C59; font-weight: 700; border: none;">
+              <i class="fas fa-id-card"></i> Digital Membership Pass
+            </button>
+            <button type="button" class="btn-secondary" id="dossierRenewBtn" style="font-size: 0.85rem; padding: 0.55rem 1rem;">
+              <i class="fas fa-sync-alt"></i> Renew Membership
+            </button>
+          ` : ''}
+          <button type="button" class="btn-secondary" onclick="window.print()" style="font-size: 0.85rem; padding: 0.55rem 1rem;">
+            <i class="fas fa-print"></i> Print Details
+          </button>
+          <button type="button" class="btn-secondary" id="modalCloseBtn" style="font-size: 0.85rem; padding: 0.55rem 1.25rem;">Close</button>
+        </div>
+      </div>
+    `;
+
+    this.showModal({
+      title: `<i class="fas fa-id-card-alt" style="color: var(--accent-gold-dark); margin-right: 0.5rem;"></i> BCCI Official Member Details`,
+      content
+    });
+
+    document.getElementById('dossierViewPassBtn')?.addEventListener('click', () => {
+      this.closeModal();
+      this.showDigitalMemberCardModal(app);
+    });
+
+    document.getElementById('dossierRenewBtn')?.addEventListener('click', () => {
+      this.closeModal();
+      this.showRenewalModal(app);
+    });
   }
 
   showRenewalModal(app) {
@@ -1349,16 +1524,26 @@ class App {
     let actionsHtml = '';
     if (memberApp && memberApp.status === 'Approved') {
       actionsHtml = `
-        <button class="pd-btn-gold pdBtnDigitalCard"><i class="fas fa-id-card"></i> View Digital Card</button>
-        <button class="pd-btn-primary pdBtnRenew"><i class="fas fa-sync-alt"></i> Annual Renewal</button>
+        <button type="button" class="pd-btn-primary pdBtnMemberDetails"><i class="fas fa-id-card-alt"></i> View Member Details</button>
+        <button type="button" class="pd-btn-gold pdBtnDigitalCard"><i class="fas fa-id-card"></i> View Digital Card</button>
+        <button type="button" class="pd-btn-primary pdBtnRenew"><i class="fas fa-sync-alt"></i> Annual Renewal</button>
+      `;
+    } else if (memberApp && memberApp.status === 'Pending') {
+      actionsHtml = `
+        <button type="button" class="pd-btn-primary pdBtnMemberDetails"><i class="fas fa-file-alt"></i> View Application Details</button>
+      `;
+    } else if (memberApp && memberApp.status === 'Rejected') {
+      actionsHtml = `
+        <button type="button" class="pd-btn-primary pdBtnMemberDetails"><i class="fas fa-file-alt"></i> View Application Details</button>
+        <button type="button" class="pd-btn-primary pdBtnApply"><i class="fas fa-redo"></i> Re-apply for Membership</button>
       `;
     } else if (!memberApp) {
       actionsHtml = `
-        <button class="pd-btn-primary pdBtnApply"><i class="fas fa-building"></i> Apply for Membership</button>
+        <button type="button" class="pd-btn-primary pdBtnApply"><i class="fas fa-building"></i> Apply for Membership</button>
       `;
     }
     actionsHtml += `
-      <button class="pd-btn-danger pdBtnSignOut"><i class="fas fa-sign-out-alt"></i> Sign Out</button>
+      <button type="button" class="pd-btn-danger pdBtnSignOut"><i class="fas fa-sign-out-alt"></i> Sign Out</button>
     `;
 
     return `
@@ -1380,8 +1565,18 @@ class App {
   }
 
   _bindProfileDropdownActions(dropdown) {
+    dropdown.querySelector('.pdBtnMemberDetails')?.addEventListener('click', async () => {
+      dropdown.classList.remove('open');
+      this.closeMobileDrawer();
+      const session = this.store.getApplicantSession();
+      if (session && session.email) {
+        const memberApp = await this.store.getApplicationByEmail(session.email);
+        if (memberApp) this.showMembershipDetailsModal(memberApp);
+      }
+    });
     dropdown.querySelector('.pdBtnDigitalCard')?.addEventListener('click', async () => {
       dropdown.classList.remove('open');
+      this.closeMobileDrawer();
       const session = this.store.getApplicantSession();
       if (session && session.email) {
         const memberApp = await this.store.getApplicationByEmail(session.email);
@@ -1390,6 +1585,7 @@ class App {
     });
     dropdown.querySelector('.pdBtnRenew')?.addEventListener('click', async () => {
       dropdown.classList.remove('open');
+      this.closeMobileDrawer();
       const session = this.store.getApplicantSession();
       if (session && session.email) {
         const memberApp = await this.store.getApplicationByEmail(session.email);
@@ -1765,6 +1961,9 @@ class App {
         </div>
 
         <div class="bcci-card-actions">
+          <button class="bcci-card-action-btn secondary" id="viewMemberDossierBtn">
+            <i class="fas fa-file-alt"></i> Member Details
+          </button>
           <button class="bcci-card-action-btn primary" id="downloadCardBtn">
             <i class="fas fa-download"></i> Download Card
           </button>
@@ -1822,6 +2021,7 @@ class App {
 
       // Bind action buttons
       setTimeout(() => {
+        document.getElementById('viewMemberDossierBtn')?.addEventListener('click', () => this.showMembershipDetailsModal(app));
         document.getElementById('downloadCardBtn')?.addEventListener('click', () => this.downloadCardAsImage());
         document.getElementById('printCardBtn')?.addEventListener('click', () => window.print());
         document.getElementById('shareCardBtn')?.addEventListener('click', () => {

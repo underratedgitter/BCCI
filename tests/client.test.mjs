@@ -1377,6 +1377,77 @@ ck('styles.css hides main on print when modal-open', cssContent.includes('body.m
 ck('index.html favicon uses relative assets/ path', indexHtml.includes('href="assets/favicon-32.png"'));
 ck('index.html apple-touch-icon uses relative assets/ path', indexHtml.includes('href="assets/apple-touch-icon.png"'));
 
+console.log('\nMember Profile Dropdown & Membership Details Modal');
+console.log('──────────────────────────────────────────────────');
+
+{
+  const app = Object.create(App.prototype);
+  app.store = {
+    getMembershipValidity: (memberApp) => ({
+      state: 'ACTIVE',
+      validUntilDate: '31 Mar 2027',
+      approvedDate: '01 Apr 2026',
+      daysRemaining: 365,
+      yearsTenure: 1
+    })
+  };
+
+  const sampleSession = { name: 'Test User', email: 'test@bcci.org' };
+  const approvedApp = {
+    id: 'BCCI-MBR-2026-0099',
+    status: 'Approved',
+    company: 'Reliance Industries',
+    legalStatus: 'Public Limited',
+    enterpriseType: 'Large',
+    businessServices: 'Petrochemicals & Manufacturing',
+    annualTurnover: '50000000',
+    employees: '500',
+    gstNo: '24AAAAA0000A1Z5',
+    panNo: 'AAAAA0000A',
+    cin: 'L17110MH1973PLC019786',
+    address: 'Dahej Industrial Estate',
+    district: 'Bharuch',
+    state: 'Gujarat',
+    pincode: '392130',
+    repName: 'Mukesh Ambani',
+    repDesignation: 'Chairman',
+    email: 'test@bcci.org',
+    phone: '9876543210',
+    paymentRef: 'UPI/998877665544',
+    submittedAt: '2026-04-01T10:00:00Z',
+    approvedAt: '2026-04-02T10:00:00Z'
+  };
+
+  const dropdownHtml = app._buildProfileDropdownHtml(sampleSession, approvedApp, app.store.getMembershipValidity(approvedApp));
+  ck('approved member dropdown contains View Member Details button', dropdownHtml.includes('pdBtnMemberDetails') && dropdownHtml.includes('View Member Details'));
+  ck('approved member dropdown contains View Digital Card button', dropdownHtml.includes('pdBtnDigitalCard'));
+  ck('approved member dropdown contains Annual Renewal button', dropdownHtml.includes('pdBtnRenew'));
+  ck('approved member dropdown contains Sign Out button', dropdownHtml.includes('pdBtnSignOut'));
+
+  const pendingApp = { ...approvedApp, status: 'Pending' };
+  const pendingDropdownHtml = app._buildProfileDropdownHtml(sampleSession, pendingApp, null);
+  ck('pending applicant dropdown contains View Application Details button', pendingDropdownHtml.includes('pdBtnMemberDetails') && pendingDropdownHtml.includes('View Application Details'));
+
+  ck('App prototype has showMembershipDetailsModal', typeof App.prototype.showMembershipDetailsModal === 'function');
+
+  let modalTitle = '';
+  let modalContent = '';
+  app.showModal = ({ title, content }) => {
+    modalTitle = title;
+    modalContent = content;
+  };
+
+  app.showMembershipDetailsModal(approvedApp);
+  ck('showMembershipDetailsModal renders official title', modalTitle.includes('Official Member Details'));
+  ck('showMembershipDetailsModal renders company name', modalContent.includes('Reliance Industries'));
+  ck('showMembershipDetailsModal renders member ID', modalContent.includes('BCCI-MBR-2026-0099'));
+  ck('showMembershipDetailsModal renders representative name', modalContent.includes('Mukesh Ambani'));
+  ck('showMembershipDetailsModal renders GSTIN and PAN', modalContent.includes('24AAAAA0000A1Z5') && modalContent.includes('AAAAA0000A'));
+  ck('showMembershipDetailsModal renders digital pass action button', modalContent.includes('id="dossierViewPassBtn"'));
+  ck('showMembershipDetailsModal renders renewal action button', modalContent.includes('id="dossierRenewBtn"'));
+  ck('showMembershipDetailsModal renders print button', modalContent.includes('window.print()'));
+}
+
 console.log(`\n${'═'.repeat(52)}\n  ${pass} passed, ${fail} failed\n${'═'.repeat(52)}`);
 process.exit(fail?1:0);
 
