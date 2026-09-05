@@ -2297,9 +2297,35 @@ footer h4 {
    PRINT
    ========================================================================== */
 @media print {
-  .top-bar, .navbar, .mobile-bottom-nav, .mobile-drawer-backdrop, .mobile-drawer, #scrollToTopBtn { display: none !important; }
-  body { background: white; }
+  .top-bar, .navbar, .mobile-bottom-nav, .mobile-drawer-backdrop, .mobile-drawer, #scrollToTopBtn, footer { display: none !important; }
+  body {
+    background: white !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
   * { box-shadow: none !important; }
+
+  /* When modal is open for digital pass or event ticket, print only the pass */
+  .modal-backdrop.show {
+    position: static !important;
+    background: transparent !important;
+    display: block !important;
+    padding: 0 !important;
+  }
+  .modal-backdrop.show .modal-box {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .modal-close,
+  #modalCloseBtn,
+  #viewFullCardBtn,
+  .universal-ticket-modal-content button,
+  .universal-ticket-modal-content [style*="background: #EFF6FF"] {
+    display: none !important;
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════════
