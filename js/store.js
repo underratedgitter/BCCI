@@ -201,6 +201,57 @@ export class Store {
   }
 
   /* ════════════════════════════════════════════════════════════════════
+     EVENTS
+     ════════════════════════════════════════════════════════════════════ */
+
+  async getEvents() {
+    try {
+      const result = await this.apiCall('/api/events');
+      return result.events || [];
+    } catch (err) {
+      console.error('[Store] Failed to fetch events:', err.message);
+      throw err;
+    }
+  }
+
+  async getEventWithAttendees(id) {
+    try {
+      const result = await this.apiCall(`/api/events?id=${encodeURIComponent(id)}&includeAttendees=true`, {
+        auth: 'admin',
+      });
+      return result.event || null;
+    } catch (err) {
+      console.error('[Store] Failed to fetch event attendees:', err.message);
+      throw err;
+    }
+  }
+
+  async broadcastEvent(eventData) {
+    const result = await this.apiCall('/api/events', {
+      method: 'POST',
+      body: eventData,
+      auth: 'admin',
+    });
+    return result.event;
+  }
+
+  async deleteEvent(id) {
+    const result = await this.apiCall(`/api/events?id=${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      auth: 'admin',
+    });
+    return result;
+  }
+
+  async registerForEvent(id, attendeeData) {
+    const result = await this.apiCall('/api/events?action=register', {
+      method: 'POST',
+      body: { eventId: id, ...attendeeData },
+    });
+    return result;
+  }
+
+  /* ════════════════════════════════════════════════════════════════════
      ADMIN SESSION
      ════════════════════════════════════════════════════════════════════ */
 

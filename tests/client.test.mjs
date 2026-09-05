@@ -77,6 +77,9 @@ ck('client no longer calls the email endpoint directly', !SRC.includes('store.se
 ck('admin recipient no longer hardcoded client-side', !SRC.includes('CONFIG.ADMIN_EMAIL'));
 ck('toast output is escaped', /toast\.innerHTML[\s\S]{0,120}escapeHtml\(message\)/.test(SRC));
 ck('FAQ answer id bug fixed', SRC.includes('id="${faqId}"') && !SRC.includes('id="faqId"'));
+ck('downloadCardAsImage appends and removes link from document.body', SRC.includes('document.body.appendChild(link)') && SRC.includes('document.body.removeChild(link)'));
+ck('card error state uses event listener instead of inline onclick', !SRC.includes('onclick="location.reload()"') && SRC.includes('cardErrorRetryBtn'));
+ck('_restoreDraft guards CSS.escape', SRC.includes('typeof CSS') && SRC.includes('CSS.escape'));
 
 console.log('\nMembership CTAs reflect the member\'s actual state');
 console.log('─────────────────────────────────────────────────');
@@ -221,6 +224,12 @@ ck('store has applicantLogin method', typeof store.applicantLogin === 'function'
 ck('store has applicantRegister method', typeof store.applicantRegister === 'function');
 ck('store has applicantForgotPasswordRequest method', typeof store.applicantForgotPasswordRequest === 'function');
 ck('store has applicantResetPassword method', typeof store.applicantResetPassword === 'function');
+
+// Events store methods
+ck('store has getEvents method', typeof store.getEvents === 'function');
+ck('store has broadcastEvent method', typeof store.broadcastEvent === 'function');
+ck('store has deleteEvent method', typeof store.deleteEvent === 'function');
+ck('store has registerForEvent method', typeof store.registerForEvent === 'function');
 
 // Test 2: applicantLogin success
 localStorage.clear();
@@ -428,7 +437,10 @@ class MockElement {
   set className(v) { this._classes = new Set(v ? v.split(/\s+/).filter(Boolean) : []); }
 
   get textContent() { return this._textContent; }
-  set textContent(v) { this._textContent = String(v); }
+  set textContent(v) {
+    this._textContent = String(v);
+    this._innerHTML = String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
 
   get innerHTML() { return this._innerHTML; }
   set innerHTML(v) { this._innerHTML = String(v); }
@@ -1017,6 +1029,228 @@ function createTestApp(dom, testStore) {
     ck('Reset password submits to applicantResetPassword with valid inputs', false);
     ck('Reset password success updates nav auth UI and transitions view', false);
   }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// Admin Page Apply Button Removal & Membership Form Field Validation
+// ════════════════════════════════════════════════════════════════════
+console.log('\nAdmin Page Apply Button Removal & Membership Form Validation');
+console.log('────────────────────────────────────────────────────────────');
+
+ck('admin view hides Apply for Membership CTA buttons in code', SRC.includes("this.adminAuthed || this.currentView === 'admin'") && SRC.includes("el.style.display = 'none'"));
+ck('admin view hides mobile membership tab in code', SRC.includes("this.adminAuthed || this.currentView === 'admin'") && SRC.includes("tab.style.display = 'none'"));
+ck('membership form validates annualTurnover', SRC.includes("case 'annualTurnover':"));
+ck('membership form validates employees headcount', SRC.includes("case 'employees':"));
+ck('membership form validates address min length', SRC.includes("case 'address':") && SRC.includes("val.length < 5"));
+ck('paymentProof has required attribute in index.html', /<input[^>]*name=["']paymentProof["'][^>]*required/.test(HTML));
+ck('annualTurnover has required attribute in index.html', /<input[^>]*name=["']annualTurnover["'][^>]*required/.test(HTML));
+ck('employees headcount has required attribute in index.html', /<input[^>]*name=["']employees["'][^>]*required/.test(HTML));
+
+// Functional tests for field validations
+{
+  const app = Object.create(App.prototype);
+  app.currentPaymentProofBase64 = null;
+
+  const createInput = (name, val, required = true) => {
+    const parent = new MockElement('div', '', 'form-group');
+    const inp = new MockElement('input');
+    inp.name = name;
+    inp.value = val;
+    if (required) inp.setAttribute('required', '');
+    parent.appendChild(inp);
+    inp.parentElement = parent;
+    return inp;
+  };
+
+  // annualTurnover
+  const turnEmpty = createInput('annualTurnover', '');
+  ck('annualTurnover rejects empty value', !app.validateField(turnEmpty));
+  const turnShort = createInput('annualTurnover', 'A');
+  ck('annualTurnover rejects < 2 chars', !app.validateField(turnShort));
+  const turnValid = createInput('annualTurnover', '25 Crore');
+  ck('annualTurnover accepts valid value', app.validateField(turnValid));
+
+  // employees
+  const empZero = createInput('employees', '0');
+  ck('employees rejects 0', !app.validateField(empZero));
+  const empNeg = createInput('employees', '-5');
+  ck('employees rejects negative numbers', !app.validateField(empNeg));
+  const empNan = createInput('employees', 'abc');
+  ck('employees rejects NaN string', !app.validateField(empNan));
+  const empValid = createInput('employees', '150');
+  ck('employees accepts valid headcount', app.validateField(empValid));
+
+  // address
+  const addrShort = createInput('address', 'Abc');
+  ck('address rejects < 5 chars', !app.validateField(addrShort));
+  const addrValid = createInput('address', 'Plot 42, GIDC Industrial Estate, Bharuch');
+  ck('address accepts valid address', app.validateField(addrValid));
+
+  // paymentProof
+  const proofDropzone = new MockElement('div', 'paymentProofDropzone');
+  regEl(proofDropzone);
+  const proofInput = createInput('paymentProof', '', true);
+  ck('paymentProof rejects when no receipt uploaded', !app.validateField(proofInput));
+  app.currentPaymentProofBase64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  ck('paymentProof accepts when receipt is uploaded', app.validateField(proofInput));
+
+  // CTA visibility functional test
+  const ctaBtn1 = new MockElement('button');
+  ctaBtn1.setAttribute('data-apply-cta', '');
+  const ctaBtn2 = new MockElement('button');
+  ctaBtn2.setAttribute('data-apply-cta', '');
+  const mobTab = new MockElement('a', 'mobileTabMembership');
+  regEl(mobTab);
+  globalDocElements.set('cta1', ctaBtn1);
+  globalDocElements.set('cta2', ctaBtn2);
+
+  app.adminAuthed = true;
+  app._updateApplyCtas(null);
+  ck('when adminAuthed is true, apply CTAs are hidden', ctaBtn1.style.display === 'none' && ctaBtn2.style.display === 'none');
+  app._updateMobileMembershipTab(null);
+  ck('when adminAuthed is true, mobile tab is hidden', mobTab.style.display === 'none');
+
+  app.adminAuthed = false;
+  app.currentView = 'home';
+  app._updateApplyCtas(null);
+  ck('when adminAuthed is false on home, apply CTAs are visible', ctaBtn1.style.display === '' && ctaBtn2.style.display === '');
+  app._updateMobileMembershipTab(null);
+  ck('when adminAuthed is false on home, mobile tab is visible', mobTab.style.display === '');
+
+  // Subject validation
+  const subjShort = createInput('subject', 'A');
+  ck('subject rejects < 2 chars', !app.validateField(subjShort));
+  const subjValid = createInput('subject', 'Membership Enquiry');
+  ck('subject accepts valid subject', app.validateField(subjValid));
+
+  // Verify index.html structural integrity
+  const htmlContent = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  ck('view-membership has container inside section-padding', htmlContent.includes('<main id="view-membership" class="view-page" style="display: none;">\n    <section class="section-padding">\n      <div class="container">'));
+  ck('index.html has no duplicate downloadCardBtn', (htmlContent.match(/id="downloadCardBtn"/g) || []).length === 0);
+  ck('index.html has no duplicate printCardBtn', (htmlContent.match(/id="printCardBtn"/g) || []).length === 0);
+
+  // Verify renewal error toast shows err.message
+  ck('showRenewalModal uses err?.message for error toasts', SRC.includes("this.showToast(err?.message || 'Failed to renew membership. Please try again.', 'error')"));
+
+  // Verify password-input-group padding in CSS
+  const cssContent = fs.readFileSync(new URL('../css/styles.css', import.meta.url), 'utf8');
+  ck('password-input-group form-control has right padding in CSS', cssContent.includes('.password-input-group .form-control') && cssContent.includes('padding-right: 2.5rem;'));
+
+  // Admin Event Broadcasting assertions
+  ck('admin portal has Event Broadcasting tab', htmlContent.includes('data-tab="events"'));
+  ck('#tab-events exists in index.html', htmlContent.includes('id="tab-events"'));
+  ck('#broadcastEventForm exists in index.html', htmlContent.includes('id="broadcastEventForm"'));
+  ck('#eventTitleInput exists in index.html', htmlContent.includes('id="eventTitleInput"'));
+  ck('#eventCapacityInput exists in index.html', htmlContent.includes('id="eventCapacityInput"'));
+  ck('#eventModeSelect exists in index.html', htmlContent.includes('id="eventModeSelect"'));
+  ck('#eventPricingSelect exists in index.html', htmlContent.includes('id="eventPricingSelect"'));
+  ck('App prototype has renderAdminEvents', typeof App.prototype.renderAdminEvents === 'function');
+
+  // Public Events Page assertions
+  ck('VIEW_PATHS has events route', SRC.includes("events: '/events'"));
+  ck('PAGE_TITLES has events title', SRC.includes("events: 'Events & Conclaves — BCCI Bharuch'"));
+  ck('data-view-nav="events" exists in desktop nav', htmlContent.includes('<li class="nav-item"><a href="#" class="nav-link" data-view-nav="events">Events</a></li>'));
+  ck('data-view-nav="events" exists in mobile drawer', htmlContent.includes('data-view-nav="events"><i class="fas fa-calendar-alt"></i> Events &amp; Conclaves</a>'));
+  ck('data-view-nav="events" exists in footer', htmlContent.includes('data-view-nav="events">Events &amp; Conclaves</a>'));
+  ck('#view-events exists in index.html', htmlContent.includes('id="view-events"'));
+  ck('#eventsGrid exists in index.html', htmlContent.includes('id="eventsGrid"'));
+  ck('#eventsFilterPills exists in index.html', htmlContent.includes('id="eventsFilterPills"'));
+  ck('#eventsSearchInput exists in index.html', htmlContent.includes('id="eventsSearchInput"'));
+  ck('App prototype has renderEventsPage', typeof App.prototype.renderEventsPage === 'function');
+  ck('App prototype has showJoinEventModal', typeof App.prototype.showJoinEventModal === 'function');
+
+  // ── Public Events & Join Modal Test Suite ──────────────────────────
+  console.log('\nPublic Events & Registration Modal');
+  console.log('─────────────────────────────────');
+
+  const eventsGrid = new MockElement('div', 'eventsGrid');
+  const eventsEmptyState = new MockElement('div', 'eventsEmptyState');
+  eventsEmptyState.style.display = 'none';
+  const eventsFilterPills = new MockElement('div', 'eventsFilterPills');
+  const eventsSearchInput = new MockElement('input', 'eventsSearchInput');
+  const modalBackdrop = new MockElement('div', 'modalBackdrop');
+  const modalContainer = new MockElement('div', 'modalContainer');
+
+  regEl(eventsGrid);
+  regEl(eventsEmptyState);
+  regEl(eventsFilterPills);
+  regEl(eventsSearchInput);
+  regEl(modalBackdrop);
+  regEl(modalContainer);
+
+  const sampleEvents = [
+    {
+      id: 'ev-1',
+      title: 'BCCI Industrial Conclave 2026',
+      date: '2026-10-15',
+      time: '10:00 AM - 04:00 PM',
+      mode: 'offline',
+      venue: 'BCCI Hall, Station Road, Bharuch',
+      pricingType: 'free',
+      fee: 0,
+      capacity: 100,
+      registeredCount: 50,
+      seatsLeft: 50,
+      isFull: false,
+      description: 'Annual flagship conclave for Gujarat chemical industry leaders.',
+    },
+    {
+      id: 'ev-2',
+      title: 'Webinar on GST Compliance',
+      date: '2026-11-01',
+      time: '03:00 PM - 05:00 PM',
+      mode: 'online',
+      venue: 'https://meet.google.com/abc-def-ghi',
+      pricingType: 'paid',
+      fee: 499,
+      capacity: 50,
+      registeredCount: 50,
+      seatsLeft: 0,
+      isFull: true,
+      description: 'Interactive session on new GST compliance norms.',
+    }
+  ];
+  app.store = {
+    getEvents: async () => sampleEvents,
+    registerForEvent: async () => ({ success: true, message: 'Registration confirmed!' }),
+  };
+  app.announce = () => {};
+  app.showToast = () => {};
+  await app.renderEventsPage();
+
+  ck('renderEventsPage populates eventsGrid HTML', eventsGrid.innerHTML.includes('BCCI Industrial Conclave 2026'));
+  ck('event card contains offline mode badge', eventsGrid.innerHTML.includes('In-Person Venue'));
+  ck('event card contains online mode badge', eventsGrid.innerHTML.includes('Virtual Online'));
+  ck('event card displays capacity progress', eventsGrid.innerHTML.includes('50 / 100 Joined'));
+  ck('full event renders Sold Out / Capacity Full button', eventsGrid.innerHTML.includes('Sold Out / Capacity Full'));
+  ck('open event renders Register / Join Event button', eventsGrid.innerHTML.includes('data-join-event-id="ev-1"'));
+
+  // Test filter pills
+  app._eventsFilter = 'online';
+  app.applyEventsFilterAndSearch();
+  ck('filtering by online keeps only online event', eventsGrid.innerHTML.includes('Webinar on GST Compliance') && !eventsGrid.innerHTML.includes('BCCI Industrial Conclave 2026'));
+
+  app._eventsFilter = 'free';
+  app.applyEventsFilterAndSearch();
+  ck('filtering by free keeps only free event', eventsGrid.innerHTML.includes('BCCI Industrial Conclave 2026') && !eventsGrid.innerHTML.includes('Webinar on GST Compliance'));
+
+  // Test search query
+  app._eventsFilter = 'all';
+  app._eventsSearchQuery = 'conclave';
+  app.applyEventsFilterAndSearch();
+  ck('searching for conclave shows matching event', eventsGrid.innerHTML.includes('BCCI Industrial Conclave 2026') && !eventsGrid.innerHTML.includes('Webinar on GST Compliance'));
+
+  app._eventsSearchQuery = 'nonexistentxyz';
+  app.applyEventsFilterAndSearch();
+  ck('search with no match displays empty state', eventsEmptyState.style.display === 'block');
+
+  // Test showJoinEventModal
+  app._eventsSearchQuery = '';
+  app._eventsFilter = 'all';
+  app.showJoinEventModal(sampleEvents[0]);
+  ck('showJoinEventModal opens modal container', modalBackdrop.classList.contains('show'));
+  ck('modal container contains attendee registration form', modalContainer.innerHTML.includes('id="joinEventForm"'));
+  ck('modal container contains delegate inputs', modalContainer.innerHTML.includes('id="joinNameInput"') && modalContainer.innerHTML.includes('id="joinPhoneInput"'));
 }
 
 console.log(`\n${'═'.repeat(52)}\n  ${pass} passed, ${fail} failed\n${'═'.repeat(52)}`);

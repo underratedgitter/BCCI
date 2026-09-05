@@ -117,6 +117,48 @@ async function handler(req, res) {
       return res.status(400).json({ error: 'Enter a valid 10-digit Indian mobile number.' });
     }
 
+    const gstNo = str(body.gstNo, 20).toUpperCase();
+    if (gstNo && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}[Zz][0-9A-Z]{1}$/.test(gstNo)) {
+      return res.status(400).json({ error: 'Invalid GSTIN format (15 characters).' });
+    }
+
+    const panNo = str(body.panNo, 15).toUpperCase();
+    if (panNo && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(panNo)) {
+      return res.status(400).json({ error: 'Invalid PAN format (10 characters).' });
+    }
+
+    const pincode = str(body.pincode, 10);
+    if (pincode && !/^[1-9][0-9]{5}$/.test(pincode)) {
+      return res.status(400).json({ error: 'Invalid 6-digit postal pincode.' });
+    }
+
+    const cin = str(body.cin, 30).toUpperCase();
+    if (cin && !/^[LU][0-9]{5}[A-Z]{2}[0-9]{4}[A-Z]{3}[0-9]{6}$/.test(cin)) {
+      return res.status(400).json({ error: 'Invalid 21-character CIN format.' });
+    }
+
+    const annualTurnover = str(body.annualTurnover, 60);
+    if (annualTurnover && annualTurnover.length < 2) {
+      return res.status(400).json({ error: 'Annual turnover must be at least 2 characters.' });
+    }
+
+    const employees = str(body.employees, 30);
+    if (employees) {
+      const empCount = parseInt(employees, 10);
+      if (isNaN(empCount) || empCount < 1) {
+        return res.status(400).json({ error: 'Employee count must be a number greater than or equal to 1.' });
+      }
+    }
+
+    if (applicantAddress && applicantAddress.length < 5) {
+      return res.status(400).json({ error: 'Address must be at least 5 characters.' });
+    }
+
+    const paymentRef = str(body.paymentRef, 80);
+    if (paymentRef && paymentRef.length < 6) {
+      return res.status(400).json({ error: 'Payment reference / UTR must be at least 6 characters.' });
+    }
+
     // One application per verified email.
     const existing = await getApplicationByEmail(applicantEmail);
     if (existing) {

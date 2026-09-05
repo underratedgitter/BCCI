@@ -139,6 +139,25 @@ r = await call(applications, {
 });
 check('a second application from the same email → 409', r.statusCode === 409, `got ${r.statusCode}`);
 
+// Server-side validation checks
+r = await call(applications, {
+  method: 'POST', token: applicantToken,
+  body: { repName: 'Rajesh Shah', company: 'Test Ltd', phone: '9876543210', businessServices: 'Chemicals', employees: 'abc' },
+});
+check('POST with invalid employees → 400', r.statusCode === 400, `got ${r.statusCode}`);
+
+r = await call(applications, {
+  method: 'POST', token: applicantToken,
+  body: { repName: 'Rajesh Shah', company: 'Test Ltd', phone: '9876543210', businessServices: 'Chemicals', address: 'Plot' },
+});
+check('POST with short address (<5 chars) → 400', r.statusCode === 400, `got ${r.statusCode}`);
+
+r = await call(applications, {
+  method: 'POST', token: applicantToken,
+  body: { repName: 'Rajesh Shah', company: 'Test Ltd', phone: '9876543210', businessServices: 'Chemicals', annualTurnover: '1' },
+});
+check('POST with short annualTurnover (<2 chars) → 400', r.statusCode === 400, `got ${r.statusCode}`);
+
 // ════════════════════════════════════════════════════════════════════
 section('Ownership: an applicant can only read their own record');
 

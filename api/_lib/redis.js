@@ -32,6 +32,10 @@ export const KEYS = {
   account: (email) => `bcci:account:${String(email).trim().toLowerCase()}`,
   otpReset: (email) => `bcci:otp:reset:${String(email).trim().toLowerCase()}`,
 
+  event: (id) => `bcci:event:${id}`,
+  eventIndex: 'bcci:event_index',
+  eventAttendees: (id) => `bcci:event_attendees:${id}`,
+
   migrated: (what) => `bcci:migrated:${what}`,
 };
 
@@ -250,3 +254,110 @@ export async function trimEnquiries(keep = 1000) {
   await redis.zrem(KEYS.enqIndex, ...stale);
   return stale.length;
 }
+
+// ── Events ─────────────────────────────────────────────────────────
+
+export async function getEvent(id) {
+  if (!id) return null;
+  return withRetry(async () => {
+    const data = await redis.get(KEYS.event(id));
+    if (!data) return null;
+    return typeof data === 'string' ? JSON.parse(data) : data;
+  });
+}
+
+export async function putEvent(event) {
+  if (!event || !event.id) throw new Error('Event must have an ID');
+  const record = {
+    ...event,
+    registeredCount: Number(event.registeredCount) || 0,
+    updatedAt: new Date().toISOString(),
+  };
+  return withRetry(async () => {
+    await redis.set(KEYS.event(record.id), record);
+    const t = Date.parse(record.date || record.createdAt || '') || Date.now();
+    await redis.zadd(KEYS.eventIndex, { score: t, member: record.id });
+    return record;
+  });
+}
+
+export async function listEvents({ limit = 100, offset = 0 } = {}) {
+  return withRetry(async () => {
+    const ids = await redis.zrange(KEYS.eventIndex, offset, offset + limit - 1, {
+      rev: true,
+    });
+    if (!ids || !ids.length) return [];
+    const records = await redis.mget(...ids.map(KEYS.event));
+    return records.filter(Boolean).map(r => (typeof r === 'string' ? JSON.parse(r) : r));
+  });
+}
+
+export async function countEvents() {
+  return (await redis.zcard(KEYS.eventIndex)) || 0;
+}
+
+export async function deleteEvent(id) {
+  if (!id) return false;
+  return withRetry(async () => {
+    await redis.del(KEYS.event(id), KEYS.eventAttendees(id));
+    await redis.zrem(KEYS.eventIndex, id);
+    return true;
+  });
+}
+
+export async function getEventAttendees(id) {
+  if (!id) return [];
+  return withRetry(async () => {
+    const attendees = await redis.get(KEYS.eventAttendees(id));
+    if (!attendees) return [];
+    return Array.isArray(attendees) ? attendees : (typeof attendees === 'string' ? JSON.parse(attendees) : []);
+  });
+}
+
+export async function registerForEvent(id, attendee) {
+  if (!id || !attendee || !attendee.email) {
+    return { success: false, error: 'Event ID and attendee email are required.' };
+  }
+  const email = String(attendee.email).trim().toLowerCase();
+
+  return withRetry(async () => {
+    const rawEvent = await redis.get(KEYS.event(id));
+    if (!rawEvent) {
+      return { success: false, error: 'Event not found.' };
+    }
+    const event = typeof rawEvent === 'string' ? JSON.parse(rawEvent) : rawEvent;
+
+    const capacity = Number(event.capacity) || 0;
+    const currentCount = Number(event.registeredCount) || 0;
+    if (capacity > 0 && currentCount >= capacity) {
+      return { success: false, error: 'This event has reached maximum capacity.' };
+    }
+
+    const rawAttendees = await redis.get(KEYS.eventAttendees(id));
+    let attendees = [];
+    if (rawAttendees) {
+      attendees = Array.isArray(rawAttendees) ? rawAttendees : (typeof rawAttendees === 'string' ? JSON.parse(rawAttendees) : []);
+    }
+
+    if (attendees.some(a => String(a.email || '').trim().toLowerCase() === email)) {
+      return { success: false, error: 'You are already registered for this event.' };
+    }
+
+    const newAttendee = {
+      name: String(attendee.name || '').trim(),
+      email,
+      phone: String(attendee.phone || '').trim(),
+      company: String(attendee.company || '').trim() || 'Delegate / Independent',
+      registeredAt: new Date().toISOString(),
+    };
+
+    attendees.push(newAttendee);
+    event.registeredCount = currentCount + 1;
+
+    await redis.set(KEYS.eventAttendees(id), attendees);
+    await redis.set(KEYS.event(id), event);
+
+    return { success: true, event, attendee: newAttendee };
+  });
+}
+

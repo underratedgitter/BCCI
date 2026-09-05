@@ -2508,6 +2508,10 @@ footer h4 {
   align-items: center;
 }
 
+.password-input-group .form-control {
+  padding-right: 2.5rem;
+}
+
 .password-toggle-btn {
   position: absolute;
   right: 0.75rem;
@@ -2584,4 +2588,215 @@ footer h4 {
   text-align: center;
   font-family: var(--font-mono, monospace);
 }
+
+/* ── Public Events & Conclaves Page ─────────────────────────────── */
+.events-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  gap: 1.5rem;
+}
+
+.event-card {
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border-color, #E2E8F0);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: 0 4px 12px rgba(15, 44, 89, 0.05);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.event-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 24px rgba(15, 44, 89, 0.1);
+}
+
+.event-card-header {
+  padding: 1.25rem 1.25rem 0.5rem 1.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.event-pill-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.event-pill-badge.mode-offline {
+  background: #EFF6FF;
+  color: #1D4ED8;
+  border: 1px solid #BFDBFE;
+}
+
+.event-pill-badge.mode-online {
+  background: #F0FDF4;
+  color: #15803D;
+  border: 1px solid #BBF7D0;
+}
+
+.event-pill-badge.pricing-free {
+  background: #ECFDF5;
+  color: #047857;
+  border: 1px solid #A7F3D0;
+}
+
+.event-pill-badge.pricing-paid {
+  background: #FFFBEB;
+  color: #B45309;
+  border: 1px solid #FDE68A;
+}
+
+.event-card-body {
+  padding: 0.75rem 1.25rem;
+  flex: 1;
+}
+
+.event-card-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--primary, #0F2C59);
+  margin-bottom: 0.65rem;
+  line-height: 1.35;
+}
+
+.event-meta-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+  color: var(--text-muted, #64748B);
+  margin-bottom: 0.45rem;
+}
+
+.event-meta-row i {
+  color: var(--accent-gold, #d4af37);
+  font-size: 0.9rem;
+  margin-top: 0.2rem;
+  min-width: 16px;
+  text-align: center;
+}
+
+.event-card-desc {
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: #475569;
+  margin-top: 0.85rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.event-card-footer {
+  padding: 1rem 1.25rem 1.25rem 1.25rem;
+  border-top: 1px solid var(--border-color, #E2E8F0);
+  background: #F8FAFC;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.event-capacity-bar-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.event-capacity-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #64748B;
+}
+
+.event-capacity-track {
+  height: 6px;
+  width: 100%;
+  background: #E2E8F0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.event-capacity-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #10B981, #059669);
+  transition: width 0.3s ease;
+}
+
+.event-capacity-fill.high-occupancy {
+  background: linear-gradient(90deg, #F59E0B, #D97706);
+}
+
+.event-capacity-fill.full {
+  background: linear-gradient(90deg, #EF4444, #DC2626);
+}
+
+.btn-join-event {
+  width: 100%;
+  padding: 0.65rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  border: none;
+  background: var(--primary, #0F2C59);
+  color: #ffffff;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.btn-join-event:hover:not(:disabled) {
+  background: #1E3E62;
+}
+
+.btn-join-event:disabled {
+  background: #94A3B8;
+  cursor: not-allowed;
+  opacity: 0.85;
+}
+
+.event-filter-pill {
+  border: 1px solid var(--border-color, #CBD5E1);
+  background: #ffffff;
+  color: #475569;
+  padding: 0.45rem 0.95rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: all 0.15s ease;
+}
+
+.event-filter-pill:hover {
+  background: #F1F5F9;
+  color: var(--primary, #0F2C59);
+  border-color: #94A3B8;
+}
+
+.event-filter-pill.active {
+  background: var(--primary, #0F2C59);
+  color: #ffffff;
+  border-color: var(--primary, #0F2C59);
+  box-shadow: 0 2px 6px rgba(15, 44, 89, 0.2);
+}
+
 

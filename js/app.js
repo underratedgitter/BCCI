@@ -52,6 +52,7 @@ const VIEW_PATHS = {
   home: '/',
   about: '/about',
   services: '/services',
+  events: '/events',
   gallery: '/gallery',
   qrcode: '/qr',
   enquiry: '/enquiry',
@@ -69,6 +70,7 @@ const PAGE_TITLES = {
   home: 'BCCI Bharuch — Bharuch Chamber of Commerce & Industry',
   about: 'About BCCI — Bharuch Chamber of Commerce & Industry',
   services: 'Member Services — BCCI Bharuch',
+  events: 'Events & Conclaves — BCCI Bharuch',
   gallery: 'Gallery — BCCI Bharuch',
   qrcode: 'Pay by UPI — BCCI Bharuch',
   enquiry: 'Contact Us — BCCI Bharuch',
@@ -83,6 +85,7 @@ function viewFromLocation() {
   const hash = (window.location.hash || '').toLowerCase().replace('#', '');
   if (hash === 'admin' || hash === 'secret-admin') return 'admin';
   if (hash === 'signin' || hash === 'login') return 'signin';
+  if (hash === 'events') return 'events';
 
   const path = window.location.pathname.replace(/\/+$/, '') || '/';
   return PATH_VIEWS[path] || 'home';
@@ -110,6 +113,8 @@ class App {
     this.setupFileUploadHandlers();
     this.setupFormValidation();
     this.setupFormHandlers();
+    this.setupAdminEventForm();
+    this.setupPublicEventsHandlers();
     this.setupModalEvents();
     this.setupLightboxEvents();
     this.setupScrollToTop();
@@ -772,6 +777,11 @@ class App {
   _updateMobileMembershipTab(memberApp) {
     const tab = document.getElementById('mobileTabMembership');
     if (!tab) return;
+    if (this.adminAuthed || this.currentView === 'admin') {
+      tab.style.display = 'none';
+      return;
+    }
+    tab.style.display = '';
     const approved = memberApp && memberApp.status === 'Approved';
     tab.setAttribute('data-view-nav', approved ? 'card' : 'membership');
     tab.innerHTML = approved
@@ -786,6 +796,16 @@ class App {
    * action reflects where they actually are.
    */
   _updateApplyCtas(memberApp) {
+    const drawerSignIn = document.querySelector('.mobile-drawer-signin-item');
+    if (this.adminAuthed || this.currentView === 'admin') {
+      document.querySelectorAll('[data-apply-cta]').forEach((el) => {
+        el.style.display = 'none';
+      });
+      if (drawerSignIn) drawerSignIn.style.display = 'none';
+      return;
+    }
+    if (drawerSignIn) drawerSignIn.style.display = '';
+
     const status = memberApp && memberApp.status;
     document.querySelectorAll('[data-apply-cta]').forEach((el) => {
       if (status === 'Approved') {
@@ -803,6 +823,7 @@ class App {
   }
 
   updateHeaderMemberBadge(memberApp, validity) {
+    this._lastMemberApp = memberApp;
     const desktopAuthContainer = document.getElementById('navAuthContainer');
     let badgeEl = document.getElementById('navHeaderMemberBadge');
 
@@ -971,8 +992,11 @@ class App {
             this.closeModal();
             this.showToast(`Membership ${app.id} successfully renewed for +1 Year!`, 'success');
             this.updateApplicantAuthUI();
+            if (this.currentView === 'card') {
+              this.renderMembershipCard();
+            }
           } catch (err) {
-            this.showToast('Failed to renew membership. Please try again.', 'error');
+            this.showToast(err?.message || 'Failed to renew membership. Please try again.', 'error');
           }
         });
       }
@@ -1064,6 +1088,9 @@ class App {
 
     if (desktopContainer) desktopContainer.innerHTML = desktopHtml;
     if (drawerContainer) drawerContainer.innerHTML = drawerHtml;
+
+    this._updateApplyCtas(this._lastMemberApp);
+    this._updateMobileMembershipTab(this._lastMemberApp);
 
     // Show/hide View Card button based on membership status
     const viewCardBtn = document.getElementById('viewCardBtn');
@@ -1316,6 +1343,17 @@ class App {
       });
     });
 
+    document.addEventListener('click', (e) => {
+      const target = e.target.closest('[data-view-nav]');
+      if (!target || e.defaultPrevented) return;
+      const targetView = target.getAttribute('data-view-nav');
+      if (targetView) {
+        e.preventDefault();
+        this.closeMobileDrawer();
+        this.renderView(targetView);
+      }
+    });
+
     const mobileBtn = document.getElementById('mobileMenuBtn');
     const drawerCloseBtn = document.getElementById('mobileDrawerCloseBtn');
     const backdrop = document.getElementById('mobileDrawerBackdrop');
@@ -1369,6 +1407,9 @@ class App {
       tab.classList.toggle('active', tab.getAttribute('data-view-nav') === viewId);
     });
 
+    this._updateApplyCtas(this._lastMemberApp);
+    this._updateMobileMembershipTab(this._lastMemberApp);
+
     // Show/hide scroll-to-top button
     this._updateScrollToTopBtn();
 
@@ -1385,6 +1426,7 @@ class App {
 
     if (viewId === 'home' || viewId === 'about') this.renderLeadership();
     if (viewId === 'services') this.renderServicesAndFaqs();
+    if (viewId === 'events') await this.renderEventsPage();
     if (viewId === 'membership') this.updateApplicantAuthUI();
     if (viewId === 'card') this.renderMembershipCard();
     if (viewId === 'admin') await this.renderAdminPortal();
@@ -1656,10 +1698,11 @@ class App {
         <div style="text-align: center; padding: 60px 20px; background: var(--white); border: var(--rule);">
           <i class="fas fa-exclamation-triangle" style="font-size: 48px; color: var(--danger); margin-bottom: 16px;"></i>
           <p style="color: var(--gray-600); font-size: 14px;">Failed to load membership card</p>
-          <button class="btn-primary" style="margin-top: 16px;" onclick="location.reload()">
+          <button type="button" class="btn-primary" id="cardErrorRetryBtn" style="margin-top: 16px;">
             <i class="fas fa-redo"></i> Retry
           </button>
         </div>`;
+      container.querySelector('#cardErrorRetryBtn')?.addEventListener('click', () => window.location.reload());
     }
   }
 
@@ -1936,7 +1979,9 @@ class App {
       const link = document.createElement('a');
       link.download = `BCCI_Membership_${this.currentCardId || 'Card'}.png`;
       link.href = canvas.toDataURL('image/png');
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
 
       this.showToast('Card downloaded successfully!', 'success');
     } catch (err) {
@@ -2092,6 +2137,8 @@ class App {
       const gstInput = form.querySelector('input[name="gstNo"]');
       const cinInput = form.querySelector('input[name="cin"]');
       const pincodeInput = form.querySelector('input[name="pincode"]');
+      const turnoverInput = form.querySelector('input[name="annualTurnover"]');
+      const employeesInput = form.querySelector('input[name="employees"]');
 
       if (phoneInput) {
         phoneInput.addEventListener('input', (e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10); this.validateField(phoneInput); });
@@ -2113,9 +2160,22 @@ class App {
         pincodeInput.addEventListener('input', (e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6); this.validateField(pincodeInput); });
         pincodeInput.addEventListener('blur', () => this.validateField(pincodeInput));
       }
+      if (turnoverInput) {
+        turnoverInput.addEventListener('input', () => { if (turnoverInput.classList.contains('is-invalid')) this.validateField(turnoverInput); });
+        turnoverInput.addEventListener('blur', () => this.validateField(turnoverInput));
+      }
+      if (employeesInput) {
+        employeesInput.addEventListener('input', () => this.validateField(employeesInput));
+        employeesInput.addEventListener('blur', () => this.validateField(employeesInput));
+      }
+
+      form.querySelectorAll('select').forEach(sel => {
+        sel.addEventListener('change', () => this.validateField(sel));
+        sel.addEventListener('blur', () => this.validateField(sel));
+      });
 
       form.querySelectorAll('input, select, textarea').forEach(input => {
-        if (!['phone', 'panNo', 'gstNo', 'cin', 'pincode'].includes(input.name)) {
+        if (!['phone', 'panNo', 'gstNo', 'cin', 'pincode', 'annualTurnover', 'employees'].includes(input.name)) {
           input.addEventListener('blur', () => this.validateField(input));
           input.addEventListener('input', () => { if (input.classList.contains('is-invalid')) this.validateField(input); });
         }
@@ -2177,12 +2237,20 @@ class App {
         case 'email':
           if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) { isValid = false; errorMsg = 'Invalid email address.'; }
           break;
-        case 'company': case 'repName': case 'name': case 'repDesignation': case 'address': case 'message':
+        case 'company': case 'repName': case 'name': case 'repDesignation': case 'subject': case 'message':
           if (val.length < 2) { isValid = false; errorMsg = 'Must be at least 2 characters.'; }
           break;
-        case 'employees':
-          if (parseInt(val, 10) < 1) { isValid = false; errorMsg = 'Must be at least 1.'; }
+        case 'address':
+          if (val.length < 5) { isValid = false; errorMsg = 'Address must be at least 5 characters.'; }
           break;
+        case 'annualTurnover':
+          if (val.length < 2) { isValid = false; errorMsg = 'Please enter valid annual turnover (e.g. 25 Crore).'; }
+          break;
+        case 'employees': {
+          const empNum = parseInt(val, 10);
+          if (isNaN(empNum) || empNum < 1) { isValid = false; errorMsg = 'Must be at least 1.'; }
+          break;
+        }
         case 'paymentRef':
           if (val.length > 0 && val.length < 6) { isValid = false; errorMsg = 'UTR must be at least 6 characters.'; }
           break;
@@ -2241,7 +2309,15 @@ class App {
         });
 
         if (!isFormValid) {
-          if (firstInvalidInput) { firstInvalidInput.focus(); firstInvalidInput.scrollIntoView({ behavior: scrollBehavior(), block: 'center' }); }
+          if (firstInvalidInput) {
+            const target = firstInvalidInput.id === 'paymentProofInput'
+              ? (document.getElementById('paymentProofDropzone') || firstInvalidInput)
+              : firstInvalidInput;
+            if (typeof target.focus === 'function') target.focus();
+            if (typeof target.scrollIntoView === 'function') {
+              target.scrollIntoView({ behavior: scrollBehavior(), block: 'center' });
+            }
+          }
           this.showToast('Please fix the highlighted errors before submitting.', 'warning');
           return;
         }
@@ -2331,7 +2407,10 @@ class App {
         let isFormValid = true;
         enquiryForm.querySelectorAll('input, select, textarea').forEach(input => {
           const isFieldValid = this.validateField(input);
-          if (!isFieldValid && !firstInvalidInput) { firstInvalidInput = input; isFormValid = false; }
+          if (!isFieldValid) {
+            isFormValid = false;
+            if (!firstInvalidInput) firstInvalidInput = input;
+          }
         });
 
         if (!isFormValid) {
@@ -2624,6 +2703,7 @@ class App {
     );
 
     this.bindAdminActions();
+    this.renderAdminEvents();
   }
 
   async handleApproveApplication(id) {
@@ -2867,7 +2947,592 @@ class App {
     this.showToast('CSV exported successfully!', 'success');
   }
 
+  /* ════════════════════════════════════════════════════════════════════
+     ADMIN EVENT BROADCASTING PLATFORM
+     ════════════════════════════════════════════════════════════════════ */
 
+  async renderAdminEvents() {
+    const tableBody = document.getElementById('adminEventsBody');
+    const cardsEl = document.getElementById('adminEventsCards');
+    if (!tableBody && !cardsEl) return;
+
+    let events = [];
+    try {
+      events = await this.store.getEvents();
+    } catch (err) {
+      console.error('[Admin Events] Failed to load:', err);
+      const errHtml = `<tr><td colspan="6" style="text-align:center;padding:2rem;color:#EF4444;"><i class="fas fa-exclamation-triangle"></i> Failed to load events.</td></tr>`;
+      if (tableBody) tableBody.innerHTML = errHtml;
+      return;
+    }
+
+    if (!events.length) {
+      const emptyHtml = `<div style="text-align:center;color:#94A3B8;padding:2rem;"><i class="fas fa-calendar-times" style="font-size:1.8rem;margin-bottom:0.5rem;display:block;"></i>No broadcasted events yet. Create one above to publish it to the website.</div>`;
+      if (tableBody) tableBody.innerHTML = `<tr><td colspan="6" style="padding:0;">${emptyHtml}</td></tr>`;
+      if (cardsEl) cardsEl.innerHTML = emptyHtml;
+      return;
+    }
+
+    if (tableBody) {
+      tableBody.innerHTML = events.map(ev => {
+        const cap = Number(ev.capacity) || 1;
+        const reg = Number(ev.registeredCount) || 0;
+        const pct = Math.min(100, Math.round((reg / cap) * 100));
+        const modeBadge = ev.mode === 'online'
+          ? `<span class="badge-status" style="background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE;"><i class="fas fa-video"></i> Online</span>`
+          : `<span class="badge-status" style="background:#F0FDF4;color:#15803D;border:1px solid #BBF7D0;"><i class="fas fa-building"></i> In-Person</span>`;
+        const feeBadge = ev.pricingType === 'paid'
+          ? `<strong style="color:var(--primary);">₹${escapeHtml(String(ev.fee || 0))}</strong>`
+          : `<span style="color:#059669;font-weight:700;">Free</span>`;
+
+        return `
+          <tr>
+            <td>
+              <div style="font-weight:700;color:var(--primary);margin-bottom:0.25rem;">${escapeHtml(ev.title)}</div>
+              ${modeBadge}
+              <small style="color:#64748B;display:block;margin-top:0.25rem;font-family:monospace;">${escapeHtml(ev.id)}</small>
+            </td>
+            <td>
+              <strong>${escapeHtml(formatDate(ev.date) || ev.date)}</strong><br/>
+              <small style="color:#64748B;"><i class="far fa-clock"></i> ${escapeHtml(ev.time)}</small>
+            </td>
+            <td><small style="max-width:200px;display:inline-block;word-break:break-word;">${escapeHtml(ev.venue)}</small></td>
+            <td>${feeBadge}</td>
+            <td>
+              <div style="display:flex;align-items:center;gap:0.5rem;min-width:140px;">
+                <div style="flex:1;height:8px;background:#E2E8F0;border-radius:4px;overflow:hidden;">
+                  <div style="width:${pct}%;height:100%;background:${pct >= 100 ? '#EF4444' : '#10B981'};border-radius:4px;"></div>
+                </div>
+                <span style="font-size:0.8rem;font-weight:700;white-space:nowrap;">${reg} / ${cap}</span>
+              </div>
+              <small style="font-size:0.75rem;color:${pct >= 100 ? '#DC2626' : '#64748B'};font-weight:600;">
+                ${pct >= 100 ? 'Sold Out (Full)' : `${Math.max(0, cap - reg)} spots left`}
+              </small>
+            </td>
+            <td>
+              <div style="display:flex;gap:0.4rem;">
+                <button type="button" class="btn-secondary" data-inspect-event-id="${escapeAttr(ev.id)}" style="padding:0.35rem 0.65rem;font-size:0.8rem;" title="View Registered Attendees">
+                  <i class="fas fa-users"></i> (${reg})
+                </button>
+                <button type="button" class="btn-action-reject" data-delete-event-id="${escapeAttr(ev.id)}" style="padding:0.35rem 0.65rem;font-size:0.8rem;" title="Delete Event">
+                  <i class="fas fa-trash-alt"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    if (cardsEl) {
+      cardsEl.innerHTML = events.map(ev => {
+        const cap = Number(ev.capacity) || 1;
+        const reg = Number(ev.registeredCount) || 0;
+        return `
+          <div class="admin-mobile-card">
+            <div class="admin-card-header">
+              <div>
+                <div class="admin-card-company">${escapeHtml(ev.title)}</div>
+                <small style="color:#64748B;">${escapeHtml(ev.date)} &bull; ${escapeHtml(ev.time)}</small>
+              </div>
+              <span class="admin-card-id">${escapeHtml(ev.id)}</span>
+            </div>
+            <div class="admin-card-meta">
+              <div><strong>Mode:</strong> ${ev.mode === 'online' ? 'Online Webinar' : 'In-Person Venue'}</div>
+              <div><strong>Venue:</strong> ${escapeHtml(ev.venue)}</div>
+              <div><strong>Fee:</strong> ${ev.pricingType === 'paid' ? `₹${escapeHtml(String(ev.fee))}` : 'Free'}</div>
+              <div><strong>Joined:</strong> ${reg} / ${cap} (${Math.max(0, cap - reg)} spots left)</div>
+            </div>
+            <div class="admin-card-actions">
+              <button class="btn-secondary" data-inspect-event-id="${escapeAttr(ev.id)}"><i class="fas fa-users"></i> Attendees (${reg})</button>
+              <button class="btn-action-reject" data-delete-event-id="${escapeAttr(ev.id)}"><i class="fas fa-trash-alt"></i> Delete</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    this.bindAdminEventItemActions();
+  }
+
+  bindAdminEventItemActions() {
+    // Inspect attendees
+    document.querySelectorAll('[data-inspect-event-id]').forEach(btn => {
+      btn.onclick = async () => {
+        const id = btn.getAttribute('data-inspect-event-id');
+        try {
+          const event = await this.store.getEventWithAttendees(id);
+          if (!event) return;
+          const attendees = event.attendees || [];
+          this.showModal({
+            title: `<i class="fas fa-users" style="color:var(--primary);"></i> Registered Attendees: ${escapeHtml(event.title)}`,
+            content: `
+              <div style="font-size:0.9rem;">
+                <div style="background:#F8FAFC;padding:0.75rem 1rem;border-radius:6px;border:1px solid #E2E8F0;margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+                  <div>
+                    <strong>Total Registered:</strong> ${attendees.length} / ${event.capacity} Capacity
+                    (${Math.max(0, event.capacity - attendees.length)} remaining)
+                  </div>
+                  <button type="button" class="btn-secondary" id="btnCopyEmails" style="padding:0.3rem 0.75rem;font-size:0.78rem;">
+                    <i class="fas fa-copy"></i> Copy All Emails
+                  </button>
+                </div>
+                ${attendees.length === 0 ? '<p style="color:#94A3B8;text-align:center;padding:1.5rem 0;">No attendees registered yet.</p>' : `
+                  <div style="max-height:320px;overflow-y:auto;border:1px solid #E2E8F0;border-radius:6px;">
+                    <table class="data-table" style="font-size:0.85rem;margin:0;">
+                      <thead>
+                        <tr>
+                          <th>Attendee</th>
+                          <th>Contact</th>
+                          <th>Company</th>
+                          <th>Registered At</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${attendees.map(a => `
+                          <tr>
+                            <td><strong>${escapeHtml(a.name)}</strong></td>
+                            <td>${escapeHtml(a.email)}<br/><small style="color:#64748B;">${escapeHtml(a.phone)}</small></td>
+                            <td>${escapeHtml(a.company || '-')}</td>
+                            <td><small>${escapeHtml(formatDate(a.registeredAt))}</small></td>
+                          </tr>
+                        `).join('')}
+                      </tbody>
+                    </table>
+                  </div>
+                `}
+                <div style="margin-top:1.25rem;text-align:right;">
+                  <button type="button" class="btn-secondary" id="modalCloseBtn">Close</button>
+                </div>
+              </div>
+            `
+          });
+
+          setTimeout(() => {
+            document.getElementById('btnCopyEmails')?.addEventListener('click', () => {
+              const emails = attendees.map(a => a.email).filter(Boolean).join(', ');
+              if (emails && navigator.clipboard) {
+                navigator.clipboard.writeText(emails);
+                this.showToast('Attendee emails copied to clipboard!', 'success');
+              } else if (!emails) {
+                this.showToast('No emails to copy.', 'info');
+              }
+            });
+          }, 50);
+
+        } catch (err) {
+          this.showToast('Failed to load attendees list.', 'error');
+        }
+      };
+    });
+
+    // Delete event
+    document.querySelectorAll('[data-delete-event-id]').forEach(btn => {
+      btn.onclick = async () => {
+        const id = btn.getAttribute('data-delete-event-id');
+        if (!confirm('Are you sure you want to delete this event? It will be removed from the BCCI website immediately.')) {
+          return;
+        }
+        try {
+          await this.store.deleteEvent(id);
+          this.showToast('Event removed successfully.', 'success');
+          await this.renderAdminEvents();
+        } catch (err) {
+          this.showToast(err.message || 'Failed to delete event.', 'error');
+        }
+      };
+    });
+  }
+
+  setupAdminEventForm() {
+    const pricingSelect = document.getElementById('eventPricingSelect');
+    const feeGroup = document.getElementById('eventFeeGroup');
+    const feeInput = document.getElementById('eventFeeInput');
+
+    if (pricingSelect && feeGroup) {
+      pricingSelect.addEventListener('change', () => {
+        if (pricingSelect.value === 'paid') {
+          feeGroup.style.display = 'block';
+          if (feeInput) feeInput.setAttribute('required', '');
+        } else {
+          feeGroup.style.display = 'none';
+          if (feeInput) {
+            feeInput.removeAttribute('required');
+            feeInput.value = '';
+          }
+        }
+      });
+    }
+
+    const form = document.getElementById('broadcastEventForm');
+    if (form) {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const submitBtn = document.getElementById('btnSubmitBroadcast');
+        const title = document.getElementById('eventTitleInput')?.value?.trim();
+        const date = document.getElementById('eventDateInput')?.value?.trim();
+        const time = document.getElementById('eventTimeInput')?.value?.trim();
+        const mode = document.getElementById('eventModeSelect')?.value;
+        const venue = document.getElementById('eventVenueInput')?.value?.trim();
+        const pricingType = document.getElementById('eventPricingSelect')?.value;
+        const fee = pricingType === 'paid' ? Number(document.getElementById('eventFeeInput')?.value) || 0 : 0;
+        const capacity = parseInt(document.getElementById('eventCapacityInput')?.value, 10) || 100;
+        const description = document.getElementById('eventDescInput')?.value?.trim();
+
+        if (!title || title.length < 3) {
+          this.showToast('Please enter an event title (min 3 characters).', 'warning');
+          return;
+        }
+        if (!date) {
+          this.showToast('Please specify the event date.', 'warning');
+          return;
+        }
+        if (!time) {
+          this.showToast('Please specify the event time schedule.', 'warning');
+          return;
+        }
+        if (!venue || venue.length < 3) {
+          this.showToast('Please specify the venue or online meeting URL.', 'warning');
+          return;
+        }
+        if (pricingType === 'paid' && fee <= 0) {
+          this.showToast('Please specify a valid ticket fee for paid events.', 'warning');
+          return;
+        }
+        if (capacity < 1) {
+          this.showToast('Capacity must be at least 1.', 'warning');
+          return;
+        }
+
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Broadcasting…';
+        }
+
+        try {
+          const newEvent = await this.store.broadcastEvent({
+            title,
+            date,
+            time,
+            mode,
+            venue,
+            pricingType,
+            fee,
+            capacity,
+            description,
+          });
+
+          form.reset();
+          if (feeGroup) feeGroup.style.display = 'none';
+          this.showToast(`Event "${newEvent.title}" broadcasted to BCCI website!`, 'success');
+          await this.renderAdminEvents();
+        } catch (err) {
+          this.showToast(err.message || 'Failed to broadcast event.', 'error');
+        } finally {
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-broadcast-tower"></i> Broadcast Event to Website';
+          }
+        }
+      });
+    }
+  }
+
+  /* ════════════════════════════════════════════════════════════════════
+     PUBLIC EVENTS & CONCLAVES PLATFORM
+     ════════════════════════════════════════════════════════════════════ */
+
+  setupPublicEventsHandlers() {
+    this._eventsFilter = 'all';
+    this._eventsSearchQuery = '';
+
+    const filterContainer = document.getElementById('eventsFilterPills');
+    if (filterContainer) {
+      filterContainer.addEventListener('click', (e) => {
+        const pill = e.target.closest('.event-filter-pill');
+        if (!pill) return;
+        filterContainer.querySelectorAll('.event-filter-pill').forEach(btn => btn.classList.remove('active'));
+        pill.classList.add('active');
+        this._eventsFilter = pill.getAttribute('data-filter') || 'all';
+        this.applyEventsFilterAndSearch();
+      });
+    }
+
+    const searchInput = document.getElementById('eventsSearchInput');
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        this._eventsSearchQuery = (e.target.value || '').trim().toLowerCase();
+        this.applyEventsFilterAndSearch();
+      });
+    }
+  }
+
+  async renderEventsPage() {
+    const grid = document.getElementById('eventsGrid');
+    const emptyState = document.getElementById('eventsEmptyState');
+    if (!grid) return;
+
+    if (!this._eventsHandlersInitialized) {
+      this.setupPublicEventsHandlers();
+      this._eventsHandlersInitialized = true;
+    }
+
+    grid.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 3rem 1rem; color: #64748B;">
+        <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary); margin-bottom: 0.75rem;"></i>
+        <p style="font-weight: 600;">Loading upcoming BCCI events...</p>
+      </div>
+    `;
+    if (emptyState) emptyState.style.display = 'none';
+
+    try {
+      this._events = await this.store.getEvents();
+    } catch (err) {
+      console.error('[Public Events] Failed to load:', err);
+      grid.innerHTML = `
+        <div style="grid-column: 1 / -1; text-align: center; padding: 3rem 1rem; color: #EF4444; background: #FEF2F2; border-radius: 8px;">
+          <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
+          <p style="font-weight: 600;">Unable to load events at this time. Please check back shortly.</p>
+        </div>
+      `;
+      return;
+    }
+
+    this.applyEventsFilterAndSearch();
+  }
+
+  applyEventsFilterAndSearch() {
+    const grid = document.getElementById('eventsGrid');
+    const emptyState = document.getElementById('eventsEmptyState');
+    if (!grid) return;
+
+    const filter = this._eventsFilter || 'all';
+    const query = this._eventsSearchQuery || '';
+    const all = this._events || [];
+
+    const filtered = all.filter(ev => {
+      // 1. Filter pill condition
+      if (filter === 'offline' && ev.mode !== 'offline') return false;
+      if (filter === 'online' && ev.mode !== 'online') return false;
+      if (filter === 'free' && ev.pricingType !== 'free') return false;
+      if (filter === 'paid' && ev.pricingType !== 'paid') return false;
+
+      // 2. Search query condition
+      if (query) {
+        const text = `${ev.title || ''} ${ev.description || ''} ${ev.venue || ''} ${ev.date || ''}`.toLowerCase();
+        if (!text.includes(query)) return false;
+      }
+      return true;
+    });
+
+    if (!filtered.length) {
+      grid.innerHTML = '';
+      if (emptyState) emptyState.style.display = 'block';
+      return;
+    }
+
+    if (emptyState) emptyState.style.display = 'none';
+    this.renderEventsGrid(filtered);
+  }
+
+  renderEventsGrid(events) {
+    const grid = document.getElementById('eventsGrid');
+    if (!grid) return;
+
+    grid.innerHTML = events.map(ev => {
+      const isFull = Boolean(ev.isFull || (ev.seatsLeft !== undefined && Number(ev.seatsLeft) <= 0));
+      const modeClass = ev.mode === 'online' ? 'mode-online' : 'mode-offline';
+      const modeLabel = ev.mode === 'online' ? '<i class="fas fa-video"></i> Virtual Online' : '<i class="fas fa-building"></i> In-Person Venue';
+      const pricingClass = ev.pricingType === 'paid' ? 'pricing-paid' : 'pricing-free';
+      const pricingLabel = ev.pricingType === 'paid' ? `<i class="fas fa-ticket-alt"></i> ₹${escapeHtml(String(ev.fee || 0))}` : '<i class="fas fa-tag"></i> Free Entry';
+
+      const registered = Number(ev.registeredCount) || 0;
+      const capacity = Number(ev.capacity) || 1;
+      const pct = Math.min(100, Math.round((registered / capacity) * 100));
+      const fillClass = isFull ? 'full' : (pct >= 85 ? 'high-occupancy' : '');
+      const seatsLeft = ev.seatsLeft !== undefined ? ev.seatsLeft : Math.max(0, capacity - registered);
+
+      return `
+        <article class="event-card" data-event-card-id="${escapeAttr(ev.id)}">
+          <div class="event-card-header">
+            <span class="event-pill-badge ${modeClass}">${modeLabel}</span>
+            <span class="event-pill-badge ${pricingClass}">${pricingLabel}</span>
+          </div>
+          <div class="event-card-body">
+            <h3 class="event-card-title">${escapeHtml(ev.title)}</h3>
+            <div class="event-meta-row">
+              <i class="far fa-calendar-alt"></i>
+              <span><strong>${escapeHtml(formatDate(ev.date) || ev.date)}</strong> &bull; ${escapeHtml(ev.time || '')}</span>
+            </div>
+            <div class="event-meta-row">
+              <i class="${ev.mode === 'online' ? 'fas fa-globe' : 'fas fa-map-marker-alt'}"></i>
+              <span>${escapeHtml(ev.venue || (ev.mode === 'online' ? 'Virtual Webinar Link' : 'BCCI Hall, Bharuch'))}</span>
+            </div>
+            <p class="event-card-desc">${escapeHtml(ev.description || 'Join BCCI members and regional enterprise leaders for this official conclave.')}</p>
+          </div>
+          <div class="event-card-footer">
+            <div class="event-capacity-bar-wrap">
+              <div class="event-capacity-label">
+                <span style="font-weight: 700; color: ${isFull ? '#DC2626' : '#059669'};">
+                  <i class="fas ${isFull ? 'fa-ban' : 'fa-users'}"></i> ${isFull ? 'Registration Full' : `${seatsLeft} Seats Left`}
+                </span>
+                <span>${registered} / ${capacity} Joined</span>
+              </div>
+              <div class="event-capacity-track">
+                <div class="event-capacity-fill ${fillClass}" style="width: ${pct}%;"></div>
+              </div>
+            </div>
+            ${isFull ? `
+              <button type="button" class="btn-join-event" disabled aria-disabled="true">
+                <i class="fas fa-ban"></i> Sold Out / Capacity Full
+              </button>
+            ` : `
+              <button type="button" class="btn-join-event" data-join-event-id="${escapeAttr(ev.id)}">
+                <i class="fas fa-ticket-alt"></i> Register / Join Event
+              </button>
+            `}
+          </div>
+        </article>
+      `;
+    }).join('');
+
+    grid.querySelectorAll('[data-join-event-id]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-join-event-id');
+        const targetEvent = (this._events || []).find(e => e.id === id);
+        if (targetEvent) {
+          this.showJoinEventModal(targetEvent);
+        }
+      });
+    });
+  }
+
+  showJoinEventModal(event) {
+    if (!event) return;
+    const isFull = Boolean(event.isFull || (event.seatsLeft !== undefined && Number(event.seatsLeft) <= 0));
+    if (isFull) {
+      this.showToast('This event has reached maximum capacity.', 'error');
+      return;
+    }
+
+    const defaultEmail = this.applicantSession?.email || '';
+    const defaultName = this.applicantSession?.companyName || '';
+    const seatsRemaining = event.seatsLeft !== undefined ? event.seatsLeft : Math.max(0, event.capacity - (event.registeredCount || 0));
+
+    const content = `
+      <div class="join-event-modal-content" style="text-align: left;">
+        <div style="background: var(--off-white, #F8FAFC); border: 1px solid var(--border-color, #E2E8F0); border-radius: 8px; padding: 1rem; margin-bottom: 1.25rem;">
+          <h4 style="color: var(--primary, #0F2C59); margin-bottom: 0.5rem; font-size: 1.05rem; font-weight: 700;">${escapeHtml(event.title)}</h4>
+          <div style="font-size: 0.85rem; color: #64748B; display: flex; flex-direction: column; gap: 0.35rem;">
+            <div><i class="far fa-calendar-alt" style="color: var(--accent-gold); width: 16px;"></i> <strong>${escapeHtml(formatDate(event.date) || event.date)}</strong> at ${escapeHtml(event.time || '')}</div>
+            <div><i class="${event.mode === 'online' ? 'fas fa-video' : 'fas fa-map-marker-alt'}" style="color: var(--accent-gold); width: 16px;"></i> ${escapeHtml(event.venue || '')}</div>
+            <div><i class="fas fa-tag" style="color: var(--accent-gold); width: 16px;"></i> ${event.pricingType === 'paid' ? `Ticket Fee: ₹${escapeHtml(String(event.fee))}` : 'Free / Complimentary Admission'}</div>
+            <div style="font-weight: 600; color: #059669;"><i class="fas fa-users" style="color: #059669; width: 16px;"></i> ${seatsRemaining} seats remaining (Capacity: ${event.capacity})</div>
+          </div>
+        </div>
+
+        <form id="joinEventForm" novalidate>
+          <div id="joinEventErrorAlert" style="display: none; background: #FEF2F2; border: 1px solid #FCA5A5; color: #991B1B; padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.875rem;"></div>
+
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label class="form-label" for="joinNameInput">Delegate / Attendee Full Name <span class="req">*</span></label>
+            <input type="text" id="joinNameInput" class="form-control" placeholder="e.g. Rajesh Patel" value="${escapeAttr(defaultName)}" required minlength="2" />
+          </div>
+
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label class="form-label" for="joinEmailInput">Email Address <span class="req">*</span></label>
+            <input type="email" id="joinEmailInput" class="form-control" placeholder="e.g. rajesh@example.com" value="${escapeAttr(defaultEmail)}" required />
+          </div>
+
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label class="form-label" for="joinPhoneInput">10-Digit Indian Mobile Number <span class="req">*</span></label>
+            <input type="tel" id="joinPhoneInput" class="form-control" placeholder="e.g. 9825012345" maxlength="10" required />
+          </div>
+
+          <div class="form-group" style="margin-bottom: 1.25rem;">
+            <label class="form-label" for="joinCompanyInput">Organization / Company Name</label>
+            <input type="text" id="joinCompanyInput" class="form-control" placeholder="e.g. Gujarat Industries Ltd" />
+          </div>
+
+          <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+            <button type="button" class="btn-outline" id="joinEventCancelBtn">Cancel</button>
+            <button type="submit" class="btn-primary" id="btnSubmitJoinRegistration">
+              <i class="fas fa-ticket-alt"></i> Confirm Registration
+            </button>
+          </div>
+        </form>
+      </div>
+    `;
+
+    this.showModal({
+      title: `<i class="fas fa-calendar-check" style="color: var(--accent-gold); margin-right: 0.5rem;"></i> Register for Event`,
+      content,
+    });
+
+    const form = document.getElementById('joinEventForm');
+    const cancelBtn = document.getElementById('joinEventCancelBtn');
+    const errorAlert = document.getElementById('joinEventErrorAlert');
+    const submitBtn = document.getElementById('btnSubmitJoinRegistration');
+
+    cancelBtn?.addEventListener('click', () => this.closeModal());
+
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (errorAlert) errorAlert.style.display = 'none';
+
+      const name = (document.getElementById('joinNameInput')?.value || '').trim();
+      const email = (document.getElementById('joinEmailInput')?.value || '').trim().toLowerCase();
+      const phone = (document.getElementById('joinPhoneInput')?.value || '').trim().replace(/\D/g, '');
+      const company = (document.getElementById('joinCompanyInput')?.value || '').trim();
+
+      if (name.length < 2) {
+        if (errorAlert) {
+          errorAlert.textContent = 'Please enter your full name (minimum 2 characters).';
+          errorAlert.style.display = 'block';
+        }
+        return;
+      }
+
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        if (errorAlert) {
+          errorAlert.textContent = 'Please enter a valid email address.';
+          errorAlert.style.display = 'block';
+        }
+        return;
+      }
+
+      if (!/^[6-9]\d{9}$/.test(phone)) {
+        if (errorAlert) {
+          errorAlert.textContent = 'Please enter a valid 10-digit Indian mobile number.';
+          errorAlert.style.display = 'block';
+        }
+        return;
+      }
+
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Registering...';
+      }
+
+      try {
+        const result = await this.store.registerForEvent(event.id, { name, email, phone, company });
+        this.closeModal();
+        this.showToast(result.message || 'Registration confirmed! We look forward to seeing you.', 'success');
+        await this.renderEventsPage();
+      } catch (err) {
+        if (errorAlert) {
+          errorAlert.textContent = err.message || 'Failed to complete registration. Please try again.';
+          errorAlert.style.display = 'block';
+        } else {
+          this.showToast(err.message || 'Failed to complete registration.', 'error');
+        }
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = '<i class="fas fa-ticket-alt"></i> Confirm Registration';
+        }
+      }
+    });
+  }
 
   /* ════════════════════════════════════════════════════════════════════
      MODAL, TOAST, LIGHTBOX — UI Utilities
@@ -2997,7 +3662,10 @@ class App {
 
     let restored = 0;
     Object.entries(saved.data).forEach(([name, value]) => {
-      const el = form.querySelector(`[name="${CSS.escape(name)}"]`);
+      const safeName = (typeof CSS !== 'undefined' && typeof CSS.escape === 'function')
+        ? CSS.escape(name)
+        : name.replace(/["\\]/g, '\\$&');
+      const el = form.querySelector(`[name="${safeName}"]`);
       if (el && !el.value) { el.value = value; restored++; }
     });
     if (!restored) return;

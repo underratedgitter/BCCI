@@ -107,6 +107,7 @@
         <li class="nav-item"><a href="#" class="nav-link active" data-view-nav="home">Home</a></li>
         <li class="nav-item"><a href="#" class="nav-link" data-view-nav="about">About Us</a></li>
         <li class="nav-item"><a href="#" class="nav-link" data-view-nav="services">Services</a></li>
+        <li class="nav-item"><a href="#" class="nav-link" data-view-nav="events">Events</a></li>
         <li class="nav-item"><a href="#" class="nav-link" data-view-nav="gallery">News &amp; Blogs</a></li>
         <li class="nav-item"><a href="#" class="nav-link" data-view-nav="enquiry">Enquiry Form</a></li>
       </ul>
@@ -150,6 +151,7 @@
         </li>
         <li><a href="#" class="mobile-drawer-link" data-view-nav="services"><i class="fas fa-th-list"></i> Services</a>
         </li>
+        <li><a href="#" class="mobile-drawer-link" data-view-nav="events"><i class="fas fa-calendar-alt"></i> Events &amp; Conclaves</a></li>
         <li><a href="#" class="mobile-drawer-link" data-view-nav="gallery"><i class="fas fa-newspaper"></i> News &amp;
             Blogs</a></li>
         <li><a href="#" class="mobile-drawer-link" data-view-nav="enquiry"><i class="fas fa-paper-plane"></i> Enquiry
@@ -524,6 +526,46 @@
     </section>
   </main>
 
+  <!-- 4b. EVENTS & CONCLAVES VIEW -->
+  <main id="view-events" class="view-page" style="display: none;">
+    <section class="section-padding">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-tag"><i class="fas fa-calendar-alt"></i> Chamber Conclaves &amp; Events</span>
+          <h2 class="section-title">Upcoming Events &amp; Conclaves</h2>
+          <p class="section-desc">Explore flagship industry summits, business roundtables, seminars, and networking forums hosted by the Bharuch Chamber of Commerce &amp; Industry.</p>
+        </div>
+
+        <!-- Filter & Search Controls -->
+        <div class="events-toolbar" style="margin-bottom: 2rem; display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between; align-items: center;">
+          <div class="events-filter-pills" id="eventsFilterPills" style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+            <button type="button" class="event-filter-pill active" data-filter="all">All Events</button>
+            <button type="button" class="event-filter-pill" data-filter="offline"><i class="fas fa-building"></i> In-Person (Offline)</button>
+            <button type="button" class="event-filter-pill" data-filter="online"><i class="fas fa-video"></i> Virtual (Online)</button>
+            <button type="button" class="event-filter-pill" data-filter="free"><i class="fas fa-tag"></i> Free Entry</button>
+            <button type="button" class="event-filter-pill" data-filter="paid"><i class="fas fa-ticket-alt"></i> Paid Admission</button>
+          </div>
+          <div class="events-search-box" style="position: relative; min-width: 260px;">
+            <i class="fas fa-search" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none;"></i>
+            <input type="text" id="eventsSearchInput" class="form-control" placeholder="Search events, topics, venue..." style="padding-left: 2.5rem;" />
+          </div>
+        </div>
+
+        <!-- Events Grid -->
+        <div id="eventsGrid" class="events-grid">
+          <!-- Populated dynamically via JS -->
+        </div>
+
+        <!-- Empty State (hidden by default) -->
+        <div id="eventsEmptyState" style="display: none; text-align: center; padding: 4rem 1rem; background: var(--bg-card); border-radius: var(--radius-lg); border: 1px dashed var(--border-color);">
+          <i class="fas fa-calendar-times" style="font-size: 3rem; color: var(--text-muted); margin-bottom: 1rem;"></i>
+          <h3 style="color: var(--text-heading); font-size: 1.25rem; margin-bottom: 0.5rem;">No Events Found</h3>
+          <p style="color: var(--text-muted); max-width: 450px; margin: 0 auto;">There are currently no events matching your selected criteria. Please check back soon or try clearing your search filters.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
   <!-- 5. NEW PAGE: DEDICATED QR CODE & PAYMENTS VIEW -->
   <main id="view-qrcode" class="view-page" style="display: none;">
     <section class="section-padding">
@@ -679,6 +721,7 @@
   <!-- 7. MEMBERSHIP APPLICATION FORM VIEW (WITH QR CODE SECTION AT LAST) -->
   <main id="view-membership" class="view-page" style="display: none;">
     <section class="section-padding">
+      <div class="container">
         <div class="section-header">
           <span class="section-tag">Institutional Membership</span>
           <h2 class="section-title">BCCI Membership Application</h2>
@@ -962,12 +1005,12 @@
                 </select>
               </div>
               <div class="form-group">
-                <label class="form-label">Annual Turnover (INR)</label>
-                <input type="text" class="form-control" name="annualTurnover" placeholder="e.g. 25 Crore" />
+                <label class="form-label">Annual Turnover (INR) <span class="req">*</span></label>
+                <input type="text" class="form-control" name="annualTurnover" placeholder="e.g. 25 Crore" required />
               </div>
               <div class="form-group">
-                <label class="form-label">Total Employee Headcount</label>
-                <input type="number" class="form-control" name="employees" placeholder="e.g. 150" />
+                <label class="form-label">Total Employee Headcount <span class="req">*</span></label>
+                <input type="number" class="form-control" name="employees" placeholder="e.g. 150" min="1" required />
               </div>
               <div class="form-group">
                 <label class="form-label">GSTIN Number <span class="req">*</span></label>
@@ -1099,7 +1142,7 @@
                   </div>
 
                   <!-- PROMINENT DEDICATED FULL-WIDTH PAYMENT PROOF SCREENSHOT UPLOAD SECTION -->
-                  <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed var(--border-color);">
+                  <div class="form-group full-width" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed var(--border-color);">
                     <h3
                       style="color: var(--primary); margin-bottom: 0.5rem; font-size: 1.15rem; display: flex; align-items: center; gap: 0.5rem;">
                       <i class="fas fa-camera" style="color: var(--accent-gold-dark);"></i> Upload Payment Receipt
@@ -1113,7 +1156,7 @@
                     <div class="file-upload-box" id="paymentProofDropzone"
                       style="background: #FFFFFF; border: 2px dashed #93C5FD; border-radius: var(--radius-md); padding: 1.75rem 1.25rem; text-align: center; cursor: pointer;">
                       <input type="file" name="paymentProof" id="paymentProofInput" accept="image/png, image/jpeg, image/webp"
-                        class="file-upload-input" />
+                        class="file-upload-input" required />
                       <div class="file-upload-content" id="paymentProofPlaceholder">
                         <div
                           style="width: 56px; height: 56px; background: #EFF6FF; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--primary); font-size: 1.5rem; margin-bottom: 0.75rem;">
@@ -1246,20 +1289,6 @@
             </button>
           </div>
         </div>
-
-        <div style="max-width: 500px; margin: 24px auto 0; text-align: center;">
-          <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
-            <button class="btn-secondary" id="downloadCardBtn" style="display: none;">
-              <i class="fas fa-download"></i> Download Card
-            </button>
-            <button class="btn-secondary" id="printCardBtn" style="display: none;">
-              <i class="fas fa-print"></i> Print Card
-            </button>
-            <button class="btn-secondary" id="shareCardBtn" style="display: none;">
-              <i class="fas fa-share-alt"></i> Share
-            </button>
-          </div>
-        </div>
       </div>
     </section>
   </main>
@@ -1339,6 +1368,9 @@
               </li>
               <li class="admin-menu-item" data-tab="enquiries">
                 <i class="fas fa-envelope-open-text"></i> Enquiry Inbox
+              </li>
+              <li class="admin-menu-item" data-tab="events">
+                <i class="fas fa-bullhorn"></i> Event Broadcasting
               </li>
             </ul>
           </div>
@@ -1433,6 +1465,108 @@
               </div>
               <div class="admin-mobile-cards" id="enquiriesCards"></div>
             </div>
+
+            <!-- Tab 4: Event Broadcasting -->
+            <div id="tab-events" class="admin-tab-pane" style="display: none;">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
+                <div>
+                  <h3 style="font-size: 1.25rem; color: var(--primary); margin-bottom: 0.25rem;">
+                    <i class="fas fa-bullhorn" style="color: #D4AF37;"></i> Event Broadcasting Platform
+                  </h3>
+                  <p style="color: #64748B; font-size: 0.9rem; margin-bottom: 0;">
+                    Broadcast new conclaves, industrial summits, webinars, and meetings to the official BCCI website.
+                  </p>
+                </div>
+              </div>
+
+              <!-- Broadcast Event Creation Form Card -->
+              <div style="background: #FFFFFF; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.5rem; margin-bottom: 2rem; box-shadow: var(--shadow-sm);">
+                <h4 style="font-size: 1.05rem; font-weight: 700; color: var(--primary); margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.5rem;">
+                  <i class="fas fa-plus-circle" style="color: #10B981;"></i> Broadcast a New BCCI Event
+                </h4>
+                <form id="broadcastEventForm">
+                  <div class="form-grid">
+                    <div class="form-group full-width">
+                      <label class="form-label" for="eventTitleInput">Event Name / Conclave Title <span class="req">*</span></label>
+                      <input type="text" id="eventTitleInput" class="form-control" placeholder="e.g. Gujarat Petrochemicals & Sustainable Tech Summit 2026" required minlength="3" />
+                    </div>
+
+                    <div class="form-group">
+                      <label class="form-label" for="eventDateInput">Event Date <span class="req">*</span></label>
+                      <input type="date" id="eventDateInput" class="form-control" required />
+                    </div>
+
+                    <div class="form-group">
+                      <label class="form-label" for="eventTimeInput">Time / Schedule <span class="req">*</span></label>
+                      <input type="text" id="eventTimeInput" class="form-control" placeholder="e.g. 10:00 AM - 02:00 PM" required />
+                    </div>
+
+                    <div class="form-group">
+                      <label class="form-label" for="eventModeSelect">Event Mode (Online / Offline) <span class="req">*</span></label>
+                      <select id="eventModeSelect" class="form-select" required>
+                        <option value="offline">In-Person (Offline Conclave / Venue)</option>
+                        <option value="online">Virtual (Online Webinar / Meeting)</option>
+                      </select>
+                    </div>
+
+                    <div class="form-group">
+                      <label class="form-label" for="eventVenueInput">Venue Location or Meeting URL <span class="req">*</span></label>
+                      <input type="text" id="eventVenueInput" class="form-control" placeholder="e.g. BCCI Hall, Station Road, Bharuch" required minlength="3" />
+                    </div>
+
+                    <div class="form-group">
+                      <label class="form-label" for="eventPricingSelect">Admission / Pricing <span class="req">*</span></label>
+                      <select id="eventPricingSelect" class="form-select" required>
+                        <option value="free">Free / Complimentary Access</option>
+                        <option value="paid">Paid Admission (Ticket Fee Required)</option>
+                      </select>
+                    </div>
+
+                    <div class="form-group" id="eventFeeGroup" style="display: none;">
+                      <label class="form-label" for="eventFeeInput">Ticket Fee per Attendee (INR ₹) <span class="req">*</span></label>
+                      <input type="number" id="eventFeeInput" class="form-control" placeholder="e.g. 500" min="1" />
+                    </div>
+
+                    <div class="form-group">
+                      <label class="form-label" for="eventCapacityInput">Maximum Joining Capacity (Seats Limit) <span class="req">*</span></label>
+                      <input type="number" id="eventCapacityInput" class="form-control" placeholder="e.g. 150" min="1" value="100" required />
+                    </div>
+
+                    <div class="form-group full-width">
+                      <label class="form-label" for="eventDescInput">Event Overview & Agenda Highlights <span class="req">*</span></label>
+                      <textarea id="eventDescInput" class="form-control" rows="3" placeholder="Describe the event topics, keynote delegates, and participation highlights..." required minlength="5"></textarea>
+                    </div>
+                  </div>
+
+                  <div style="margin-top: 1.25rem; display: flex; justify-content: flex-end;">
+                    <button type="submit" class="btn-primary" id="btnSubmitBroadcast" style="padding: 0.75rem 1.5rem; font-weight: 700;">
+                      <i class="fas fa-broadcast-tower"></i> Broadcast Event to Website
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              <!-- Active Broadcasted Events List -->
+              <h4 style="font-size: 1.1rem; color: var(--primary); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fas fa-list-alt" style="color: var(--primary);"></i> Broadcasted Events Directory
+              </h4>
+              <div class="table-responsive desktop-only-table">
+                <table class="data-table" id="adminEventsTable">
+                  <thead>
+                    <tr>
+                      <th>Event Name &amp; Mode</th>
+                      <th>Schedule</th>
+                      <th>Venue</th>
+                      <th>Fee</th>
+                      <th>Live Capacity</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminEventsBody"></tbody>
+                </table>
+              </div>
+              <div class="admin-mobile-cards" id="adminEventsCards"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -1463,6 +1597,7 @@
             <li><a href="#" data-view-nav="home">Home</a></li>
             <li><a href="#" data-view-nav="about">About Us</a></li>
             <li><a href="#" data-view-nav="services">Our Services</a></li>
+            <li><a href="#" data-view-nav="events">Events &amp; Conclaves</a></li>
             <li><a href="#" data-view-nav="gallery">News &amp; Blogs</a></li>
           </ul>
         </div>
