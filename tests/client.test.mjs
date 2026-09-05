@@ -157,6 +157,7 @@ ck('#applicantRegPassword and confirm have autocomplete="new-password"',
   (/id=["']applicantRegPasswordConfirm["'][^>]*autocomplete=["']new-password["']|autocomplete=["']new-password["'][^>]*id=["']applicantRegPasswordConfirm["']/.test(HTML))
 );
 ck('#applicantRegisterBtn and #switchToSignInFromReg exist', /id=["']applicantRegisterBtn["']/.test(HTML) && /id=["']switchToSignInFromReg["']/.test(HTML));
+ck('#applicantResendRegOtpBtn and #applicantRegBackToStep1Btn exist', /id=["']applicantResendRegOtpBtn["']/.test(HTML) && /id=["']applicantRegBackToStep1Btn["']/.test(HTML));
 
 ck('#authCardForgot exists and is initially hidden', /id=["']authCardForgot["'][^>]*style=["'][^"']*display:\s*none/.test(HTML));
 ck('#applicantForgotEmail and #applicantSendForgotOtpBtn exist', /id=["']applicantForgotEmail["']/.test(HTML) && /id=["']applicantSendForgotOtpBtn["']/.test(HTML));
@@ -518,6 +519,10 @@ class MockElement {
     return await this.dispatchEvent(event);
   }
 
+  focus() {
+    this._focused = true;
+  }
+
   closest(selector) {
     let el = this;
     while (el) {
@@ -669,15 +674,7 @@ function buildAuthDOM() {
   const regStep1 = new MockElement('div', 'applicantRegStep1');
   const regEmailIn = new MockElement('input', 'applicantRegEmail');
   regEmailIn.type = 'email';
-  const sendRegOtpBtn = new MockElement('button', 'applicantSendRegOtpBtn', 'btn-primary');
-  regStep1.appendChild(regEmailIn);
-  regStep1.appendChild(sendRegOtpBtn);
-  regForm.appendChild(regStep1);
 
-  const regStep2 = new MockElement('div', 'applicantRegStep2');
-  regStep2.style.display = 'none';
-  const regNotice = new MockElement('div', 'applicantRegNoticeBanner');
-  const regOtpIn = new MockElement('input', 'applicantRegOtp');
   const regPassGroup = new MockElement('div', '', 'password-input-group');
   const regPassIn = new MockElement('input', 'applicantRegPassword');
   regPassIn.type = 'password';
@@ -698,14 +695,28 @@ function buildAuthDOM() {
   regConfGroup.appendChild(regConfIn);
   regConfGroup.appendChild(regConfToggle);
 
+  const sendRegOtpBtn = new MockElement('button', 'applicantSendRegOtpBtn', 'btn-primary');
+
+  regStep1.appendChild(regEmailIn);
+  regStep1.appendChild(regPassGroup);
+  regStep1.appendChild(regConfGroup);
+  regStep1.appendChild(sendRegOtpBtn);
+  regForm.appendChild(regStep1);
+
+  const regStep2 = new MockElement('div', 'applicantRegStep2');
+  regStep2.style.display = 'none';
+  const regNotice = new MockElement('div', 'applicantRegNoticeBanner');
+  const regOtpIn = new MockElement('input', 'applicantRegOtp');
+  const resendRegOtpBtn = new MockElement('button', 'applicantResendRegOtpBtn', 'auth-text-link');
   const regBtn = new MockElement('button', 'applicantRegisterBtn', 'btn-primary');
   regBtn.type = 'submit';
+  const regBackToStep1Btn = new MockElement('button', 'applicantRegBackToStep1Btn', 'auth-text-link');
 
   regStep2.appendChild(regNotice);
   regStep2.appendChild(regOtpIn);
-  regStep2.appendChild(regPassGroup);
-  regStep2.appendChild(regConfGroup);
+  regStep2.appendChild(resendRegOtpBtn);
   regStep2.appendChild(regBtn);
+  regStep2.appendChild(regBackToStep1Btn);
   regForm.appendChild(regStep2);
 
   const backToSignInFromReg = new MockElement('button', 'switchToSignInFromReg', 'auth-text-link');
@@ -773,7 +784,7 @@ function buildAuthDOM() {
   return {
     gate, banner, tabSignIn, tabRegister, tabsNav,
     cardSignIn, alertNotSet, legacySwitchBtn, signInForm, emailIn, passIn, passToggle, passIcon, forgotLink, signInBtn, regLink,
-    cardRegister, regForm, regStep1, regEmailIn, sendRegOtpBtn, regStep2, regOtpIn, regPassIn, regPassToggle, regPassIcon, regConfIn, regConfToggle, regBtn, backToSignInFromReg,
+    cardRegister, regForm, regStep1, regEmailIn, regPassIn, regPassToggle, regPassIcon, regConfIn, regConfToggle, sendRegOtpBtn, regStep2, regOtpIn, resendRegOtpBtn, regBtn, regBackToStep1Btn, backToSignInFromReg,
     cardForgot, forgotForm, forgotStep1, forgotEmailIn, sendForgotOtpBtn, forgotStep2, forgotOtpIn, newPassIn, newPassToggle, newPassIcon, newConfIn, newConfToggle, resetBtn, backToSignInFromForgot
   };
 }
@@ -967,36 +978,59 @@ function createTestApp(dom, testStore) {
   if (typeof testApp.setupApplicantAuthHandlers === 'function') {
     testApp.setupApplicantAuthHandlers();
 
-    // Step 1: Send OTP
+    // Step 1: Validation before OTP is sent (mismatched passwords)
     dom.regEmailIn.value = 'new@example.com';
-    await dom.sendRegOtpBtn.click();
-    ck('applicantSendRegOtpBtn shows applicantRegStep2 on success', dom.regStep2.style.display === 'block');
-
-    // Step 2: Validation of password match
-    dom.regOtpIn.value = '123456';
     dom.regPassIn.value = 'Password123';
     dom.regConfIn.value = 'MismatchPass';
     testApp.toasts = [];
-    await dom.regForm.submit();
-    ck('Registration rejects mismatched passwords', regPayload === null && testApp.toasts.some(t => t.type === 'warning' || t.type === 'error'));
+    await dom.sendRegOtpBtn.click();
+    ck('Step 1 rejects mismatched passwords before sending OTP', dom.regStep2.style.display === 'none' && testApp.toasts.some(t => t.type === 'warning' || t.type === 'error'));
 
-    // Step 2: Validation of password length >= 8
+    // Step 1: Validation before OTP is sent (short password < 8)
     dom.regPassIn.value = 'short';
     dom.regConfIn.value = 'short';
     testApp.toasts = [];
-    await dom.regForm.submit();
-    ck('Registration rejects short passwords (< 8 chars)', regPayload === null && testApp.toasts.some(t => t.type === 'warning' || t.type === 'error'));
+    await dom.sendRegOtpBtn.click();
+    ck('Step 1 rejects short passwords (< 8 chars) before sending OTP', dom.regStep2.style.display === 'none' && testApp.toasts.some(t => t.type === 'warning' || t.type === 'error'));
 
-    // Step 2: Successful registration
+    // Step 1: Valid credentials -> Send OTP successfully
     dom.regPassIn.value = 'ValidPass123';
     dom.regConfIn.value = 'ValidPass123';
+    testApp.toasts = [];
+    await dom.sendRegOtpBtn.click();
+    ck('applicantSendRegOtpBtn hides step 1 and shows step 2 on valid credentials', dom.regStep1.style.display === 'none' && dom.regStep2.style.display === 'block');
+
+    // Step 2: Back to Step 1 button
+    if (dom.regBackToStep1Btn) {
+      await dom.regBackToStep1Btn.click();
+      ck('applicantRegBackToStep1Btn returns to step 1', dom.regStep1.style.display === 'block' && dom.regStep2.style.display === 'none');
+      // Return to step 2 for subsequent tests
+      await dom.sendRegOtpBtn.click();
+    }
+
+    // Step 2: Resend OTP
+    if (dom.resendRegOtpBtn) {
+      testApp.toasts = [];
+      await dom.resendRegOtpBtn.click();
+      ck('applicantResendRegOtpBtn requests new code', testApp.toasts.some(t => t.type === 'success'));
+    }
+
+    // Step 2: Validation of OTP code length === 6
+    dom.regOtpIn.value = '123';
+    testApp.toasts = [];
+    await dom.regForm.submit();
+    ck('Registration rejects incomplete OTP (< 6 digits)', regPayload === null && testApp.toasts.some(t => t.type === 'warning' || t.type === 'error'));
+
+    // Step 2: Successful registration
+    dom.regOtpIn.value = '123456';
     await dom.regForm.submit();
     ck('Registration submits to applicantRegister with valid inputs', regPayload?.email === 'new@example.com' && regPayload?.code === '123456' && regPayload?.password === 'ValidPass123');
     ck('Registration success updates nav auth UI and transitions to membership', testApp.navAuthUpdated >= 1 && testApp.viewsRendered.includes('membership'));
   } else {
-    ck('applicantSendRegOtpBtn shows applicantRegStep2 on success', false);
-    ck('Registration rejects mismatched passwords', false);
-    ck('Registration rejects short passwords (< 8 chars)', false);
+    ck('Step 1 rejects mismatched passwords before sending OTP', false);
+    ck('Step 1 rejects short passwords (< 8 chars) before sending OTP', false);
+    ck('applicantSendRegOtpBtn hides step 1 and shows step 2 on valid credentials', false);
+    ck('Registration rejects incomplete OTP (< 6 digits)', false);
     ck('Registration submits to applicantRegister with valid inputs', false);
     ck('Registration success updates nav auth UI and transitions to membership', false);
   }

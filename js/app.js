@@ -408,7 +408,7 @@ class App {
     }
 
     // ── 4. Registration Handling ─────────────────────────────────────
-    // Step 1: Request OTP
+    // Step 1: Validate Email & Password, Request OTP
     const sendRegOtpBtn = document.getElementById('applicantSendRegOtpBtn');
     if (sendRegOtpBtn) {
       sendRegOtpBtn.addEventListener('click', async (e) => {
@@ -420,15 +420,34 @@ class App {
           return;
         }
 
+        const password = document.getElementById('applicantRegPassword')?.value || '';
+        const passwordConfirm = document.getElementById('applicantRegPasswordConfirm')?.value || '';
+
+        if (!password || password.length < 8) {
+          this.showToast('Password must be at least 8 characters.', 'warning');
+          return;
+        }
+        if (password !== passwordConfirm) {
+          this.showToast('Passwords do not match.', 'warning');
+          return;
+        }
+
         setLoading(sendRegOtpBtn, true, 'Sending Code…', 'fas fa-spinner fa-spin');
         try {
           const result = await this.callOtpApi('/api/send-otp', { email });
           if (result.success) {
+            const step1 = document.getElementById('applicantRegStep1');
             const step2 = document.getElementById('applicantRegStep2');
+            if (step1) step1.style.display = 'none';
             if (step2) step2.style.display = 'block';
             const noticeBanner = document.getElementById('applicantRegNoticeBanner');
             if (noticeBanner) {
               noticeBanner.innerHTML = `<i class="fas fa-envelope-open-text"></i> Verification code sent to <strong>${escapeHtml(email)}</strong>. Check your inbox and enter the 6-digit code below.`;
+            }
+            const otpInput = document.getElementById('applicantRegOtp');
+            if (otpInput) {
+              otpInput.value = '';
+              otpInput.focus?.();
             }
             this.showToast(result.message || `Verification code sent to ${email}`, 'success');
           } else {
@@ -438,8 +457,48 @@ class App {
           console.error('[Reg Send OTP Error]', err);
           this.showToast('Network error. Please try again.', 'error');
         } finally {
-          setLoading(sendRegOtpBtn, false, 'Send Verification Code', 'fas fa-paper-plane');
+          setLoading(sendRegOtpBtn, false, 'Proceed to OTP Verification', 'fas fa-paper-plane');
         }
+      });
+    }
+
+    // Step 2: Resend Code
+    const resendRegOtpBtn = document.getElementById('applicantResendRegOtpBtn');
+    if (resendRegOtpBtn) {
+      resendRegOtpBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const email = (document.getElementById('applicantRegEmail')?.value || '').trim().toLowerCase();
+        if (!email || !email.includes('@')) {
+          this.showToast('Please enter a valid email address.', 'warning');
+          return;
+        }
+
+        setLoading(resendRegOtpBtn, true, 'Resending…', 'fas fa-spinner fa-spin');
+        try {
+          const result = await this.callOtpApi('/api/send-otp', { email });
+          if (result.success) {
+            this.showToast(result.message || `New verification code sent to ${email}`, 'success');
+          } else {
+            this.showToast(result.error || 'Failed to resend verification code.', 'error');
+          }
+        } catch (err) {
+          console.error('[Resend OTP Error]', err);
+          this.showToast('Network error. Please try again.', 'error');
+        } finally {
+          setLoading(resendRegOtpBtn, false, 'Resend Code', 'fas fa-redo');
+        }
+      });
+    }
+
+    // Step 2: Back to Step 1 (Edit email/password)
+    const backToStep1Btn = document.getElementById('applicantRegBackToStep1Btn');
+    if (backToStep1Btn) {
+      backToStep1Btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const step1 = document.getElementById('applicantRegStep1');
+        const step2 = document.getElementById('applicantRegStep2');
+        if (step1) step1.style.display = 'block';
+        if (step2) step2.style.display = 'none';
       });
     }
 
@@ -450,16 +509,12 @@ class App {
     const handleRegister = async (e) => {
       if (e && e.preventDefault) e.preventDefault();
       const email = (document.getElementById('applicantRegEmail')?.value || '').trim().toLowerCase();
-      const code = (document.getElementById('applicantRegOtp')?.value || '').trim();
       const password = document.getElementById('applicantRegPassword')?.value || '';
       const passwordConfirm = document.getElementById('applicantRegPasswordConfirm')?.value || '';
+      const code = (document.getElementById('applicantRegOtp')?.value || '').trim();
 
-      if (!email) {
+      if (!email || !email.includes('@')) {
         this.showToast('Please enter your email address.', 'warning');
-        return;
-      }
-      if (!code || code.length !== 6) {
-        this.showToast('Please enter the 6-digit verification code.', 'warning');
         return;
       }
       if (!password || password.length < 8) {
@@ -468,6 +523,10 @@ class App {
       }
       if (password !== passwordConfirm) {
         this.showToast('Passwords do not match.', 'warning');
+        return;
+      }
+      if (!code || code.length !== 6) {
+        this.showToast('Please enter the 6-digit verification code.', 'warning');
         return;
       }
 
@@ -492,6 +551,11 @@ class App {
 
     if (regForm) {
       regForm.addEventListener('submit', handleRegister);
+    }
+    if (regBtn) {
+      regBtn.addEventListener('click', (e) => {
+        if (!regForm) handleRegister(e);
+      });
     }
 
     // ── 5. Forgot Password Handling ──────────────────────────────────
