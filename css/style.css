@@ -1,0 +1,249 @@
+/* ==========================================================================
+   BCCI BHARUCH — Employee & Admin Expense Management Styles
+   Reusing design variables from BCCI editorial minimal system
+   ========================================================================== */
+
+/* ── Unified Sign-In Tabs ────────────────────────────────────────────────── */
+.signin-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.75rem;
+  background: var(--gray-100, #EDECEA);
+  padding: 0.35rem;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--border-color, #E2E8F0);
+}
+
+.signin-tab {
+  flex: 1;
+  padding: 0.65rem 1rem;
+  font-family: var(--font-sans, 'Inter', sans-serif);
+  font-weight: 600;
+  font-size: 0.85rem;
+  border: none;
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-muted, #475569);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.signin-tab:hover {
+  color: var(--primary, #0F2C59);
+}
+
+.signin-tab.active {
+  background: var(--white, #FFFFFF);
+  color: var(--primary, #0F2C59);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.signin-form-pane {
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Employee Portal Banner & Components ──────────────────────────────────── */
+.employee-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+  padding: 1.5rem 2rem;
+  background: var(--white, #FFFFFF);
+  border: 1px solid var(--border-color, #E2E8F0);
+  border-radius: var(--radius-md, 10px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.emp-avatar {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary, #0F2C59), var(--navy-light, #2C3E6B));
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  font-weight: 700;
+  box-shadow: 0 4px 10px rgba(15, 44, 89, 0.15);
+  flex-shrink: 0;
+}
+
+/* ── Expense Upload Dropzone ──────────────────────────────────────────────── */
+.expense-dropzone {
+  border: 2px dashed var(--border-color, #E2E8F0);
+  border-radius: var(--radius-md, 10px);
+  padding: 2rem 1.5rem;
+  text-align: center;
+  background: var(--gray-50, #F7F6F3);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.expense-dropzone:hover,
+.expense-dropzone.dragover {
+  border-color: var(--accent-gold, #C5A869);
+  background: var(--gold-light, #FDF6E3);
+}
+
+.expense-dropzone.has-file {
+  border-color: var(--teal, #2C7A7B);
+  background: var(--teal-light, #E6FFFA);
+}
+
+/* ── Status Badges ───────────────────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.65rem;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm, 6px);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.badge-pending {
+  background: var(--warning-bg, #FFFDF0);
+  color: var(--warning, #975A16);
+  border: 1px solid rgba(151, 90, 22, 0.2);
+}
+
+.badge-approved {
+  background: var(--success-bg, #E6F4EA);
+  color: var(--success, #276749);
+  border: 1px solid rgba(39, 103, 73, 0.2);
+}
+
+.badge-partially-approved {
+  background: var(--teal-light, #E6FFFA);
+  color: var(--teal, #2C7A7B);
+  border: 1px solid rgba(44, 122, 123, 0.25);
+}
+
+.badge-rejected {
+  background: var(--danger-bg, #FFF5F5);
+  color: var(--danger, #9B2C2C);
+  border: 1px solid rgba(155, 44, 44, 0.2);
+}
+
+.badge-active {
+  background: var(--success-bg, #E6F4EA);
+  color: var(--success, #276749);
+  border: 1px solid rgba(39, 103, 73, 0.2);
+}
+
+.badge-inactive {
+  background: var(--gray-100, #EDECEA);
+  color: var(--gray-600, #504D47);
+  border: 1px solid var(--border-color, #E2E8F0);
+}
+
+/* ── Modal Overlays & Dialogs ─────────────────────────────────────────────── */
+.expense-modal-box {
+  background: var(--white, #FFFFFF);
+  border-radius: var(--radius-md, 10px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.18);
+  max-width: 680px;
+  width: 92%;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  padding: 2rem;
+  margin: auto;
+}
+
+.expense-modal-box.large {
+  max-width: 900px;
+}
+
+.expense-modal-box.extra-large {
+  max-width: 1040px;
+}
+
+.modal-split-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .modal-split-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.doc-preview-frame {
+  width: 100%;
+  min-height: 380px;
+  max-height: 520px;
+  border: 1px solid var(--border-color, #E2E8F0);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--gray-50, #F7F6F3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.doc-preview-img {
+  max-width: 100%;
+  max-height: 500px;
+  object-fit: contain;
+  border-radius: var(--radius-sm, 6px);
+}
+
+.doc-preview-pdf {
+  width: 100%;
+  height: 500px;
+  border: none;
+}
+
+/* ── Reports KPI Grid ─────────────────────────────────────────────────────── */
+.reports-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+/* ── Filter Bar Styling ──────────────────────────────────────────────────── */
+.filter-bar {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+  background: var(--gray-50, #F7F6F3);
+  padding: 1rem 1.25rem;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--border-color, #E2E8F0);
+  margin-bottom: 1.5rem;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.filter-group label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted, #475569);
+  white-space: nowrap;
+}

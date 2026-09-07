@@ -75,6 +75,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
   <!-- Custom Stylesheet -->
   <link rel="stylesheet" href="css/styles.css?v=3.2.0" />
+  <link rel="stylesheet" href="css/style.css?v=3.2.0" />
   <!-- Premium Membership Card Styles -->
   <link rel="stylesheet" href="css/membership-card.css?v=3.2.0" />
 </head><body>
@@ -1340,38 +1341,276 @@
         </div>
 
         <div class="signin-container">
-          <form id="pageAdminLoginForm">
-            <div class="signin-icon">
-              <i class="fas fa-user-shield"></i>
-            </div>
-            <h3 class="signin-title">Administrator Login</h3>
-            <p class="signin-subtitle">BCCI Secretariat Access</p>
-
-            <div class="form-group" style="margin-bottom: 1.5rem;">
-              <label class="form-label">Username / Official Email <span class="req">*</span></label>
-              <input type="text" id="pageAdminUser" class="form-control" placeholder="admin@bccibharuch.in"
-                required autocomplete="username" />
-            </div>
-
-            <div class="form-group" style="margin-bottom: 2rem;">
-              <label class="form-label">Password <span class="req">*</span></label>
-              <input type="password" id="pageAdminPass" class="form-control" placeholder="Enter your password" required
-                autocomplete="current-password" />
-            </div>
-
-            <button type="submit" class="btn-primary"
-              style="width: 100%; justify-content: center; padding: 0.85rem; font-size: 0.9rem;">
-              <i class="fas fa-sign-in-alt"></i> Sign In to Admin Portal
+          <!-- Sign-In Tab Selector -->
+          <div class="signin-tabs" role="tablist">
+            <button type="button" class="signin-tab active" id="signinTabAdmin" role="tab" aria-selected="true">
+              <i class="fas fa-user-shield"></i> Secretariat Admin
             </button>
+            <button type="button" class="signin-tab" id="signinTabEmployee" role="tab" aria-selected="false">
+              <i class="fas fa-id-badge"></i> Employee Login
+            </button>
+          </div>
 
-            <p style="text-align: center; margin-top: 1.5rem; font-family: var(--font-mono); font-size: 0.68rem; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.08em;">
-              <i class="fas fa-lock" style="margin-right: 0.3rem;"></i> Secure Access Only
-            </p>
-          </form>
+          <!-- Secretariat Admin Form Container -->
+          <div id="formAdminSignIn" class="signin-form-pane">
+            <div id="adminSignInForm" style="display: none;" aria-hidden="true"></div>
+            <form id="pageAdminLoginForm">
+              <div class="signin-icon">
+                <i class="fas fa-user-shield"></i>
+              </div>
+              <h3 class="signin-title">Administrator Login</h3>
+              <p class="signin-subtitle">BCCI Secretariat Access</p>
+
+              <div class="form-group" style="margin-bottom: 1.5rem;">
+                <label class="form-label">Username / Official Email <span class="req">*</span></label>
+                <input type="text" id="pageAdminUser" class="form-control" placeholder="admin@bccibharuch.in"
+                  required autocomplete="username" />
+              </div>
+
+              <div class="form-group" style="margin-bottom: 2rem;">
+                <label class="form-label">Password <span class="req">*</span></label>
+                <input type="password" id="pageAdminPass" class="form-control" placeholder="Enter your password" required
+                  autocomplete="current-password" />
+              </div>
+
+              <button type="submit" class="btn-primary"
+                style="width: 100%; justify-content: center; padding: 0.85rem; font-size: 0.9rem;">
+                <i class="fas fa-sign-in-alt"></i> Sign In to Admin Portal
+              </button>
+
+              <p style="text-align: center; margin-top: 1.5rem; font-family: var(--font-mono); font-size: 0.68rem; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.08em;">
+                <i class="fas fa-lock" style="margin-right: 0.3rem;"></i> Secure Access Only
+              </p>
+            </form>
+          </div>
+
+          <!-- Employee Sign-In Form Container -->
+          <div id="formEmployeeSignIn" class="signin-form-pane" style="display: none;">
+            <form id="empSignInForm">
+              <div class="signin-icon" style="background: rgba(15, 44, 89, 0.08); color: var(--primary);">
+                <i class="fas fa-id-badge"></i>
+              </div>
+              <h3 class="signin-title">Employee Login</h3>
+              <p class="signin-subtitle">BCCI Staff &amp; Expense Portal Access</p>
+
+              <div class="form-group" style="margin-bottom: 1.5rem;">
+                <label class="form-label" for="empUsernameInput">Username / Employee ID <span class="req">*</span></label>
+                <input type="text" id="empUsernameInput" class="form-control" placeholder="e.g. anil.mehta or BCCI-E101"
+                  required autocomplete="username" />
+              </div>
+
+              <div class="form-group" style="margin-bottom: 2rem;">
+                <label class="form-label" for="empPasswordInput">Password <span class="req">*</span></label>
+                <input type="password" id="empPasswordInput" class="form-control" placeholder="Enter your employee password" required
+                  autocomplete="current-password" />
+              </div>
+
+              <button type="submit" id="btnEmpSignIn" class="btn-primary"
+                style="width: 100%; justify-content: center; padding: 0.85rem; font-size: 0.9rem;">
+                <i class="fas fa-sign-in-alt"></i> Sign In as Employee
+              </button>
+
+              <p style="text-align: center; margin-top: 1.5rem; font-family: var(--font-mono); font-size: 0.68rem; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.08em;">
+                <i class="fas fa-shield-alt" style="margin-right: 0.3rem;"></i> Staff Expense Portal &bull; SSL Secured
+              </p>
+            </form>
+          </div>
         </div>
       </div>
     </section>
   </main>
+
+  <!-- 8.5 EMPLOYEE EXPENSE PORTAL VIEW -->
+  <div id="view-employee" class="view-page" style="display: none;">
+    <section class="section-padding">
+      <div class="container">
+        
+        <!-- Auth Gate (Shown when not authenticated) -->
+        <div id="employeeAuthGate" class="employee-auth-gate" style="display: none; max-width: 520px; margin: 2rem auto; text-align: center; padding: 3rem 2rem; background: #FFFFFF; border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-sm);">
+          <div style="width: 64px; height: 64px; margin: 0 auto 1.5rem; background: rgba(15, 44, 89, 0.08); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--primary); font-size: 1.75rem;">
+            <i class="fas fa-user-lock"></i>
+          </div>
+          <h2 style="font-family: var(--font-serif); font-size: 1.75rem; color: var(--primary); margin-bottom: 0.75rem;">Employee Authentication Required</h2>
+          <p style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.6; margin-bottom: 2rem;">
+            Please sign in with your official BCCI employee credentials to submit claims, upload receipts, and track your reimbursement approvals.
+          </p>
+          <a href="#signin" data-view-nav="signin" class="btn-primary" style="display: inline-flex; justify-content: center; padding: 0.85rem 2rem; font-weight: 600;">
+            <i class="fas fa-sign-in-alt" style="margin-right: 0.5rem;"></i> Go to Employee Sign In
+          </a>
+        </div>
+
+        <!-- Employee Portal Content (Shown when authenticated) -->
+        <div id="employeePortalContent">
+          
+          <!-- Employee Banner / Header -->
+          <div class="employee-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.25rem; margin-bottom: 2rem; padding: 1.5rem 2rem; background: #FFFFFF; border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-sm);">
+            <div style="display: flex; align-items: center; gap: 1.25rem;">
+              <div class="emp-avatar">
+                <i class="fas fa-user"></i>
+              </div>
+              <div>
+                <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                  <h2 id="employeeNameDisplay" style="font-family: var(--font-serif); font-size: 1.5rem; color: var(--primary); margin: 0;">Employee Name</h2>
+                  <span id="employeeIdBadge" class="badge badge-primary" style="font-family: var(--font-mono); font-size: 0.75rem; padding: 0.25rem 0.6rem; border-radius: var(--radius-sm); font-weight: 600; letter-spacing: 0.05em; background: var(--navy-bg); color: var(--primary); border: 1px solid var(--border-color);">EMP-ID</span>
+                </div>
+                <p style="margin: 0.25rem 0 0; color: var(--text-muted); font-size: 0.85rem;">
+                  <i class="fas fa-building" style="margin-right: 0.3rem;"></i> Chamber Secretariat &bull; Expense Reimbursement Portal
+                </p>
+              </div>
+            </div>
+
+            <button id="btnEmployeeSignOut" class="btn-secondary" style="padding: 0.6rem 1.25rem; font-size: 0.85rem; border: 1px solid var(--border-color); color: var(--danger); font-weight: 600; border-radius: var(--radius-sm); background: #FFFFFF;">
+              <i class="fas fa-sign-out-alt" style="margin-right: 0.4rem;"></i> Sign Out
+            </button>
+          </div>
+
+          <!-- KPI Cards -->
+          <div class="admin-metrics-grid" style="margin-bottom: 2.5rem;">
+            <div class="metric-card">
+              <div class="metric-val" id="metricEmpClaimed" style="color: var(--primary);">₹0</div>
+              <div class="metric-title">Total Claimed</div>
+              <div class="metric-action-hint">All Time Claims</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-val approved" id="metricEmpApproved" style="color: var(--success);">₹0</div>
+              <div class="metric-title">Total Approved</div>
+              <div class="metric-action-hint">Disbursed / Approved</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-val pending" id="metricEmpPending" style="color: var(--warning);">₹0</div>
+              <div class="metric-title">Pending Approvals</div>
+              <div class="metric-action-hint">Awaiting Review</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-val rejected" id="metricEmpRejected" style="color: var(--danger);">₹0</div>
+              <div class="metric-title">Rejected Claims</div>
+              <div class="metric-action-hint">Not Reimbursed</div>
+            </div>
+          </div>
+
+          <!-- Submit New Expense Claim Card -->
+          <div class="card" style="background: #FFFFFF; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 2rem; margin-bottom: 2.5rem; box-shadow: var(--shadow-sm);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
+              <div>
+                <h3 style="font-family: var(--font-serif); font-size: 1.25rem; color: var(--primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                  <i class="fas fa-receipt" style="color: var(--accent-gold);"></i> Submit New Expense Claim
+                </h3>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0.25rem 0 0;">
+                  Fill out claim details and attach proof receipt (PDF, JPG, PNG up to 1.5MB).
+                </p>
+              </div>
+            </div>
+
+            <form id="employeeExpenseForm">
+              <div class="form-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.25rem; margin-bottom: 1.25rem;">
+                
+                <div class="form-group">
+                  <label class="form-label" for="expenseClaimedAmountInput">Claimed Amount (INR ₹) <span class="req">*</span></label>
+                  <div class="input-prefix-wrapper" style="position: relative;">
+                    <span style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-weight: 600; font-size: 0.95rem;">₹</span>
+                    <input type="number" id="expenseClaimedAmountInput" class="form-control" placeholder="0.00" step="0.01" min="1" required style="padding-left: 2.2rem;" />
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="expenseDateInput">Expense Incurred Date <span class="req">*</span></label>
+                  <input type="date" id="expenseDateInput" class="form-control" required />
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="expenseCategorySelect">Expense Category <span class="req">*</span></label>
+                  <select id="expenseCategorySelect" class="form-select" required>
+                    <option value="" disabled selected>Select Category</option>
+                    <option value="Travel">Travel</option>
+                    <option value="Food">Food</option>
+                    <option value="Lodging">Lodging</option>
+                    <option value="Supplies">Supplies</option>
+                    <option value="Transport">Transport</option>
+                    <option value="Client Entertainment">Client Entertainment</option>
+                    <option value="Miscellaneous">Miscellaneous</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 1.5rem;">
+                <label class="form-label" for="expenseDescriptionInput">Purpose / Business Description <span class="req">*</span></label>
+                <textarea id="expenseDescriptionInput" class="form-control" rows="3" placeholder="Provide business justification, trip details, or vendor description..." required minlength="5" maxlength="1000"></textarea>
+              </div>
+
+              <!-- Document Dropzone -->
+              <div class="form-group" style="margin-bottom: 1.75rem;">
+                <label class="form-label">Attach Bill / Receipt Document <span class="req">*</span> <small style="color: var(--text-muted); font-weight: 400;">(PDF, PNG, JPG, WEBP — Max 1.5MB)</small></label>
+                <div id="expenseReceiptDropzone" class="expense-dropzone">
+                  <input type="file" id="expenseReceiptInput" accept=".pdf,image/png,image/jpeg,image/webp" style="display: none;" />
+                  
+                  <div id="expenseReceiptPlaceholder">
+                    <div style="font-size: 2.25rem; color: var(--accent-gold); margin-bottom: 0.75rem;">
+                      <i class="fas fa-cloud-upload-alt"></i>
+                    </div>
+                    <p style="font-weight: 600; color: var(--primary); margin: 0 0 0.25rem; font-size: 0.95rem;">
+                      Click to browse or drag and drop receipt file here
+                    </p>
+                    <p style="color: var(--text-muted); font-size: 0.8rem; margin: 0;">
+                      Accepted: PDF, PNG, JPG, WEBP (Maximum size 1.5MB)
+                    </p>
+                  </div>
+
+                  <div id="expenseReceiptPreview" style="display: none; align-items: center; justify-content: center; gap: 1rem; flex-wrap: wrap;">
+                    <div class="receipt-icon" style="font-size: 1.75rem; color: var(--primary);">
+                      <i class="fas fa-file-invoice"></i>
+                    </div>
+                    <div style="text-align: left;">
+                      <div id="expenseReceiptFileName" style="font-weight: 600; color: var(--primary); font-size: 0.9rem; word-break: break-all;">receipt.pdf</div>
+                      <span id="expenseReceiptFileSize" style="font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-mono);"></span>
+                    </div>
+                    <button type="button" id="removeExpenseReceiptBtn" class="btn-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; color: var(--danger); border-color: rgba(155, 44, 44, 0.2);">
+                      <i class="fas fa-times"></i> Remove
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display: flex; justify-content: flex-end; align-items: center; gap: 1rem;">
+                <button type="submit" id="btnSubmitExpense" class="btn-primary" style="padding: 0.75rem 2rem; font-weight: 700; font-size: 0.95rem;">
+                  <i class="fas fa-paper-plane" style="margin-right: 0.5rem;"></i> Submit Expense Claim
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- My Submitted Expenses Section -->
+          <div class="card" style="background: #FFFFFF; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 2rem; box-shadow: var(--shadow-sm);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+              <h3 style="font-family: var(--font-serif); font-size: 1.25rem; color: var(--primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fas fa-history" style="color: var(--accent-gold);"></i> My Submitted Expenses
+              </h3>
+            </div>
+
+            <div class="table-responsive desktop-only-table">
+              <table class="data-table" id="employeeExpensesTable">
+                <thead>
+                  <tr>
+                    <th>Claim ID</th>
+                    <th>Date</th>
+                    <th>Category</th>
+                    <th>Description</th>
+                    <th>Claimed</th>
+                    <th>Approved</th>
+                    <th>Status</th>
+                    <th>Admin Remark</th>
+                    <th>Receipt</th>
+                  </tr>
+                </thead>
+                <tbody id="employeeExpensesBody"></tbody>
+              </table>
+            </div>
+            <div class="admin-mobile-cards" id="employeeExpensesCards"></div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+  </div>
 
   <!-- 9. ADMIN DASHBOARD VIEW PORTAL -->
   <main id="view-admin" class="view-page" style="display: none;">
@@ -1410,6 +1649,15 @@
               <li class="admin-menu-item" data-tab="events">
                 <i class="fas fa-bullhorn"></i> Event Broadcasting
               </li>
+              <li class="admin-menu-item" data-tab="expenses">
+                <i class="fas fa-receipt"></i> Expense Management
+              </li>
+              <li class="admin-menu-item" data-tab="employees">
+                <i class="fas fa-users-cog"></i> Employee Management
+              </li>
+              <li class="admin-menu-item" data-tab="expense-reports">
+                <i class="fas fa-chart-line"></i> Monthly Reports
+              </li>
             </ul>
           </div>
 
@@ -1441,6 +1689,31 @@
                 <div class="metric-val" id="metricEnquiries" style="color: var(--primary);">0</div>
                 <div class="metric-title">Enquiry Requests</div>
                 <div class="metric-action-hint"><i class="fas fa-arrow-right"></i> Inbox</div>
+              </div>
+              <div class="metric-card" data-admin-tab="expenses" role="button" tabindex="0" title="Click to view Expenses">
+                <div class="metric-val" id="metricExpensesTotal">0</div>
+                <div class="metric-title">Total Expenses</div>
+                <div class="metric-action-hint"><i class="fas fa-arrow-right"></i> Review</div>
+              </div>
+              <div class="metric-card" data-admin-tab="expenses" role="button" tabindex="0" title="Click to view Claimed Amount">
+                <div class="metric-val" id="metricExpensesClaimed" style="color: var(--primary);">₹0</div>
+                <div class="metric-title">Claimed Amount</div>
+                <div class="metric-action-hint"><i class="fas fa-arrow-right"></i> Claims</div>
+              </div>
+              <div class="metric-card" data-admin-tab="expenses" role="button" tabindex="0" title="Click to view Approved Amount">
+                <div class="metric-val approved" id="metricExpensesApproved" style="color: var(--success);">₹0</div>
+                <div class="metric-title">Approved Amount</div>
+                <div class="metric-action-hint"><i class="fas fa-arrow-right"></i> Approved</div>
+              </div>
+              <div class="metric-card" data-admin-tab="expenses" role="button" tabindex="0" title="Click to view Pending Approvals">
+                <div class="metric-val pending" id="metricExpensesPending" style="color: var(--warning);">0</div>
+                <div class="metric-title">Pending Approvals</div>
+                <div class="metric-action-hint"><i class="fas fa-arrow-right"></i> Review</div>
+              </div>
+              <div class="metric-card" data-admin-tab="employees" role="button" tabindex="0" title="Click to view Employees">
+                <div class="metric-val" id="metricExpensesEmployees" style="color: var(--navy);">0</div>
+                <div class="metric-title">Employees</div>
+                <div class="metric-action-hint"><i class="fas fa-arrow-right"></i> Manage</div>
               </div>
             </div>
 
@@ -1639,6 +1912,229 @@
               </div>
               <div class="admin-mobile-cards" id="adminEventsCards"></div>
             </div>
+
+            <!-- Tab 6: Expense Management -->
+            <div id="tab-expenses" class="admin-tab-pane" style="display: none;">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
+                <h3 style="font-size: 1.2rem; color: var(--primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                  <i class="fas fa-receipt" style="color: var(--accent-gold);"></i> Staff Expense Claims Management
+                </h3>
+              </div>
+
+              <!-- Filter Bar -->
+              <div class="filter-bar">
+                <div class="filter-group">
+                  <label for="adminExpenseFilterStatus">Status:</label>
+                  <select id="adminExpenseFilterStatus" class="form-select" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">
+                    <option value="">All Statuses</option>
+                    <option value="Pending Approval">Pending Approval</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Partially Approved">Partially Approved</option>
+                    <option value="Rejected">Rejected</option>
+                  </select>
+                </div>
+
+                <div class="filter-group">
+                  <label for="adminExpenseFilterEmp">Employee:</label>
+                  <select id="adminExpenseFilterEmp" class="form-select" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">
+                    <option value="">All Employees</option>
+                  </select>
+                </div>
+
+                <div class="filter-group">
+                  <label for="adminExpenseFilterCat">Category:</label>
+                  <select id="adminExpenseFilterCat" class="form-select" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">
+                    <option value="">All Categories</option>
+                    <option value="Travel">Travel</option>
+                    <option value="Food">Food</option>
+                    <option value="Lodging">Lodging</option>
+                    <option value="Supplies">Supplies</option>
+                    <option value="Transport">Transport</option>
+                    <option value="Client Entertainment">Client Entertainment</option>
+                    <option value="Miscellaneous">Miscellaneous</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="table-responsive desktop-only-table">
+                <table class="data-table" id="adminExpensesTable">
+                  <thead>
+                    <tr>
+                      <th>Claim ID</th>
+                      <th>Employee</th>
+                      <th>Date</th>
+                      <th>Category</th>
+                      <th>Claimed</th>
+                      <th>Approved</th>
+                      <th>Status</th>
+                      <th>Receipt</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminExpensesBody"></tbody>
+                </table>
+              </div>
+              <div class="admin-mobile-cards" id="adminExpensesCards"></div>
+            </div>
+
+            <!-- Tab 7: Employee Management -->
+            <div id="tab-employees" class="admin-tab-pane" style="display: none;">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
+                <div>
+                  <h3 style="font-size: 1.2rem; color: var(--primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                    <i class="fas fa-users-cog" style="color: var(--accent-gold);"></i> BCCI Employee Management
+                  </h3>
+                  <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0.25rem 0 0;">
+                    Manage staff accounts authorized to submit expense claims and access the secretariat portal.
+                  </p>
+                </div>
+                <button id="btnAddEmployee" class="btn-primary" style="padding: 0.65rem 1.25rem; font-size: 0.85rem; font-weight: 600;">
+                  <i class="fas fa-user-plus" style="margin-right: 0.4rem;"></i> + Add Employee
+                </button>
+              </div>
+
+              <div class="table-responsive desktop-only-table">
+                <table class="data-table" id="adminEmployeesTable">
+                  <thead>
+                    <tr>
+                      <th>Employee ID</th>
+                      <th>Full Name</th>
+                      <th>Username</th>
+                      <th>Email</th>
+                      <th>Status</th>
+                      <th>Total Claims</th>
+                      <th>Total Approved</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminEmployeesBody"></tbody>
+                </table>
+              </div>
+              <div class="admin-mobile-cards" id="adminEmployeesCards"></div>
+            </div>
+
+            <!-- Tab 8: Monthly Reports -->
+            <div id="tab-expense-reports" class="admin-tab-pane" style="display: none;">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
+                <div>
+                  <h3 style="font-size: 1.2rem; color: var(--primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                    <i class="fas fa-chart-line" style="color: var(--accent-gold);"></i> Expense Monthly Reports &amp; Analytics
+                  </h3>
+                  <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0.25rem 0 0;">
+                    Period breakdown and audit metrics across departments, categories, and reimbursement disbursements.
+                  </p>
+                </div>
+                <button id="btnExportExpenseReportCSV" class="btn-secondary" style="padding: 0.65rem 1.25rem; font-size: 0.85rem; background: #FFFFFF; border: 1px solid var(--border-color); color: var(--primary); font-weight: 600; border-radius: var(--radius-sm);">
+                  <i class="fas fa-file-csv" style="color: #10B981; font-size: 1rem; margin-right: 0.4rem;"></i> Export Report CSV
+                </button>
+              </div>
+
+              <!-- Reports Filter Bar -->
+              <div class="filter-bar">
+                <div class="filter-group">
+                  <label for="reportMonthSelect">Month:</label>
+                  <select id="reportMonthSelect" class="form-select" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">
+                    <option value="">All Months</option>
+                    <option value="1">January</option>
+                    <option value="2">February</option>
+                    <option value="3">March</option>
+                    <option value="4">April</option>
+                    <option value="5">May</option>
+                    <option value="6">June</option>
+                    <option value="7">July</option>
+                    <option value="8">August</option>
+                    <option value="9">September</option>
+                    <option value="10">October</option>
+                    <option value="11">November</option>
+                    <option value="12">December</option>
+                  </select>
+                </div>
+
+                <div class="filter-group">
+                  <label for="reportYearSelect">Year:</label>
+                  <select id="reportYearSelect" class="form-select" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">
+                    <option value="">All Years</option>
+                    <option value="2026" selected>2026</option>
+                    <option value="2025">2025</option>
+                  </select>
+                </div>
+
+                <div class="filter-group">
+                  <label for="reportEmpSelect">Employee:</label>
+                  <select id="reportEmpSelect" class="form-select" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">
+                    <option value="">All Employees</option>
+                  </select>
+                </div>
+
+                <div class="filter-group">
+                  <label for="reportCatSelect">Category:</label>
+                  <select id="reportCatSelect" class="form-select" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">
+                    <option value="">All Categories</option>
+                    <option value="Travel">Travel</option>
+                    <option value="Food">Food</option>
+                    <option value="Lodging">Lodging</option>
+                    <option value="Supplies">Supplies</option>
+                    <option value="Transport">Transport</option>
+                    <option value="Client Entertainment">Client Entertainment</option>
+                    <option value="Miscellaneous">Miscellaneous</option>
+                  </select>
+                </div>
+
+                <div class="filter-group">
+                  <label for="reportStatusSelect">Status:</label>
+                  <select id="reportStatusSelect" class="form-select" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">
+                    <option value="">All Statuses</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Partially Approved">Partially Approved</option>
+                    <option value="Pending Approval">Pending Approval</option>
+                    <option value="Rejected">Rejected</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Period KPI Metrics -->
+              <div class="reports-kpi-grid">
+                <div class="metric-card">
+                  <div class="metric-val" id="reportTotalClaims" style="color: var(--primary);">0</div>
+                  <div class="metric-title">Total Claims</div>
+                </div>
+                <div class="metric-card">
+                  <div class="metric-val" id="reportClaimedAmount" style="color: var(--primary);">₹0</div>
+                  <div class="metric-title">Claimed Amount</div>
+                </div>
+                <div class="metric-card">
+                  <div class="metric-val approved" id="reportApprovedAmount" style="color: var(--success);">₹0</div>
+                  <div class="metric-title">Approved Amount</div>
+                </div>
+                <div class="metric-card">
+                  <div class="metric-val rejected" id="reportRejectedAmount" style="color: var(--danger);">₹0</div>
+                  <div class="metric-title">Rejected Amount</div>
+                </div>
+                <div class="metric-card">
+                  <div class="metric-val pending" id="reportPendingAmount" style="color: var(--warning);">₹0</div>
+                  <div class="metric-title">Pending Amount</div>
+                </div>
+              </div>
+
+              <!-- Itemized Breakdown Table -->
+              <div class="table-responsive desktop-only-table">
+                <table class="data-table" id="reportsTable">
+                  <thead>
+                    <tr>
+                      <th>Claim ID</th>
+                      <th>Employee</th>
+                      <th>Date</th>
+                      <th>Category</th>
+                      <th>Claimed</th>
+                      <th>Approved</th>
+                      <th>Status</th>
+                      <th>Admin Remarks</th>
+                    </tr>
+                  </thead>
+                  <tbody id="reportsTableBody"></tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1648,6 +2144,195 @@
   <!-- Global Modal Backdrop -->
   <div class="modal-backdrop" id="modalBackdrop" role="dialog" aria-modal="true" aria-label="Modal dialog">
     <div class="modal-box" id="modalContainer"></div>
+  </div>
+
+  <!-- Expense Review Modal -->
+  <div class="modal-backdrop" id="expenseReviewModal" role="dialog" aria-modal="true" aria-label="Review Expense Claim" style="display: none;">
+    <div class="expense-modal-box extra-large" id="expenseReviewModalContainer">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
+        <h3 class="modal-title" style="margin: 0; font-size: 1.3rem; color: var(--primary); display: flex; align-items: center; gap: 0.5rem;">
+          <i class="fas fa-file-invoice-dollar" style="color: var(--accent-gold);"></i> Expense Claim Review Dossier
+        </h3>
+        <button type="button" class="modal-close" id="closeExpenseReviewModalBtn" aria-label="Close dialog">&times;</button>
+      </div>
+
+      <div class="modal-split-grid">
+        <!-- Left: Claim Details & Document Viewer -->
+        <div>
+          <h4 style="font-size: 1rem; color: var(--primary); margin-bottom: 0.75rem;">
+            <i class="fas fa-info-circle"></i> Claim Dossier
+          </h4>
+          <div id="reviewClaimDossier" style="background: var(--gray-50); padding: 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); margin-bottom: 1rem; font-size: 0.85rem; line-height: 1.6;">
+            <!-- Rendered dynamically by app.js -->
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <h4 style="font-size: 1rem; color: var(--primary); margin: 0;">
+              <i class="fas fa-paperclip"></i> Attached Document
+            </h4>
+            <a href="#" target="_blank" rel="noopener noreferrer" id="expenseDocNewTabLink" style="font-size: 0.8rem; color: var(--accent-blue); text-decoration: none; font-weight: 600;">
+              <i class="fas fa-external-link-alt"></i> Open in New Tab
+            </a>
+          </div>
+          <div id="expenseDocPreviewContainer" class="doc-preview-frame">
+            <p style="color: var(--text-muted); font-size: 0.85rem;">No receipt attached</p>
+          </div>
+        </div>
+
+        <!-- Right: Admin Review Controls -->
+        <div>
+          <h4 style="font-size: 1rem; color: var(--primary); margin-bottom: 0.75rem;">
+            <i class="fas fa-tasks"></i> Adjudication &amp; Approval
+          </h4>
+          
+          <div class="form-group" style="margin-bottom: 1.25rem;">
+            <label class="form-label" for="reviewApprovedAmountInput">Approved Amount (INR ₹) <span class="req">*</span></label>
+            <div class="input-prefix-wrapper" style="position: relative;">
+              <span style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-weight: 600;">₹</span>
+              <input type="number" id="reviewApprovedAmountInput" class="form-control" placeholder="0.00" step="0.01" min="0" style="padding-left: 2.2rem;" />
+            </div>
+            <small style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.25rem; display: block;">
+              Must be between ₹0 and claimed amount. Enter 0 only when rejecting.
+            </small>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 1.5rem;">
+            <label class="form-label" for="reviewAdminRemarkInput">Admin Remarks / Audit Notes</label>
+            <textarea id="reviewAdminRemarkInput" class="form-control" rows="4" placeholder="Enter reason for partial approval, rejection justification, or accounting reference..."></textarea>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <button type="button" id="btnReviewApprove" class="btn-primary" style="background: var(--success); border-color: var(--success); justify-content: center; padding: 0.75rem;">
+              <i class="fas fa-check-circle" style="margin-right: 0.4rem;"></i> Approve Full Claim
+            </button>
+            <button type="button" id="btnReviewPartial" class="btn-secondary" style="background: #FFFFFF; border-color: var(--teal); color: var(--teal); justify-content: center; padding: 0.75rem; font-weight: 600;">
+              <i class="fas fa-check" style="margin-right: 0.4rem;"></i> Partially Approve
+            </button>
+            <button type="button" id="btnReviewReject" class="btn-secondary" style="background: #FFFFFF; border-color: var(--danger); color: var(--danger); justify-content: center; padding: 0.75rem; font-weight: 600;">
+              <i class="fas fa-times-circle" style="margin-right: 0.4rem;"></i> Reject Claim
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Employee Modal -->
+  <div class="modal-backdrop" id="addEmployeeModal" role="dialog" aria-modal="true" aria-label="Add New Employee" style="display: none;">
+    <div class="expense-modal-box" id="addEmployeeModalContainer">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
+        <h3 class="modal-title" style="margin: 0; font-size: 1.3rem; color: var(--primary); display: flex; align-items: center; gap: 0.5rem;">
+          <i class="fas fa-user-plus" style="color: var(--accent-gold);"></i> Add New BCCI Employee
+        </h3>
+        <button type="button" class="modal-close" id="closeAddEmployeeModalBtn" aria-label="Close dialog">&times;</button>
+      </div>
+
+      <form id="addEmployeeForm">
+        <div class="form-group" style="margin-bottom: 1.25rem;">
+          <label class="form-label" for="addEmpNameInput">Full Legal Name <span class="req">*</span></label>
+          <input type="text" id="addEmpNameInput" class="form-control" placeholder="e.g. Ramesh Patel" required minlength="2" />
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1.25rem;">
+          <label class="form-label" for="addEmpIdInput">Employee ID / Code <span class="req">*</span></label>
+          <input type="text" id="addEmpIdInput" class="form-control" placeholder="e.g. BCCI-E101" required minlength="3" style="text-transform: uppercase;" />
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1.25rem;">
+          <label class="form-label" for="addEmpUsernameInput">Username <span class="req">*</span></label>
+          <input type="text" id="addEmpUsernameInput" class="form-control" placeholder="e.g. ramesh.patel" required minlength="3" autocomplete="off" />
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1.25rem;">
+          <label class="form-label" for="addEmpPasswordInput">Temporary Password <span class="req">*</span></label>
+          <input type="password" id="addEmpPasswordInput" class="form-control" placeholder="Minimum 8 characters" required minlength="8" autocomplete="new-password" />
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1.25rem;">
+          <label class="form-label" for="addEmpEmailInput">Official Email Address</label>
+          <input type="email" id="addEmpEmailInput" class="form-control" placeholder="e.g. ramesh@bccibharuch.in" />
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1.75rem;">
+          <label class="form-label" for="addEmpStatusSelect">Account Status <span class="req">*</span></label>
+          <select id="addEmpStatusSelect" class="form-select" required>
+            <option value="active" selected>Active (Can login &amp; submit claims)</option>
+            <option value="inactive">Inactive / Deactivated</option>
+          </select>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 1rem;">
+          <button type="button" class="btn-secondary" id="btnCancelAddEmp" style="padding: 0.65rem 1.25rem;">Cancel</button>
+          <button type="submit" id="btnSaveNewEmployee" class="btn-primary" style="padding: 0.65rem 1.5rem; font-weight: 600;">
+            <i class="fas fa-save" style="margin-right: 0.4rem;"></i> Create Employee
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Employee Expense History Modal -->
+  <div class="modal-backdrop" id="employeeHistoryModal" role="dialog" aria-modal="true" aria-label="Employee Expense History" style="display: none;">
+    <div class="expense-modal-box large" id="employeeHistoryModalContainer">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
+        <div>
+          <h3 class="modal-title" id="empHistoryNameDisplay" style="margin: 0; font-size: 1.3rem; color: var(--primary);">Employee History</h3>
+          <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0.25rem 0 0;" id="empHistorySubTitle">Itemized expense claims ledger</p>
+        </div>
+        <button type="button" class="modal-close" id="closeEmployeeHistoryModalBtn" aria-label="Close dialog">&times;</button>
+      </div>
+
+      <!-- History KPI Metrics -->
+      <div class="reports-kpi-grid" style="margin-bottom: 1.5rem;">
+        <div class="metric-card">
+          <div class="metric-val" id="empHistoryTotalClaims" style="color: var(--primary);">0</div>
+          <div class="metric-title">Total Claims</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-val" id="empHistoryClaimedAmount" style="color: var(--primary);">₹0</div>
+          <div class="metric-title">Claimed Amount</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-val approved" id="empHistoryApprovedAmount" style="color: var(--success);">₹0</div>
+          <div class="metric-title">Approved Amount</div>
+        </div>
+      </div>
+
+      <div class="table-responsive desktop-only-table">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Claim ID</th>
+              <th>Date</th>
+              <th>Category</th>
+              <th>Claimed</th>
+              <th>Approved</th>
+              <th>Status</th>
+              <th>Admin Remark</th>
+            </tr>
+          </thead>
+          <tbody id="empHistoryTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Receipt Viewer Modal -->
+  <div class="modal-backdrop" id="receiptViewModal" role="dialog" aria-modal="true" aria-label="Receipt Document Viewer" style="display: none;">
+    <div class="expense-modal-box large" id="receiptViewModalContainer">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
+        <h3 class="modal-title" style="margin: 0; font-size: 1.2rem; color: var(--primary); display: flex; align-items: center; gap: 0.5rem;">
+          <i class="fas fa-file-invoice" style="color: var(--accent-gold);"></i> Receipt Document
+        </h3>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+          <a href="#" target="_blank" rel="noopener noreferrer" id="receiptModalOpenNewTab" class="btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem; text-decoration: none;">
+            <i class="fas fa-external-link-alt" style="margin-right: 0.3rem;"></i> Open in New Tab
+          </a>
+          <button type="button" class="modal-close" id="closeReceiptViewModalBtn" aria-label="Close dialog">&times;</button>
+        </div>
+      </div>
+      <div id="receiptModalContent" class="doc-preview-frame" style="min-height: 480px;"></div>
+    </div>
   </div>
 
   <!-- Footer -->
@@ -1671,6 +2356,7 @@
             <li><a href="#" data-view-nav="services">Our Services</a></li>
             <li><a href="#" data-view-nav="events">Events &amp; Conclaves</a></li>
             <li><a href="#" data-view-nav="gallery">News &amp; Blogs</a></li>
+            <li><a href="/employee" data-view-nav="employee">Employee Portal</a></li>
           </ul>
         </div>
 
@@ -1694,7 +2380,7 @@
       </div>
 
       <div class="footer-bottom">
-        <p>Copyright &copy; 2026 Bharuch Chamber of Commerce &amp; Industry (BCCI). All Rights Reserved. &bull; <a href="#signin" data-view-nav="signin" style="color: rgba(255,255,255,0.35); font-size: 0.75rem; text-decoration: none;" title="Chamber Secretariat Access">Secretariat Access</a></p>
+        <p>Copyright &copy; 2026 Bharuch Chamber of Commerce &amp; Industry (BCCI). All Rights Reserved. &bull; <a href="#signin" data-view-nav="signin" style="color: rgba(255,255,255,0.35); font-size: 0.75rem; text-decoration: none;" title="Chamber Secretariat Access">Secretariat Access</a> &bull; <a href="/employee" data-view-nav="employee" style="color: rgba(255,255,255,0.35); font-size: 0.75rem; text-decoration: none;" title="Employee Expense Portal">Employee Portal</a></p>
       </div>
     </div>
   </footer>
