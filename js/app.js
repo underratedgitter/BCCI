@@ -1339,8 +1339,8 @@ class App {
     if (formEmp) {
       formEmp.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const empId = document.getElementById('employeeUsername')?.value;
-        const empPass = document.getElementById('employeePassword')?.value;
+        const empId = document.getElementById('empUsernameInput')?.value || document.getElementById('employeeUsername')?.value;
+        const empPass = document.getElementById('empPasswordInput')?.value || document.getElementById('employeePassword')?.value;
         
         if (btnEmpSignIn) {
           btnEmpSignIn.disabled = true;
@@ -2962,11 +2962,14 @@ class App {
     let claimed = 0, approved = 0, pending = 0, rejected = 0;
     claims.forEach(c => {
       claimed += (c.claimedAmount || 0);
-      if (c.status === 'approved' || c.status === 'partially_approve') {
+      const st = String(c.status || '').toLowerCase().trim();
+      if (st === 'approved' || st === 'partially approved' || st === 'partially_approved' || st === 'partially_approve' || st === 'partial') {
         approved += (c.approvedAmount || 0);
+      } else if (st === 'rejected') {
+        rejected++;
+      } else {
+        pending++;
       }
-      if (c.status === 'pending') pending++;
-      if (c.status === 'rejected') rejected++;
     });
     
     const setMetric = (id, val) => {
@@ -2983,12 +2986,13 @@ class App {
     const cards = document.getElementById('employeeExpensesCards');
     
     const getStatusBadge = (status) => {
-      switch(status) {
-        case 'approved': return '<span class="status-badge status-approved"><i class="fas fa-check"></i> Approved</span>';
-        case 'partially_approve': return '<span class="status-badge status-approved" style="background:#fef08a;color:#854d0e;"><i class="fas fa-check-double"></i> Partial</span>';
-        case 'rejected': return '<span class="status-badge status-rejected"><i class="fas fa-times"></i> Rejected</span>';
-        default: return '<span class="status-badge status-pending"><i class="fas fa-clock"></i> Pending</span>';
+      const st = String(status || '').toLowerCase().trim();
+      if (st === 'approved') return '<span class="status-badge status-approved"><i class="fas fa-check"></i> Approved</span>';
+      if (st === 'partially approved' || st === 'partially_approved' || st === 'partially_approve' || st === 'partial') {
+        return '<span class="status-badge status-approved" style="background:#fef08a;color:#854d0e;"><i class="fas fa-check-double"></i> Partial</span>';
       }
+      if (st === 'rejected') return '<span class="status-badge status-rejected"><i class="fas fa-times"></i> Rejected</span>';
+      return '<span class="status-badge status-pending"><i class="fas fa-clock"></i> Pending</span>';
     };
     
     if (claims.length === 0) {
@@ -2998,10 +3002,11 @@ class App {
       let htmlRows = '';
       let htmlCards = '';
       claims.forEach(c => {
+        const claimDate = c.expenseDate || c.date;
         const trHtml = `
           <tr>
             <td>${escapeHtml(c.id)}</td>
-            <td>${escapeHtml(formatDate(c.date))}</td>
+            <td>${escapeHtml(formatDate(claimDate))}</td>
             <td>${escapeHtml(c.category)}</td>
             <td>${escapeHtml(c.description)}</td>
             <td>₹${(c.claimedAmount || 0).toLocaleString('en-IN')}</td>
@@ -3021,7 +3026,7 @@ class App {
               <strong>${escapeHtml(c.id)}</strong>
               ${getStatusBadge(c.status)}
             </div>
-            <div><strong>Date:</strong> ${escapeHtml(formatDate(c.date))}</div>
+            <div><strong>Date:</strong> ${escapeHtml(formatDate(claimDate))}</div>
             <div><strong>Category:</strong> ${escapeHtml(c.category)}</div>
             <div><strong>Amount:</strong> ₹${(c.claimedAmount || 0).toLocaleString('en-IN')}</div>
             <div style="margin-top:10px;text-align:right;">
@@ -4759,6 +4764,7 @@ class App {
       reader.onload = (e) => {
         this.currentExpenseFileBase64 = e.target.result;
         this.currentExpenseFileType = file.type;
+        this.currentExpenseFileName = file.name;
         
         if(fileName) fileName.textContent = file.name;
         if(fileSize) fileSize.textContent = (file.size / 1024).toFixed(1) + ' KB';
@@ -4785,6 +4791,7 @@ class App {
         e.stopPropagation();
         this.currentExpenseFileBase64 = null;
         this.currentExpenseFileType = null;
+        this.currentExpenseFileName = null;
         input.value = '';
         if(placeholder) placeholder.style.display = 'flex';
         if(preview) preview.style.display = 'none';
@@ -4809,11 +4816,12 @@ class App {
       
       const res = await this.store.submitExpense({
         claimedAmount: amount,
-        date,
+        expenseDate: date,
         category,
         description: desc,
-        documentBase64: this.currentExpenseFileBase64,
-        documentType: this.currentExpenseFileType
+        docData: this.currentExpenseFileBase64,
+        docName: this.currentExpenseFileName || 'receipt',
+        docMime: this.currentExpenseFileType || 'application/octet-stream'
       });
       
       if (res.success) {
@@ -4848,12 +4856,13 @@ class App {
     const cards = document.getElementById('adminExpensesCards');
     
     const getStatusBadge = (s) => {
-      switch(s) {
-        case 'approved': return '<span class="status-badge status-approved"><i class="fas fa-check"></i> Approved</span>';
-        case 'partially_approve': return '<span class="status-badge status-approved" style="background:#fef08a;color:#854d0e;"><i class="fas fa-check-double"></i> Partial</span>';
-        case 'rejected': return '<span class="status-badge status-rejected"><i class="fas fa-times"></i> Rejected</span>';
-        default: return '<span class="status-badge status-pending"><i class="fas fa-clock"></i> Pending</span>';
+      const st = String(s || '').toLowerCase().trim();
+      if (st === 'approved') return '<span class="status-badge status-approved"><i class="fas fa-check"></i> Approved</span>';
+      if (st === 'partially approved' || st === 'partially_approved' || st === 'partially_approve' || st === 'partial') {
+        return '<span class="status-badge status-approved" style="background:#fef08a;color:#854d0e;"><i class="fas fa-check-double"></i> Partial</span>';
       }
+      if (st === 'rejected') return '<span class="status-badge status-rejected"><i class="fas fa-times"></i> Rejected</span>';
+      return '<span class="status-badge status-pending"><i class="fas fa-clock"></i> Pending</span>';
     };
 
     if (expenses.length === 0) {
@@ -4867,7 +4876,7 @@ class App {
           <tr>
             <td>${escapeHtml(e.id)}</td>
             <td>${escapeHtml(e.employeeName)} (${escapeHtml(e.employeeId)})</td>
-            <td>${escapeHtml(formatDate(e.date))}</td>
+            <td>${escapeHtml(formatDate(e.expenseDate || e.date))}</td>
             <td>${escapeHtml(e.category)}</td>
             <td>₹${(e.claimedAmount || 0).toLocaleString('en-IN')}</td>
             <td>${getStatusBadge(e.status)}</td>
@@ -4935,7 +4944,8 @@ class App {
     const doc = await this.store.getExpenseDocument(id);
     const container = document.getElementById('expenseDocPreviewContainer'); // Corrected ID
     if (container && doc && doc.docData) {
-      if (doc.docType === 'application/pdf') {
+      const isPdf = doc.mimeType === 'application/pdf' || doc.docMime === 'application/pdf' || doc.docType === 'application/pdf' || (doc.fileName && doc.fileName.endsWith('.pdf')) || (doc.docData && doc.docData.startsWith('data:application/pdf'));
+      if (isPdf) {
         container.innerHTML = `
           <iframe src="${doc.docData}" style="width:100%; height:500px; border:none;"></iframe>
           <br><a href="${doc.docData}" target="_blank">Open in New Tab</a>
@@ -5000,22 +5010,43 @@ class App {
     let htmlCards = '';
     
     employees.forEach(e => {
+      const claimsCount = e.totalClaims != null ? e.totalClaims : (e.stats?.totalClaims || 0);
+      const approvedTotal = e.totalApprovedAmount != null ? e.totalApprovedAmount : (e.stats?.approvedAmount || 0);
       html += `
         <tr>
           <td>${escapeHtml(e.employeeId)}</td>
           <td>${escapeHtml(e.name)}</td>
-          <td>${escapeHtml(e.email)}</td>
-          <td>${escapeHtml(e.department)}</td>
-          <td>${e.status === 'active' ? 'Active' : 'Inactive'}</td>
+          <td>${escapeHtml(e.username || '—')}</td>
+          <td>${escapeHtml(e.email || '—')}</td>
+          <td>${e.status === 'active' ? '<span class="status-badge status-approved">Active</span>' : '<span class="status-badge status-rejected">Inactive</span>'}</td>
+          <td>${claimsCount}</td>
+          <td>₹${approvedTotal.toLocaleString('en-IN')}</td>
           <td>
-            <button class="btn-icon" data-emp-history-id="${escapeAttr(e.employeeId)}"><i class="fas fa-history"></i></button>
-            <button class="btn-icon" data-emp-toggle-status-id="${escapeAttr(e.employeeId)}"><i class="fas fa-power-off"></i></button>
+            <button class="btn-icon" data-emp-history-id="${escapeAttr(e.employeeId)}" title="View History"><i class="fas fa-history"></i></button>
+            <button class="btn-icon" data-emp-toggle-status-id="${escapeAttr(e.employeeId)}" title="${e.status === 'active' ? 'Deactivate' : 'Activate'}"><i class="fas fa-power-off"></i></button>
           </td>
         </tr>
       `;
+      htmlCards += `
+        <div class="admin-mobile-card">
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+            <strong>${escapeHtml(e.employeeId)}</strong>
+            ${e.status === 'active' ? '<span class="status-badge status-approved">Active</span>' : '<span class="status-badge status-rejected">Inactive</span>'}
+          </div>
+          <div><strong>Name:</strong> ${escapeHtml(e.name)}</div>
+          <div><strong>Username:</strong> ${escapeHtml(e.username || '—')}</div>
+          <div><strong>Email:</strong> ${escapeHtml(e.email || '—')}</div>
+          <div><strong>Total Claims:</strong> ${claimsCount}</div>
+          <div><strong>Total Approved:</strong> ₹${approvedTotal.toLocaleString('en-IN')}</div>
+          <div style="margin-top:10px;display:flex;gap:0.5rem;justify-content:flex-end;">
+            <button class="btn-secondary" data-emp-history-id="${escapeAttr(e.employeeId)}">History</button>
+            <button class="btn-secondary" data-emp-toggle-status-id="${escapeAttr(e.employeeId)}">${e.status === 'active' ? 'Deactivate' : 'Activate'}</button>
+          </div>
+        </div>
+      `;
     });
     
-    if (tbody) tbody.innerHTML = html || '<tr><td colspan="6">No employees</td></tr>';
+    if (tbody) tbody.innerHTML = html || '<tr><td colspan="8">No employees found</td></tr>';
     if (cards) cards.innerHTML = htmlCards;
     
     document.querySelectorAll('[data-emp-history-id]').forEach(btn => {
@@ -5115,23 +5146,25 @@ class App {
     details.history.forEach(c => {
       claimsTotal++;
       claimsTotalAmount += (c.claimedAmount || 0);
-      if (c.status === 'approved' || c.status === 'partially_approve') {
+      const st = String(c.status || '').toLowerCase().trim();
+      if (st === 'approved' || st === 'partially approved' || st === 'partially_approved' || st === 'partially_approve' || st === 'partial') {
         approvedTotal += (c.approvedAmount || 0);
       }
       
       const getStatusBadge = (s) => {
-        switch(s) {
-          case 'approved': return '<span class="status-badge status-approved"><i class="fas fa-check"></i> Approved</span>';
-          case 'partially_approve': return '<span class="status-badge status-approved" style="background:#fef08a;color:#854d0e;"><i class="fas fa-check-double"></i> Partial</span>';
-          case 'rejected': return '<span class="status-badge status-rejected"><i class="fas fa-times"></i> Rejected</span>';
-          default: return '<span class="status-badge status-pending"><i class="fas fa-clock"></i> Pending</span>';
+        const str = String(s || '').toLowerCase().trim();
+        if (str === 'approved') return '<span class="status-badge status-approved"><i class="fas fa-check"></i> Approved</span>';
+        if (str === 'partially approved' || str === 'partially_approved' || str === 'partially_approve' || str === 'partial') {
+          return '<span class="status-badge status-approved" style="background:#fef08a;color:#854d0e;"><i class="fas fa-check-double"></i> Partial</span>';
         }
+        if (str === 'rejected') return '<span class="status-badge status-rejected"><i class="fas fa-times"></i> Rejected</span>';
+        return '<span class="status-badge status-pending"><i class="fas fa-clock"></i> Pending</span>';
       };
       
       html += `
         <tr>
           <td>${escapeHtml(c.id)}</td>
-          <td>${escapeHtml(formatDate(c.date))}</td>
+          <td>${escapeHtml(formatDate(c.expenseDate || c.date))}</td>
           <td>${escapeHtml(c.category)}</td>
           <td>₹${(c.claimedAmount || 0).toLocaleString('en-IN')}</td>
           <td>₹${(c.approvedAmount || 0).toLocaleString('en-IN')}</td>
@@ -5191,9 +5224,14 @@ class App {
     let claimed = 0, approved = 0, rejected = 0, pending = 0;
     expenses.forEach(e => {
       claimed += (e.claimedAmount || 0);
-      if (e.status === 'approved' || e.status === 'partially_approve') approved += (e.approvedAmount || 0);
-      if (e.status === 'rejected') rejected += (e.claimedAmount || 0);
-      if (e.status === 'pending') pending += (e.claimedAmount || 0);
+      const st = String(e.status || '').toLowerCase().trim();
+      if (st === 'approved' || st === 'partially approved' || st === 'partially_approved' || st === 'partially_approve' || st === 'partial') {
+        approved += (e.approvedAmount || 0);
+      } else if (st === 'rejected') {
+        rejected += (e.claimedAmount || 0);
+      } else {
+        pending += (e.claimedAmount || 0);
+      }
     });
     
     const s = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
@@ -5204,12 +5242,13 @@ class App {
     s('reportPendingAmount', '₹' + pending.toLocaleString('en-IN'));
     
     const getStatusBadge = (st) => {
-      switch(st) {
-        case 'approved': return '<span class="status-badge status-approved"><i class="fas fa-check"></i> Approved</span>';
-        case 'partially_approve': return '<span class="status-badge status-approved" style="background:#fef08a;color:#854d0e;"><i class="fas fa-check-double"></i> Partial</span>';
-        case 'rejected': return '<span class="status-badge status-rejected"><i class="fas fa-times"></i> Rejected</span>';
-        default: return '<span class="status-badge status-pending"><i class="fas fa-clock"></i> Pending</span>';
+      const s = String(st || '').toLowerCase().trim();
+      if (s === 'approved') return '<span class="status-badge status-approved"><i class="fas fa-check"></i> Approved</span>';
+      if (s === 'partially approved' || s === 'partially_approved' || s === 'partially_approve' || s === 'partial') {
+        return '<span class="status-badge status-approved" style="background:#fef08a;color:#854d0e;"><i class="fas fa-check-double"></i> Partial</span>';
       }
+      if (s === 'rejected') return '<span class="status-badge status-rejected"><i class="fas fa-times"></i> Rejected</span>';
+      return '<span class="status-badge status-pending"><i class="fas fa-clock"></i> Pending</span>';
     };
     
     const tbody = document.getElementById('reportsTableBody');
@@ -5218,7 +5257,7 @@ class App {
         <tr>
           <td>${escapeHtml(e.id)}</td>
           <td>${escapeHtml(e.employeeName)}</td>
-          <td>${escapeHtml(formatDate(e.date))}</td>
+          <td>${escapeHtml(formatDate(e.expenseDate || e.date))}</td>
           <td>${escapeHtml(e.category)}</td>
           <td>₹${(e.claimedAmount || 0).toLocaleString('en-IN')}</td>
           <td>₹${(e.approvedAmount || 0).toLocaleString('en-IN')}</td>
@@ -5249,7 +5288,8 @@ class App {
       if (newTabLink) newTabLink.href = doc.docData;
       
       if (content) {
-        if (doc.docType === 'application/pdf') {
+        const isPdf = doc.mimeType === 'application/pdf' || doc.docMime === 'application/pdf' || doc.docType === 'application/pdf' || (doc.fileName && doc.fileName.endsWith('.pdf')) || (doc.docData && doc.docData.startsWith('data:application/pdf'));
+        if (isPdf) {
           content.innerHTML = `<iframe src="${doc.docData}" style="width:100%; height:500px; border:none;"></iframe>`;
         } else {
           content.innerHTML = `<img src="${doc.docData}" style="max-width:100%;" />`;
