@@ -60,6 +60,7 @@ const VIEW_PATHS = {
   card: '/card',
   signin: '/signin',
   admin: '/admin',
+  employee: '/employee',
 };
 
 const PATH_VIEWS = Object.fromEntries(
@@ -78,6 +79,7 @@ const PAGE_TITLES = {
   card: 'Digital Membership Card — BCCI Bharuch',
   signin: 'Secretariat Sign In — BCCI Bharuch',
   admin: 'Admin Portal — BCCI Bharuch',
+  employee: 'Employee Expense Portal — BCCI Bharuch',
 };
 
 /** Resolves the view for the current URL, tolerating the old #hash links. */
@@ -85,6 +87,7 @@ function viewFromLocation() {
   const hash = (window.location.hash || '').toLowerCase().replace(/^#/, '');
   if (hash === 'admin' || hash === 'secret-admin') return 'admin';
   if (hash === 'signin' || hash === 'login') return 'signin';
+  if (hash === 'employee' || hash === 'expenses') return 'employee';
   if (hash === 'qr') return 'qrcode';
   if (hash && VIEW_PATHS[hash]) return hash;
 
@@ -110,6 +113,7 @@ class App {
     this.renderView(viewFromLocation(), { updateHistory: false });
     this.updateApplicantAuthUI();
     this.setupSecretAccessHandlers();
+    this.setupUnifiedSignInTabs();
     this.setupApplicantAuthHandlers();
     this.setupFileUploadHandlers();
     this.setupFormValidation();
@@ -1307,6 +1311,58 @@ class App {
      ADMIN AUTHENTICATION — Server-backed sessions
      ════════════════════════════════════════════════════════════════════ */
 
+  setupUnifiedSignInTabs() {
+    const tabAdmin = document.getElementById('signinTabAdmin');
+    const tabEmp = document.getElementById('signinTabEmployee');
+    const formAdmin = document.getElementById('formAdminSignIn');
+    const formEmp = document.getElementById('formEmployeeSignIn');
+    const btnEmpSignIn = document.getElementById('btnEmpSignIn');
+
+    if (tabAdmin && tabEmp) {
+      tabAdmin.addEventListener('click', () => {
+        tabAdmin.classList.add('active');
+        tabEmp.classList.remove('active');
+        if (formAdmin) formAdmin.style.display = 'block';
+        if (formEmp) formEmp.style.display = 'none';
+      });
+
+      tabEmp.addEventListener('click', () => {
+        tabEmp.classList.add('active');
+        tabAdmin.classList.remove('active');
+        if (formEmp) formEmp.style.display = 'block';
+        if (formAdmin) formAdmin.style.display = 'none';
+      });
+    }
+
+    if (formEmp) {
+      formEmp.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const empId = document.getElementById('employeeUsername')?.value;
+        const empPass = document.getElementById('employeePassword')?.value;
+        
+        if (btnEmpSignIn) {
+          btnEmpSignIn.disabled = true;
+          btnEmpSignIn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing In...';
+        }
+
+        const res = await this.store.employeeLogin(empId, empPass);
+        
+        if (btnEmpSignIn) {
+          btnEmpSignIn.disabled = false;
+          btnEmpSignIn.innerHTML = 'Sign In';
+        }
+
+        if (res.success) {
+          this.showToast('Employee signed in', 'success');
+          formEmp.reset();
+          this.renderView('employee');
+        } else {
+          this.showToast(res.error || 'Login failed', 'error');
+        }
+      });
+    }
+  }
+
   setupSecretAccessHandlers() {
     // Back / forward through the real URLs.
     window.addEventListener('popstate', () => {
@@ -1772,6 +1828,20 @@ class App {
     if (viewId === 'membership') this.updateApplicantAuthUI();
     if (viewId === 'card') this.renderMembershipCard();
     if (viewId === 'admin') await this.renderAdminPortal();
+    if (viewId === 'employee') {
+      if (!this.store.isEmployeeAuthed()) {
+        const employeeAuthGate = document.getElementById('employeeAuthGate');
+        const employeePortalContent = document.getElementById('employeePortalContent');
+        if (employeeAuthGate) employeeAuthGate.style.display = 'flex';
+        if (employeePortalContent) employeePortalContent.style.display = 'none';
+      } else {
+        const employeeAuthGate = document.getElementById('employeeAuthGate');
+        const employeePortalContent = document.getElementById('employeePortalContent');
+        if (employeeAuthGate) employeeAuthGate.style.display = 'none';
+        if (employeePortalContent) employeePortalContent.style.display = 'block';
+        await this.renderEmployeePortal();
+      }
+    }
   }
 
   renderLeadership() {
@@ -2867,7 +2937,108 @@ class App {
   /* ════════════════════════════════════════════════════════════════════
      ADMIN PORTAL — Server-backed data
      ════════════════════════════════════════════════════════════════════ */
-
+  async renderEmployeePortal() {
+    const session = this.store.getEmployeeSession();
+    if (!session) return;
+    
+    // Update headers
+    const nameDisplay = document.getElementById('employeeNameDisplay');
+    const idBadge = document.getElementById('employeeIdBadge');
+    if (nameDisplay) nameDisplay.textContent = session.name || session.id;
+    if (idBadge) idBadge.textContent = session.id;
+    
+    // Sign out button
+    const btnSignOut = document.getElementById('btnEmployeeSignOut');
+    if (btnSignOut) {
+      btnSignOut.onclick = () => {
+        this.store.employeeLogout();
+        this.showToast('Signed out successfully', 'success');
+        this.renderView('signin');
+      };
+    }
+    
+    // Fetch claims
+    const claims = await this.store.getEmployeeExpenses();
+    
+    // Calculate KPIs
+    let claimed = 0, approved = 0, pending = 0, rejected = 0;
+    claims.forEach(c => {
+      claimed += (c.claimedAmount || 0);
+      if (c.status === 'approved' || c.status === 'partially_approve') {
+        approved += (c.approvedAmount || 0);
+      }
+      if (c.status === 'pending') pending++;
+      if (c.status === 'rejected') rejected++;
+    });
+    
+    const setMetric = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = val;
+    };
+    
+    setMetric('metricEmpClaimed', `₹${claimed.toLocaleString('en-IN')}`);
+    setMetric('metricEmpApproved', `₹${approved.toLocaleString('en-IN')}`);
+    setMetric('metricEmpPending', pending);
+    setMetric('metricEmpRejected', rejected);
+    
+    // Render Table and Mobile Cards
+    const tbody = document.getElementById('employeeExpensesBody');
+    const cards = document.getElementById('employeeExpensesCards');
+    
+    const getStatusBadge = (status) => {
+      switch(status) {
+        case 'approved': return '<span class="status-badge status-approved"><i class="fas fa-check"></i> Approved</span>';
+        case 'partially_approve': return '<span class="status-badge status-approved" style="background:#fef08a;color:#854d0e;"><i class="fas fa-check-double"></i> Partial</span>';
+        case 'rejected': return '<span class="status-badge status-rejected"><i class="fas fa-times"></i> Rejected</span>';
+        default: return '<span class="status-badge status-pending"><i class="fas fa-clock"></i> Pending</span>';
+      }
+    };
+    
+    if (claims.length === 0) {
+      if (tbody) tbody.innerHTML = `<tr><td colspan="9" class="empty-state"><i class="fas fa-receipt"></i><p>No expenses claimed yet.</p></td></tr>`;
+      if (cards) cards.innerHTML = `<div class="empty-state"><i class="fas fa-receipt"></i><p>No expenses claimed yet.</p></div>`;
+    } else {
+      let htmlRows = '';
+      let htmlCards = '';
+      claims.forEach(c => {
+        const trHtml = `
+          <tr>
+            <td>${escapeHtml(c.id)}</td>
+            <td>${escapeHtml(formatDate(c.date))}</td>
+            <td>${escapeHtml(c.category)}</td>
+            <td>${escapeHtml(c.description)}</td>
+            <td>₹${(c.claimedAmount || 0).toLocaleString('en-IN')}</td>
+            <td>₹${(c.approvedAmount || 0).toLocaleString('en-IN')}</td>
+            <td>${getStatusBadge(c.status)}</td>
+            <td>${escapeHtml(c.adminRemark || '-')}</td>
+            <td>
+              <button class="btn-icon" data-view-receipt-id="${escapeAttr(c.id)}" title="View Receipt"><i class="fas fa-file-invoice"></i></button>
+            </td>
+          </tr>
+        `;
+        htmlRows += trHtml;
+        
+        const cardHtml = `
+          <div class="admin-mobile-card">
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+              <strong>${escapeHtml(c.id)}</strong>
+              ${getStatusBadge(c.status)}
+            </div>
+            <div><strong>Date:</strong> ${escapeHtml(formatDate(c.date))}</div>
+            <div><strong>Category:</strong> ${escapeHtml(c.category)}</div>
+            <div><strong>Amount:</strong> ₹${(c.claimedAmount || 0).toLocaleString('en-IN')}</div>
+            <div style="margin-top:10px;text-align:right;">
+              <button class="btn-secondary" data-view-receipt-id="${escapeAttr(c.id)}">View Receipt</button>
+            </div>
+          </div>
+        `;
+        htmlCards += cardHtml;
+      });
+      
+      if (tbody) tbody.innerHTML = htmlRows;
+      if (cards) cards.innerHTML = htmlCards;
+    }
+  }
   /** Placeholder rows shown while data is in flight. */
   _skeletonRows(rows, cols) {
     return Array.from({ length: rows }, () =>
@@ -2909,10 +3080,12 @@ class App {
 
     let apps = [];
     let enquiries = [];
+    let stats = null;
     try {
-      [apps, enquiries] = await Promise.all([
+      [apps, enquiries, stats] = await Promise.all([
         this.store.getApplications(),
         this.store.getEnquiries(),
+        this.store.apiCall('/api/admin-stats', { auth: 'admin' }).catch(() => null)
       ]);
     } catch (err) {
       // An expired admin session is the common case here; the store has
@@ -2927,14 +3100,12 @@ class App {
       // Replace the skeletons with something actionable, not a frozen shimmer.
       const failure = `<div style="text-align:center;padding:2rem;color:#94A3B8;">
         <i class="fas fa-triangle-exclamation" style="font-size:1.8rem;display:block;margin-bottom:0.5rem;color:#DC2626;"></i>
-        Could not load this data.
-        <button type="button" class="btn-secondary" id="adminRetryBtn" style="margin-top:0.75rem;">
-          <i class="fas fa-rotate-right"></i> Retry
-        </button>
+        Failed to load dashboard data.
+        <br><br><button class="btn-primary" id="adminRetryBtn" style="font-size:0.85rem;"><i class="fas fa-redo"></i> Retry</button>
       </div>`;
-      [['pendingAppsBody', 7], ['approvedAppsBody', 7], ['rejectedAppsBody', 7], ['enquiriesBody', 5]].forEach(([id, cols]) => {
+      ['pendingAppsBody', 'approvedAppsBody', 'rejectedAppsBody', 'enquiriesBody'].forEach((id) => {
         const el = document.getElementById(id);
-        if (el) el.innerHTML = `<tr><td colspan="${cols}" style="padding:0;">${failure}</td></tr>`;
+        if (el) el.innerHTML = `<tr><td colspan="7">${failure}</td></tr>`;
       });
       ['pendingAppsCards', 'approvedAppsCards', 'rejectedAppsCards', 'enquiriesCards'].forEach((id) => {
         const el = document.getElementById(id);
@@ -2954,6 +3125,14 @@ class App {
     setMetric('metricApproved', approvedApps.length);
     setMetric('metricRejected', rejectedApps.length);
     setMetric('metricEnquiries', enquiries.length);
+    
+    if (stats && stats.success) {
+      setMetric('metricExpensesTotal', stats.expensesTotal);
+      setMetric('metricExpensesClaimed', '₹' + (stats.expensesClaimedAmount || 0));
+      setMetric('metricExpensesApproved', '₹' + (stats.expensesApprovedAmount || 0));
+      setMetric('metricExpensesPending', stats.expensesPending);
+      setMetric('metricExpensesEmployees', stats.employeesCount);
+    }
 
     const emptyState = (icon, text) =>
       `<div style="text-align: center; color: #94A3B8; padding: 2rem;"><i class="fas ${icon}" style="font-size: 1.8rem; margin-bottom: 0.5rem; display: block;"></i>${escapeHtml(text)}</div>`;
@@ -3404,6 +3583,9 @@ class App {
         targetPane.style.display = 'block';
         targetPane.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
       }
+      if (tabName === 'expenses') this.renderAdminExpensesTab();
+      if (tabName === 'employees') this.renderAdminEmployeesTab();
+      if (tabName === 'expense-reports') this.renderMonthlyExpenseReports();
     };
 
     document.querySelectorAll('.admin-menu-item').forEach(item => {
@@ -4511,6 +4693,333 @@ class App {
       }
     });
   }
+
+  setupExpenseFileUploadHandlers() {
+    const dropzone = document.getElementById('expenseReceiptDropzone');
+    const input = document.getElementById('expenseReceiptFile');
+    const preview = document.getElementById('expenseReceiptPreview');
+    const fileName = document.getElementById('expenseReceiptFileName');
+    const fileSize = document.getElementById('expenseReceiptFileSize');
+    const placeholder = document.getElementById('expenseReceiptPlaceholder');
+    const removeBtn = document.getElementById('removeExpenseReceiptBtn');
+    
+    if (!dropzone || !input) return;
+    
+    this.currentExpenseFileBase64 = null;
+    this.currentExpenseFileType = null;
+
+    dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropzone.classList.add('dragover');
+    });
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+      if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    });
+    dropzone.addEventListener('click', () => input.click());
+    input.addEventListener('change', (e) => {
+      if (e.target.files.length) handleFile(e.target.files[0]);
+    });
+    
+    const handleFile = (file) => {
+      if (file.size > 1.5 * 1024 * 1024) {
+        this.showToast('File size must be <= 1.5MB', 'warning');
+        return;
+      }
+      if (!['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'].includes(file.type)) {
+        this.showToast('Only PDF, PNG, JPG allowed', 'warning');
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        this.currentExpenseFileBase64 = e.target.result;
+        this.currentExpenseFileType = file.type;
+        
+        fileName.textContent = file.name;
+        fileSize.textContent = (file.size / 1024).toFixed(1) + ' KB';
+        
+        if (file.type === 'application/pdf') {
+          preview.querySelector('img').style.display = 'none';
+          preview.querySelector('.pdf-icon').style.display = 'block';
+        } else {
+          preview.querySelector('img').src = e.target.result;
+          preview.querySelector('img').style.display = 'block';
+          if (preview.querySelector('.pdf-icon')) preview.querySelector('.pdf-icon').style.display = 'none';
+        }
+        
+        placeholder.style.display = 'none';
+        preview.style.display = 'flex';
+      };
+      reader.readAsDataURL(file);
+    };
+    
+    if (removeBtn) {
+      removeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.currentExpenseFileBase64 = null;
+        this.currentExpenseFileType = null;
+        input.value = '';
+        placeholder.style.display = 'flex';
+        preview.style.display = 'none';
+      });
+    }
+  }
+
+  setupExpenseFormHandlers() {
+    const form = document.getElementById('employeeExpenseForm');
+    if (!form) return;
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const amount = parseFloat(document.getElementById('expenseAmount').value);
+      const date = document.getElementById('expenseDate').value;
+      const category = document.getElementById('expenseCategory').value;
+      const desc = document.getElementById('expenseDescription').value;
+      
+      if (!this.currentExpenseFileBase64) {
+        this.showToast('Please attach a receipt', 'warning');
+        return;
+      }
+      
+      const res = await this.store.submitExpense({
+        claimedAmount: amount,
+        date,
+        category,
+        description: desc,
+        documentBase64: this.currentExpenseFileBase64,
+        documentType: this.currentExpenseFileType
+      });
+      
+      if (res.success) {
+        this.showToast('Expense submitted successfully', 'success');
+        form.reset();
+        document.getElementById('removeExpenseReceiptBtn')?.click();
+        this.renderEmployeePortal();
+      } else {
+        this.showToast(res.error || 'Failed to submit', 'error');
+      }
+    });
+  }
+
+  async renderAdminExpensesTab() {
+    const status = document.getElementById('adminExpenseFilterStatus')?.value;
+    const emp = document.getElementById('adminExpenseFilterEmployee')?.value;
+    const cat = document.getElementById('adminExpenseFilterCategory')?.value;
+    
+    const filters = { status, employeeId: emp, category: cat };
+    const expenses = await this.store.getAdminExpenses(filters);
+    
+    const tbody = document.getElementById('adminExpensesBody');
+    const cards = document.getElementById('adminExpensesCards');
+    
+    const getStatusBadge = (s) => {
+      switch(s) {
+        case 'approved': return '<span class="status-badge status-approved"><i class="fas fa-check"></i> Approved</span>';
+        case 'partially_approve': return '<span class="status-badge status-approved" style="background:#fef08a;color:#854d0e;"><i class="fas fa-check-double"></i> Partial</span>';
+        case 'rejected': return '<span class="status-badge status-rejected"><i class="fas fa-times"></i> Rejected</span>';
+        default: return '<span class="status-badge status-pending"><i class="fas fa-clock"></i> Pending</span>';
+      }
+    };
+
+    if (expenses.length === 0) {
+      if (tbody) tbody.innerHTML = '<tr><td colspan="9" class="empty-state">No expenses found</td></tr>';
+      if (cards) cards.innerHTML = '<div class="empty-state">No expenses found</div>';
+    } else {
+      let html = '';
+      let htmlCards = '';
+      expenses.forEach(e => {
+        const row = `
+          <tr>
+            <td>${escapeHtml(e.id)}</td>
+            <td>${escapeHtml(e.employeeName)} (${escapeHtml(e.employeeId)})</td>
+            <td>${escapeHtml(formatDate(e.date))}</td>
+            <td>${escapeHtml(e.category)}</td>
+            <td>₹${(e.claimedAmount || 0).toLocaleString('en-IN')}</td>
+            <td>${getStatusBadge(e.status)}</td>
+            <td>
+              <button class="btn-secondary" data-review-expense-id="${escapeAttr(e.id)}">Review</button>
+            </td>
+          </tr>
+        `;
+        html += row;
+        htmlCards += `
+          <div class="admin-mobile-card">
+            <div><strong>${escapeHtml(e.id)}</strong></div>
+            <div>${escapeHtml(e.employeeName)}</div>
+            <div>₹${(e.claimedAmount || 0).toLocaleString('en-IN')}</div>
+            <button class="btn-secondary" data-review-expense-id="${escapeAttr(e.id)}">Review</button>
+          </div>
+        `;
+      });
+      if (tbody) tbody.innerHTML = html;
+      if (cards) cards.innerHTML = htmlCards;
+    }
+  }
+
+  async openExpenseReviewModal(id) {
+    const modal = document.getElementById('expenseReviewModal');
+    if (!modal) return;
+    
+    modal.style.display = 'flex';
+    modal.classList.add('show');
+    
+    // In a real app we would fetch the specific expense details
+    // Here we assume it's available or we just fetch the doc
+    const doc = await this.store.getExpenseDocument(id);
+    
+    const container = document.getElementById('expenseReviewDocContainer');
+    if (container && doc && doc.docData) {
+      if (doc.docType === 'application/pdf') {
+        container.innerHTML = `
+          <object data="${doc.docData}" type="application/pdf" width="100%" height="400px">
+            <p>PDF cannot be displayed. <a href="${doc.docData}" target="_blank">Open here</a></p>
+          </object>
+          <a href="${doc.docData}" target="_blank">Open in New Tab</a>
+        `;
+      } else {
+        container.innerHTML = `
+          <img src="${doc.docData}" style="max-width:100%;" />
+          <br/><a href="${doc.docData}" target="_blank">Open in New Tab</a>
+        `;
+      }
+    }
+    
+    // Attach buttons
+    const btnApprove = document.getElementById('btnReviewApprove');
+    const btnPartial = document.getElementById('btnReviewPartial');
+    const btnReject = document.getElementById('btnReviewReject');
+    
+    const submitReview = async (decision) => {
+      const approvedAmount = parseFloat(document.getElementById('reviewApprovedAmountInput').value) || 0;
+      const remark = document.getElementById('reviewAdminRemarkInput').value || '';
+      
+      if (decision === 'reject' && !remark) {
+        this.showToast('Remark required for rejection', 'warning');
+        return;
+      }
+      
+      const res = await this.store.reviewExpense(id, { decision, approvedAmount, remark });
+      if (res.success) {
+        this.showToast('Expense reviewed', 'success');
+        modal.style.display = 'none';
+        modal.classList.remove('show');
+        this.renderAdminExpensesTab();
+      } else {
+        this.showToast(res.error || 'Failed', 'error');
+      }
+    };
+    
+    if (btnApprove) btnApprove.onclick = () => submitReview('approve');
+    if (btnPartial) btnPartial.onclick = () => submitReview('partially_approve');
+    if (btnReject) btnReject.onclick = () => submitReview('reject');
+  }
+
+  async renderAdminEmployeesTab() {
+    const employees = await this.store.getAdminEmployees();
+    const tbody = document.getElementById('adminEmployeesBody');
+    const cards = document.getElementById('adminEmployeesCards');
+    
+    let html = '';
+    let htmlCards = '';
+    
+    employees.forEach(e => {
+      html += `
+        <tr>
+          <td>${escapeHtml(e.employeeId)}</td>
+          <td>${escapeHtml(e.name)}</td>
+          <td>${escapeHtml(e.email)}</td>
+          <td>${escapeHtml(e.department)}</td>
+          <td>${e.status === 'active' ? 'Active' : 'Inactive'}</td>
+          <td>
+            <button class="btn-icon" data-emp-history-id="${escapeAttr(e.employeeId)}"><i class="fas fa-history"></i></button>
+            <button class="btn-icon" data-emp-toggle-status-id="${escapeAttr(e.employeeId)}"><i class="fas fa-power-off"></i></button>
+          </td>
+        </tr>
+      `;
+    });
+    
+    if (tbody) tbody.innerHTML = html || '<tr><td colspan="6">No employees</td></tr>';
+    if (cards) cards.innerHTML = htmlCards;
+    
+    const btnAdd = document.getElementById('btnAddEmployee');
+    if (btnAdd) {
+      btnAdd.onclick = () => {
+        const m = document.getElementById('addEmployeeModal');
+        if (m) {
+          m.style.display = 'flex';
+          m.classList.add('show');
+        }
+      };
+    }
+    
+    const addForm = document.getElementById('addEmployeeForm');
+    if (addForm) {
+      addForm.onsubmit = async (ev) => {
+        ev.preventDefault();
+        const empData = {
+          employeeId: document.getElementById('addEmpId').value,
+          name: document.getElementById('addEmpName').value,
+          email: document.getElementById('addEmpEmail').value,
+          department: document.getElementById('addEmpDept').value,
+        };
+        const res = await this.store.createEmployee(empData);
+        if (res.success) {
+          this.showToast('Employee created', 'success');
+          document.getElementById('addEmployeeModal').style.display = 'none';
+          this.renderAdminEmployeesTab();
+        } else {
+          this.showToast(res.error || 'Error', 'error');
+        }
+      };
+    }
+  }
+
+  async renderMonthlyExpenseReports() {
+    const month = document.getElementById('reportFilterMonth')?.value;
+    const year = document.getElementById('reportFilterYear')?.value;
+    const expenses = await this.store.getAdminExpenses({ month, year });
+    
+    let claimed = 0, approved = 0, rejected = 0, pending = 0;
+    expenses.forEach(e => {
+      claimed += (e.claimedAmount || 0);
+      if (e.status === 'approved' || e.status === 'partially_approve') approved += (e.approvedAmount || 0);
+      if (e.status === 'rejected') rejected += (e.claimedAmount || 0);
+      if (e.status === 'pending') pending += (e.claimedAmount || 0);
+    });
+    
+    const s = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    s('reportTotalClaims', expenses.length);
+    s('reportClaimedAmount', '₹' + claimed);
+    s('reportApprovedAmount', '₹' + approved);
+    s('reportRejectedAmount', '₹' + rejected);
+    s('reportPendingAmount', '₹' + pending);
+    
+    const tbody = document.getElementById('reportsTableBody');
+    if (tbody) {
+      tbody.innerHTML = expenses.map(e => `
+        <tr>
+          <td>${escapeHtml(e.id)}</td>
+          <td>${escapeHtml(e.date)}</td>
+          <td>₹${(e.claimedAmount || 0)}</td>
+          <td>₹${(e.approvedAmount || 0)}</td>
+        </tr>
+      `).join('');
+    }
+  }
+
+  async openReceiptViewer(expenseId) {
+    const modal = document.getElementById('receiptViewModal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    modal.classList.add('show');
+    
+    const doc = await this.store.getExpenseDocument(expenseId);
+    // render viewer logic...
+  }
+
+
 }
 
 // Bootstrap
