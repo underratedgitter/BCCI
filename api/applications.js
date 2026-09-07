@@ -25,6 +25,7 @@ import {
   withErrorHandling,
 } from './_lib/http.js';
 import { sendEmail, adminRecipients } from './_lib/email.js';
+import { validateFileSignature } from './_lib/validation.js';
 
 // A receipt is base64 in the JSON body, so the cap has to leave room for it.
 const MAX_BODY_SIZE = 900 * 1024;
@@ -173,6 +174,15 @@ async function handler(req, res) {
       });
     }
 
+    let paymentProof = '';
+    if (typeof body.paymentProof === 'string' && body.paymentProof.trim()) {
+      const sigCheck = validateFileSignature(body.paymentProof.trim(), ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'application/pdf']);
+      if (!sigCheck.ok) {
+        return res.status(400).json({ error: `Payment receipt validation failed: ${sigCheck.error}` });
+      }
+      paymentProof = body.paymentProof.trim();
+    }
+
     const district = str(body.district, 120);
     const application = {
       id: newApplicationId(),
@@ -198,7 +208,7 @@ async function handler(req, res) {
       employees: str(body.employees, 30),
       cin: str(body.cin, 30),
       membershipType,
-      paymentProof: typeof body.paymentProof === 'string' ? body.paymentProof : '',
+      paymentProof,
       paymentAmount: '',
       paymentRef: str(body.paymentRef, 80),
       status: STATUS.PENDING,

@@ -20,7 +20,7 @@ export const CSP = [
   "font-src 'self' data: https://cdnjs.cloudflare.com https://fonts.gstatic.com",
   "img-src 'self' data: blob:",
   "connect-src 'self'",
-  "frame-src 'none'",
+  "frame-src 'self' blob: data:",
   "frame-ancestors 'none'",
   "base-uri 'none'",
   "object-src 'none'",

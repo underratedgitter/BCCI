@@ -5285,14 +5285,36 @@ class App {
     const newTabLink = document.getElementById('receiptModalOpenNewTab');
     
     if (doc && doc.docData) {
-      if (newTabLink) newTabLink.href = doc.docData;
+      if (newTabLink) {
+        newTabLink.href = doc.docData;
+        newTabLink.setAttribute('rel', 'noopener noreferrer');
+        if (doc.docName) newTabLink.setAttribute('download', doc.docName);
+      }
       
       if (content) {
         const isPdf = doc.mimeType === 'application/pdf' || doc.docMime === 'application/pdf' || doc.docType === 'application/pdf' || (doc.fileName && doc.fileName.endsWith('.pdf')) || (doc.docData && doc.docData.startsWith('data:application/pdf'));
+        const safeName = escapeHtml(doc.docName || (isPdf ? 'receipt.pdf' : 'receipt.png'));
+        const safeData = escapeAttr(doc.docData);
         if (isPdf) {
-          content.innerHTML = `<iframe src="${doc.docData}" style="width:100%; height:500px; border:none;"></iframe>`;
+          content.innerHTML = `<div class="receipt-dossier" style="margin-bottom:0.75rem;padding:0.75rem;background:var(--gray-50);border:1px solid var(--border-color);border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <strong style="color:var(--primary);font-size:0.9rem;"><i class="fas fa-file-pdf" style="color:#DC2626;margin-right:0.4rem;"></i>${safeName}</strong>
+              <span style="font-size:0.75rem;color:var(--text-muted);display:block;margin-top:0.2rem;">PDF Document &bull; Isolated Preview</span>
+            </div>
+            <a href="${safeData}" download="${safeName}" class="btn-secondary" style="font-size:0.8rem;padding:0.35rem 0.75rem;text-decoration:none;"><i class="fas fa-download"></i> Download</a>
+          </div>
+          <iframe src="${safeData}" sandbox="allow-downloads allow-popups" title="Receipt Preview" style="width:100%; height:480px; border:1px solid var(--border-color); border-radius:6px; background:#fff;"></iframe>`;
         } else {
-          content.innerHTML = `<img src="${doc.docData}" style="max-width:100%;" />`;
+          content.innerHTML = `<div class="receipt-dossier" style="margin-bottom:0.75rem;padding:0.75rem;background:var(--gray-50);border:1px solid var(--border-color);border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <strong style="color:var(--primary);font-size:0.9rem;"><i class="fas fa-file-image" style="color:var(--accent-gold);margin-right:0.4rem;"></i>${safeName}</strong>
+              <span style="font-size:0.75rem;color:var(--text-muted);display:block;margin-top:0.2rem;">Image Receipt &bull; Isolated View</span>
+            </div>
+            <a href="${safeData}" download="${safeName}" class="btn-secondary" style="font-size:0.8rem;padding:0.35rem 0.75rem;text-decoration:none;"><i class="fas fa-download"></i> Download</a>
+          </div>
+          <div style="text-align:center;padding:1rem;background:#f8fafc;border:1px solid var(--border-color);border-radius:6px;max-height:480px;overflow:auto;">
+            <img src="${safeData}" alt="Receipt Document" style="max-width:100%;max-height:440px;border-radius:4px;box-shadow:0 1px 4px rgba(0,0,0,0.1);" />
+          </div>`;
         }
       }
     }

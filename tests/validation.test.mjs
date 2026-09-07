@@ -5,6 +5,7 @@ import {
   validateEmployeeInput,
   validateExpenseInput,
   validateReviewInput,
+  validateFileSignature,
   EXPENSE_CATEGORIES,
   EXPENSE_STATUSES,
 } from '../api/_lib/validation.js';
@@ -208,4 +209,59 @@ test('validation functions handle null input gracefully without throwing', () =>
   assert.equal(rev.ok, false);
   assert.ok(rev.errors.length > 0);
 });
+
+test('validateFileSignature validates real magic bytes for PDF, PNG, JPEG, WEBP and rejects spoofed files', () => {
+  // Valid PDF: %PDF-1.4
+  const validPdfB64 = Buffer.from('%PDF-1.4 test').toString('base64');
+  assert.equal(validateFileSignature(`data:application/pdf;base64,${validPdfB64}`).ok, true);
+
+  // Valid PNG: \x89PNG\r\n\x1a\n
+  const validPngB64 = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00]).toString('base64');
+  assert.equal(validateFileSignature(`data:image/png;base64,${validPngB64}`).ok, true);
+
+  // Valid JPEG: \xFF\xD8\xFF\xE0
+  const validJpgB64 = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10]).toString('base64');
+  assert.equal(validateFileSignature(`data:image/jpeg;base64,${validJpgB64}`).ok, true);
+
+  // Valid WEBP: RIFF....WEBP
+  const validWebpB64 = Buffer.from([
+    0x52, 0x49, 0x46, 0x46, // RIFF
+    0x20, 0x00, 0x00, 0x00, // size
+    0x57, 0x45, 0x42, 0x50, // WEBP
+    0x56, 0x50, 0x38, 0x20, // VP8
+  ]).toString('base64');
+  assert.equal(validateFileSignature(`data:image/webp;base64,${validWebpB64}`).ok, true);
+
+  // Spoofed file: HTML/XSS payload disguised as PNG
+  const spoofedPng = Buffer.from('<script>alert(1)</script>').toString('base64');
+  const resSpoofed = validateFileSignature(`data:image/png;base64,${spoofedPng}`);
+  assert.equal(resSpoofed.ok, false);
+  assert.match(resSpoofed.error, /signature/i);
+
+  // Mismatched MIME: PNG magic bytes claiming to be PDF
+  const mismatch = validateFileSignature(`data:application/pdf;base64,${validPngB64}`);
+  assert.equal(mismatch.ok, false);
+});
+
+test('validateExpenseInput rejects non-existent calendar dates like 2026-02-31 and zero amounts', () => {
+  const leapInvalid = validateExpenseInput({
+    claimedAmount: 100,
+    expenseDate: '2026-02-31',
+    category: 'Travel',
+    description: 'Travel to Dahej',
+    docData: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  });
+  assert.equal(leapInvalid.ok, false);
+  assert.ok(leapInvalid.errors.some(e => e.includes('valid calendar date')));
+
+  const zeroAmt = validateExpenseInput({
+    claimedAmount: 0,
+    expenseDate: '2026-09-01',
+    category: 'Travel',
+    description: 'Travel to Dahej',
+    docData: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  });
+  assert.equal(zeroAmt.ok, false);
+});
+
 
