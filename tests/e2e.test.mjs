@@ -66,6 +66,15 @@ ck('robots.txt served', r.status === 200);
 r = await req('/../package.json');
 ck('path traversal blocked', !r.text.includes('"dependencies"'), 'package.json was readable');
 
+r = await req('/css/..%2fpackage.json');
+ck('static path traversal via css blocked', (r.status === 403 || r.status === 404) && !r.text.includes('"dependencies"'), `status ${r.status}`);
+
+r = await req('/assets/..%2fapi/admin-auth.js');
+ck('static path traversal via assets blocked', (r.status === 403 || r.status === 404) && !r.text.includes('requireAdmin'), `status ${r.status}`);
+
+r = await req('/js/..%2f.env.example');
+ck('static path traversal via js blocked', (r.status === 403 || r.status === 404) && !r.text.includes('UPSTASH'), `status ${r.status}`);
+
 r = await req('/server.js');
 ck('server source is not served', !r.text.includes('createServer'), 'server.js was readable');
 

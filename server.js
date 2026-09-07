@@ -102,10 +102,16 @@ async function loadHandler(name) {
 
 // ── Static files ───────────────────────────────────────────────────
 
-async function serveStatic(res, relPath, { immutable = false } = {}) {
-  const full = path.join(ROOT, relPath);
-  // Defence in depth: never serve outside the project root.
-  if (!full.startsWith(ROOT + path.sep)) return false;
+async function serveStatic(res, relPath, { baseDir = ROOT, immutable = false } = {}) {
+  // Reject traversal markers outright
+  const parts = relPath.split(/[/\\]+/).filter(Boolean);
+  if (parts.some((p) => p === '..' || p === '.')) return false;
+
+  const targetDir = path.resolve(baseDir);
+  const full = path.resolve(targetDir, ...parts);
+
+  // Strictly enforce that the resolved path is within targetDir
+  if (full !== targetDir && !full.startsWith(targetDir + path.sep)) return false;
 
   let stat;
   try {
@@ -187,12 +193,19 @@ const server = http.createServer(async (req, res) => {
 
     // ── Static assets ──────────────────────────────────────────────
     const segments = pathname.split('/').filter(Boolean);
+    if (segments.some((s) => s === '..' || s === '.')) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
     if (segments.length && STATIC_DIRS.has(segments[0])) {
-      if (await serveStatic(res, segments.join('/'), { immutable: segments[0] === 'assets' })) return;
+      const dir = segments[0];
+      const rel = segments.slice(1).join('/');
+      if (!rel) return res.status(404).json({ error: 'Not found' });
+      if (await serveStatic(res, rel, { baseDir: path.join(ROOT, dir), immutable: dir === 'assets' })) return;
       return res.status(404).json({ error: 'Not found' });
     }
     if (segments.length === 1 && ROOT_FILES.has(segments[0])) {
-      if (await serveStatic(res, segments[0])) return;
+      if (await serveStatic(res, segments[0], { baseDir: ROOT })) return;
     }
 
     // ── SPA fallback ───────────────────────────────────────────────
