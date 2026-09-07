@@ -4629,7 +4629,7 @@ class App {
       const m = document.getElementById(id);
       if (m) {
         m.addEventListener('click', (e) => {
-          if (e.target === m) {
+          if (e.target === m || e.target.closest('.close-modal-btn') || e.target.id === ('close' + id.charAt(0).toUpperCase() + id.slice(1) + 'Btn')) {
             m.style.display = 'none';
             m.classList.remove('show');
           }
