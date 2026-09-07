@@ -2,6 +2,7 @@
 // Dashboard counters for the admin portal.
 
 import { listApplications, countEnquiries, STATUS } from './_lib/redis.js';
+import { getExpenseSummaryMetrics } from './_lib/expenses.js';
 import {
   applyCors,
   handlePreflight,
@@ -22,8 +23,11 @@ async function handler(req, res) {
   // session store as every other route.
   if (!(await requireAdmin(req, res))) return;
 
-  const applications = await listApplications();
-  const totalEnquiries = await countEnquiries();
+  const [applications, totalEnquiries, expenses] = await Promise.all([
+    listApplications(),
+    countEnquiries(),
+    getExpenseSummaryMetrics(),
+  ]);
 
   const stats = {
     total: applications.length,
@@ -37,9 +41,17 @@ async function handler(req, res) {
       status: a.status,
       submittedAt: a.submittedAt,
     })),
+    expenses,
   };
 
-  return res.status(200).json({ success: true, stats });
+  return res.status(200).json({
+    success: true,
+    stats,
+    applications: applications.length,
+    enquiries: totalEnquiries,
+    expenses,
+    checkedAt: new Date().toISOString(),
+  });
 }
 
 export default withErrorHandling('AdminStats', handler);
