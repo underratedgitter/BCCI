@@ -4625,6 +4625,17 @@ class App {
   }
 
   setupModalEvents() {
+    ['expenseReviewModal', 'addEmployeeModal', 'employeeHistoryModal', 'receiptViewModal'].forEach(id => {
+      const m = document.getElementById(id);
+      if (m) {
+        m.addEventListener('click', (e) => {
+          if (e.target === m) {
+            m.style.display = 'none';
+            m.classList.remove('show');
+          }
+        });
+      }
+    });
     const backdrop = document.getElementById('modalBackdrop');
     if (backdrop) backdrop.addEventListener('click', (e) => { if (e.target === backdrop) this.closeModal(); });
 
@@ -4632,6 +4643,13 @@ class App {
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         this.closeModal();
+        ['expenseReviewModal', 'addEmployeeModal', 'employeeHistoryModal', 'receiptViewModal'].forEach(id => {
+          const m = document.getElementById(id);
+          if (m) {
+            m.style.display = 'none';
+            m.classList.remove('show');
+          }
+        });
         document.querySelectorAll('.nav-profile-dropdown.open').forEach(d => d.classList.remove('open'));
         this.closeMobileDrawer();
       }
@@ -4700,7 +4718,7 @@ class App {
 
   setupExpenseFileUploadHandlers() {
     const dropzone = document.getElementById('expenseReceiptDropzone');
-    const input = document.getElementById('expenseReceiptFile');
+    const input = document.getElementById('expenseReceiptInput');
     const preview = document.getElementById('expenseReceiptPreview');
     const fileName = document.getElementById('expenseReceiptFileName');
     const fileSize = document.getElementById('expenseReceiptFileSize');
@@ -4779,10 +4797,10 @@ class App {
     if (!form) return;
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const amount = parseFloat(document.getElementById('expenseAmount').value);
-      const date = document.getElementById('expenseDate').value;
-      const category = document.getElementById('expenseCategory').value;
-      const desc = document.getElementById('expenseDescription').value;
+      const amount = parseFloat(document.getElementById('expenseClaimedAmountInput').value);
+      const date = document.getElementById('expenseDateInput').value;
+      const category = document.getElementById('expenseCategorySelect').value;
+      const desc = document.getElementById('expenseDescriptionInput').value;
       
       if (!this.currentExpenseFileBase64) {
         this.showToast('Please attach a receipt', 'warning');
@@ -4811,13 +4829,13 @@ class App {
 
   async renderAdminExpensesTab() {
     const status = document.getElementById('adminExpenseFilterStatus')?.value;
-    const emp = document.getElementById('adminExpenseFilterEmployee')?.value;
-    const cat = document.getElementById('adminExpenseFilterCategory')?.value;
+    const emp = document.getElementById('adminExpenseFilterEmp')?.value;
+    const cat = document.getElementById('adminExpenseFilterCat')?.value;
     
     // Wire change listeners once if not already wired
     if (!this._expenseFiltersWired) {
       this._expenseFiltersWired = true;
-      ['adminExpenseFilterStatus', 'adminExpenseFilterEmployee', 'adminExpenseFilterCategory'].forEach(id => {
+      ['adminExpenseFilterStatus', 'adminExpenseFilterEmp', 'adminExpenseFilterCat'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.addEventListener('change', () => this.renderAdminExpensesTab());
       });
@@ -4886,7 +4904,7 @@ class App {
     modal.style.display = 'flex';
     modal.classList.add('show');
     
-    const closeBtn = document.getElementById('closeExpenseReviewModalBtn');
+    const closeBtn = modal.querySelector('.close-modal-btn') || document.getElementById('close' + modal.id.charAt(0).toUpperCase() + modal.id.slice(1) + 'Btn');
     if (closeBtn) closeBtn.onclick = () => {
       modal.style.display = 'none';
       modal.classList.remove('show');
@@ -5022,15 +5040,6 @@ class App {
       };
     }
     
-    const closeBtn = document.getElementById('closeAddEmployeeModalBtn');
-    if (closeBtn) closeBtn.onclick = () => {
-      const m = document.getElementById('addEmployeeModal');
-      if (m) {
-        m.style.display = 'none';
-        m.classList.remove('show');
-      }
-    };
-    
     const cancelBtn = document.getElementById('btnCancelAddEmp');
     if (cancelBtn) cancelBtn.onclick = () => {
       const m = document.getElementById('addEmployeeModal');
@@ -5083,6 +5092,12 @@ class App {
     modal.style.display = 'flex';
     modal.classList.add('show');
     
+    const closeBtn = modal.querySelector('.close-modal-btn') || document.getElementById('close' + modal.id.charAt(0).toUpperCase() + modal.id.slice(1) + 'Btn');
+    if (closeBtn) closeBtn.onclick = () => {
+      modal.style.display = 'none';
+      modal.classList.remove('show');
+    };
+    
     const details = await this.store.getEmployeeDetails(employeeId);
     if (!details) {
       this.showToast('Failed to load employee details', 'error');
@@ -5093,11 +5108,13 @@ class App {
     if (nameDisplay) nameDisplay.textContent = details.employee.name;
     
     let claimsTotal = 0;
+    let claimsTotalAmount = 0;
     let approvedTotal = 0;
     
     let html = '';
     details.history.forEach(c => {
       claimsTotal++;
+      claimsTotalAmount += (c.claimedAmount || 0);
       if (c.status === 'approved' || c.status === 'partially_approve') {
         approvedTotal += (c.approvedAmount || 0);
       }
@@ -5119,18 +5136,21 @@ class App {
           <td>₹${(c.claimedAmount || 0).toLocaleString('en-IN')}</td>
           <td>₹${(c.approvedAmount || 0).toLocaleString('en-IN')}</td>
           <td>${getStatusBadge(c.status)}</td>
+          <td>${escapeHtml(c.adminRemark || '-')}</td>
         </tr>
       `;
     });
     
-    const totalClaimsEl = document.getElementById('empHistoryTotalClaims');
-    if (totalClaimsEl) totalClaimsEl.textContent = claimsTotal;
+    const totalClaimsEl = document.getElementById('empHistoryClaimedAmount');
+    if (totalClaimsEl) totalClaimsEl.textContent = '₹' + claimsTotalAmount.toLocaleString('en-IN');
+    const countClaimsEl = document.getElementById('empHistoryTotalClaims');
+    if (countClaimsEl) countClaimsEl.textContent = claimsTotal;
     
-    const totalApprovedEl = document.getElementById('empHistoryTotalApproved');
+    const totalApprovedEl = document.getElementById('empHistoryApprovedAmount');
     if (totalApprovedEl) totalApprovedEl.textContent = '₹' + approvedTotal.toLocaleString('en-IN');
     
     const tbody = document.getElementById('empHistoryTableBody');
-    if (tbody) tbody.innerHTML = html || '<tr><td colspan="6">No history found</td></tr>';
+    if (tbody) tbody.innerHTML = html || '<tr><td colspan="7">No history found</td></tr>';
   }
 
   async handleToggleEmployeeStatus(employeeId) {
@@ -5154,17 +5174,17 @@ class App {
     // Wire change listeners
     if (!this._reportFiltersWired) {
       this._reportFiltersWired = true;
-      ['reportFilterMonth', 'reportFilterYear', 'reportFilterEmployee', 'reportFilterCategory', 'reportFilterStatus'].forEach(id => {
+      ['reportMonthSelect', 'reportYearSelect', 'reportEmpSelect', 'reportCatSelect', 'reportStatusSelect'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.addEventListener('change', () => this.renderMonthlyExpenseReports());
       });
     }
     
-    const month = document.getElementById('reportFilterMonth')?.value;
-    const year = document.getElementById('reportFilterYear')?.value;
-    const employeeId = document.getElementById('reportFilterEmployee')?.value;
-    const category = document.getElementById('reportFilterCategory')?.value;
-    const status = document.getElementById('reportFilterStatus')?.value;
+    const month = document.getElementById('reportMonthSelect')?.value;
+    const year = document.getElementById('reportYearSelect')?.value;
+    const employeeId = document.getElementById('reportEmpSelect')?.value;
+    const category = document.getElementById('reportCatSelect')?.value;
+    const status = document.getElementById('reportStatusSelect')?.value;
     
     const expenses = await this.store.getAdminExpenses({ month, year, employeeId, category, status });
     
@@ -5215,7 +5235,7 @@ class App {
     modal.style.display = 'flex';
     modal.classList.add('show');
     
-    const closeBtn = document.getElementById('closeReceiptViewModalBtn');
+    const closeBtn = modal.querySelector('.close-modal-btn') || document.getElementById('close' + modal.id.charAt(0).toUpperCase() + modal.id.slice(1) + 'Btn');
     if (closeBtn) closeBtn.onclick = () => {
       modal.style.display = 'none';
       modal.classList.remove('show');
