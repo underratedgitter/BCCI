@@ -118,6 +118,8 @@ class App {
     this.setupFileUploadHandlers();
     this.setupFormValidation();
     this.setupFormHandlers();
+    this.setupExpenseFileUploadHandlers();
+    this.setupExpenseFormHandlers();
     this.setupAdminEventForm();
     this.setupPublicEventsHandlers();
     this.setupModalEvents();
@@ -2941,13 +2943,11 @@ class App {
     const session = this.store.getEmployeeSession();
     if (!session) return;
     
-    // Update headers
     const nameDisplay = document.getElementById('employeeNameDisplay');
     const idBadge = document.getElementById('employeeIdBadge');
     if (nameDisplay) nameDisplay.textContent = session.name || session.id;
     if (idBadge) idBadge.textContent = session.id;
     
-    // Sign out button
     const btnSignOut = document.getElementById('btnEmployeeSignOut');
     if (btnSignOut) {
       btnSignOut.onclick = () => {
@@ -2957,10 +2957,8 @@ class App {
       };
     }
     
-    // Fetch claims
     const claims = await this.store.getEmployeeExpenses();
     
-    // Calculate KPIs
     let claimed = 0, approved = 0, pending = 0, rejected = 0;
     claims.forEach(c => {
       claimed += (c.claimedAmount || 0);
@@ -2981,7 +2979,6 @@ class App {
     setMetric('metricEmpPending', pending);
     setMetric('metricEmpRejected', rejected);
     
-    // Render Table and Mobile Cards
     const tbody = document.getElementById('employeeExpensesBody');
     const cards = document.getElementById('employeeExpensesCards');
     
@@ -3037,6 +3034,13 @@ class App {
       
       if (tbody) tbody.innerHTML = htmlRows;
       if (cards) cards.innerHTML = htmlCards;
+      
+      // Wire view receipt buttons
+      document.querySelectorAll('[data-view-receipt-id]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          this.openReceiptViewer(btn.getAttribute('data-view-receipt-id'));
+        });
+      });
     }
   }
   /** Placeholder rows shown while data is in flight. */
@@ -3103,9 +3107,9 @@ class App {
         Failed to load dashboard data.
         <br><br><button class="btn-primary" id="adminRetryBtn" style="font-size:0.85rem;"><i class="fas fa-redo"></i> Retry</button>
       </div>`;
-      ['pendingAppsBody', 'approvedAppsBody', 'rejectedAppsBody', 'enquiriesBody'].forEach((id) => {
+      [['pendingAppsBody', 7], ['approvedAppsBody', 7], ['rejectedAppsBody', 7], ['enquiriesBody', 5]].forEach(([id, cols]) => {
         const el = document.getElementById(id);
-        if (el) el.innerHTML = `<tr><td colspan="7">${failure}</td></tr>`;
+        if (el) el.innerHTML = `<tr><td colspan="${cols}">${failure}</td></tr>`;
       });
       ['pendingAppsCards', 'approvedAppsCards', 'rejectedAppsCards', 'enquiriesCards'].forEach((id) => {
         const el = document.getElementById(id);
@@ -4738,20 +4742,22 @@ class App {
         this.currentExpenseFileBase64 = e.target.result;
         this.currentExpenseFileType = file.type;
         
-        fileName.textContent = file.name;
-        fileSize.textContent = (file.size / 1024).toFixed(1) + ' KB';
+        if(fileName) fileName.textContent = file.name;
+        if(fileSize) fileSize.textContent = (file.size / 1024).toFixed(1) + ' KB';
         
         if (file.type === 'application/pdf') {
-          preview.querySelector('img').style.display = 'none';
-          preview.querySelector('.pdf-icon').style.display = 'block';
+          if (preview.querySelector('img')) preview.querySelector('img').style.display = 'none';
+          if (preview.querySelector('.pdf-icon')) preview.querySelector('.pdf-icon').style.display = 'block';
         } else {
-          preview.querySelector('img').src = e.target.result;
-          preview.querySelector('img').style.display = 'block';
+          if (preview.querySelector('img')) {
+            preview.querySelector('img').src = e.target.result;
+            preview.querySelector('img').style.display = 'block';
+          }
           if (preview.querySelector('.pdf-icon')) preview.querySelector('.pdf-icon').style.display = 'none';
         }
         
-        placeholder.style.display = 'none';
-        preview.style.display = 'flex';
+        if(placeholder) placeholder.style.display = 'none';
+        if(preview) preview.style.display = 'flex';
       };
       reader.readAsDataURL(file);
     };
@@ -4762,8 +4768,8 @@ class App {
         this.currentExpenseFileBase64 = null;
         this.currentExpenseFileType = null;
         input.value = '';
-        placeholder.style.display = 'flex';
-        preview.style.display = 'none';
+        if(placeholder) placeholder.style.display = 'flex';
+        if(preview) preview.style.display = 'none';
       });
     }
   }
@@ -4808,6 +4814,15 @@ class App {
     const emp = document.getElementById('adminExpenseFilterEmployee')?.value;
     const cat = document.getElementById('adminExpenseFilterCategory')?.value;
     
+    // Wire change listeners once if not already wired
+    if (!this._expenseFiltersWired) {
+      this._expenseFiltersWired = true;
+      ['adminExpenseFilterStatus', 'adminExpenseFilterEmployee', 'adminExpenseFilterCategory'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('change', () => this.renderAdminExpensesTab());
+      });
+    }
+
     const filters = { status, employeeId: emp, category: cat };
     const expenses = await this.store.getAdminExpenses(filters);
     
@@ -4855,6 +4870,12 @@ class App {
       });
       if (tbody) tbody.innerHTML = html;
       if (cards) cards.innerHTML = htmlCards;
+      
+      document.querySelectorAll('[data-review-expense-id]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          this.openExpenseReviewModal(btn.getAttribute('data-review-expense-id'));
+        });
+      });
     }
   }
 
@@ -4865,55 +4886,91 @@ class App {
     modal.style.display = 'flex';
     modal.classList.add('show');
     
-    // In a real app we would fetch the specific expense details
-    // Here we assume it's available or we just fetch the doc
-    const doc = await this.store.getExpenseDocument(id);
+    const closeBtn = document.getElementById('closeExpenseReviewModalBtn');
+    if (closeBtn) closeBtn.onclick = () => {
+      modal.style.display = 'none';
+      modal.classList.remove('show');
+    };
     
-    const container = document.getElementById('expenseReviewDocContainer');
+    const expenses = await this.store.getAdminExpenses({});
+    const expense = expenses.find(e => e.id === id);
+    if (expense) {
+      const dossier = document.getElementById('reviewClaimDossier');
+      if (dossier) {
+        dossier.innerHTML = `
+          <p><strong>Claim ID:</strong> ${escapeHtml(expense.id)}</p>
+          <p><strong>Employee:</strong> ${escapeHtml(expense.employeeName)} (${escapeHtml(expense.employeeId)})</p>
+          <p><strong>Date:</strong> ${escapeHtml(formatDate(expense.date))}</p>
+          <p><strong>Category:</strong> ${escapeHtml(expense.category)}</p>
+          <p><strong>Description:</strong> ${escapeHtml(expense.description)}</p>
+          <p><strong>Claimed Amount:</strong> ₹${(expense.claimedAmount || 0).toLocaleString('en-IN')}</p>
+        `;
+      }
+      this._currentReviewExpenseClaimed = expense.claimedAmount || 0;
+    }
+    
+    const approvedInput = document.getElementById('reviewApprovedAmountInput');
+    if (approvedInput) approvedInput.value = ''; // Enforce CRITICAL AMOUNT RULE
+    const remarkInput = document.getElementById('reviewAdminRemarkInput');
+    if (remarkInput) remarkInput.value = '';
+    
+    const doc = await this.store.getExpenseDocument(id);
+    const container = document.getElementById('expenseDocPreviewContainer'); // Corrected ID
     if (container && doc && doc.docData) {
       if (doc.docType === 'application/pdf') {
         container.innerHTML = `
-          <object data="${doc.docData}" type="application/pdf" width="100%" height="400px">
-            <p>PDF cannot be displayed. <a href="${doc.docData}" target="_blank">Open here</a></p>
-          </object>
-          <a href="${doc.docData}" target="_blank">Open in New Tab</a>
+          <iframe src="${doc.docData}" style="width:100%; height:500px; border:none;"></iframe>
+          <br><a href="${doc.docData}" target="_blank">Open in New Tab</a>
         `;
       } else {
         container.innerHTML = `
           <img src="${doc.docData}" style="max-width:100%;" />
-          <br/><a href="${doc.docData}" target="_blank">Open in New Tab</a>
+          <br><a href="${doc.docData}" target="_blank">Open in New Tab</a>
         `;
       }
     }
     
-    // Attach buttons
     const btnApprove = document.getElementById('btnReviewApprove');
     const btnPartial = document.getElementById('btnReviewPartial');
     const btnReject = document.getElementById('btnReviewReject');
     
-    const submitReview = async (decision) => {
-      const approvedAmount = parseFloat(document.getElementById('reviewApprovedAmountInput').value) || 0;
-      const remark = document.getElementById('reviewAdminRemarkInput').value || '';
-      
-      if (decision === 'reject' && !remark) {
+    if (btnApprove) btnApprove.onclick = () => this.handleReviewExpense(id, 'approve');
+    if (btnPartial) btnPartial.onclick = () => this.handleReviewExpense(id, 'partially_approve');
+    if (btnReject) btnReject.onclick = () => this.handleReviewExpense(id, 'reject');
+  }
+
+  async handleReviewExpense(id, decision) {
+    const approvedStr = document.getElementById('reviewApprovedAmountInput')?.value;
+    const remark = document.getElementById('reviewAdminRemarkInput')?.value || '';
+    const claimed = this._currentReviewExpenseClaimed || 0;
+    
+    let approvedAmount = parseFloat(approvedStr);
+    
+    if (decision === 'reject') {
+      approvedAmount = 0;
+      if (!remark.trim()) {
         this.showToast('Remark required for rejection', 'warning');
         return;
       }
-      
-      const res = await this.store.reviewExpense(id, { decision, approvedAmount, remark });
-      if (res.success) {
-        this.showToast('Expense reviewed', 'success');
+    } else {
+      if (isNaN(approvedAmount) || approvedAmount < 0 || approvedAmount > claimed) {
+        this.showToast('Please enter a valid approved amount between 0 and ' + claimed, 'warning');
+        return;
+      }
+    }
+    
+    const res = await this.store.reviewExpense(id, { decision, approvedAmount, remark });
+    if (res.success) {
+      this.showToast('Expense reviewed', 'success');
+      const modal = document.getElementById('expenseReviewModal');
+      if (modal) {
         modal.style.display = 'none';
         modal.classList.remove('show');
-        this.renderAdminExpensesTab();
-      } else {
-        this.showToast(res.error || 'Failed', 'error');
       }
-    };
-    
-    if (btnApprove) btnApprove.onclick = () => submitReview('approve');
-    if (btnPartial) btnPartial.onclick = () => submitReview('partially_approve');
-    if (btnReject) btnReject.onclick = () => submitReview('reject');
+      this.renderAdminExpensesTab();
+    } else {
+      this.showToast(res.error || 'Failed', 'error');
+    }
   }
 
   async renderAdminEmployeesTab() {
@@ -4943,6 +5000,17 @@ class App {
     if (tbody) tbody.innerHTML = html || '<tr><td colspan="6">No employees</td></tr>';
     if (cards) cards.innerHTML = htmlCards;
     
+    document.querySelectorAll('[data-emp-history-id]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.openEmployeeHistoryModal(btn.getAttribute('data-emp-history-id'));
+      });
+    });
+    document.querySelectorAll('[data-emp-toggle-status-id]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.handleToggleEmployeeStatus(btn.getAttribute('data-emp-toggle-status-id'));
+      });
+    });
+    
     const btnAdd = document.getElementById('btnAddEmployee');
     if (btnAdd) {
       btnAdd.onclick = () => {
@@ -4954,32 +5022,151 @@ class App {
       };
     }
     
+    const closeBtn = document.getElementById('closeAddEmployeeModalBtn');
+    if (closeBtn) closeBtn.onclick = () => {
+      const m = document.getElementById('addEmployeeModal');
+      if (m) {
+        m.style.display = 'none';
+        m.classList.remove('show');
+      }
+    };
+    
+    const cancelBtn = document.getElementById('btnCancelAddEmp');
+    if (cancelBtn) cancelBtn.onclick = () => {
+      const m = document.getElementById('addEmployeeModal');
+      if (m) {
+        m.style.display = 'none';
+        m.classList.remove('show');
+      }
+    };
+    
     const addForm = document.getElementById('addEmployeeForm');
     if (addForm) {
       addForm.onsubmit = async (ev) => {
         ev.preventDefault();
-        const empData = {
-          employeeId: document.getElementById('addEmpId').value,
-          name: document.getElementById('addEmpName').value,
-          email: document.getElementById('addEmpEmail').value,
-          department: document.getElementById('addEmpDept').value,
-        };
-        const res = await this.store.createEmployee(empData);
-        if (res.success) {
-          this.showToast('Employee created', 'success');
-          document.getElementById('addEmployeeModal').style.display = 'none';
-          this.renderAdminEmployeesTab();
-        } else {
-          this.showToast(res.error || 'Error', 'error');
-        }
+        this.handleAddEmployee();
       };
     }
   }
 
+  async handleAddEmployee() {
+    const employeeId = document.getElementById('addEmpIdInput')?.value;
+    const name = document.getElementById('addEmpNameInput')?.value;
+    const username = document.getElementById('addEmpUsernameInput')?.value;
+    const password = document.getElementById('addEmpPasswordInput')?.value;
+    const email = document.getElementById('addEmpEmailInput')?.value;
+    const status = document.getElementById('addEmpStatusSelect')?.value || 'active';
+    
+    if (!employeeId || !name || !username || !password || !email) {
+      this.showToast('All fields are required', 'warning');
+      return;
+    }
+    
+    const empData = { employeeId, name, username, password, email, status, department: 'General' };
+    const res = await this.store.createEmployee(empData);
+    if (res.success) {
+      this.showToast('Employee created', 'success');
+      const m = document.getElementById('addEmployeeModal');
+      if (m) {
+        m.style.display = 'none';
+        m.classList.remove('show');
+      }
+      this.renderAdminEmployeesTab();
+    } else {
+      this.showToast(res.error || 'Error', 'error');
+    }
+  }
+  
+  async openEmployeeHistoryModal(employeeId) {
+    const modal = document.getElementById('employeeHistoryModal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    modal.classList.add('show');
+    
+    const details = await this.store.getEmployeeDetails(employeeId);
+    if (!details) {
+      this.showToast('Failed to load employee details', 'error');
+      return;
+    }
+    
+    const nameDisplay = document.getElementById('empHistoryNameDisplay');
+    if (nameDisplay) nameDisplay.textContent = details.employee.name;
+    
+    let claimsTotal = 0;
+    let approvedTotal = 0;
+    
+    let html = '';
+    details.history.forEach(c => {
+      claimsTotal++;
+      if (c.status === 'approved' || c.status === 'partially_approve') {
+        approvedTotal += (c.approvedAmount || 0);
+      }
+      
+      const getStatusBadge = (s) => {
+        switch(s) {
+          case 'approved': return '<span class="status-badge status-approved"><i class="fas fa-check"></i> Approved</span>';
+          case 'partially_approve': return '<span class="status-badge status-approved" style="background:#fef08a;color:#854d0e;"><i class="fas fa-check-double"></i> Partial</span>';
+          case 'rejected': return '<span class="status-badge status-rejected"><i class="fas fa-times"></i> Rejected</span>';
+          default: return '<span class="status-badge status-pending"><i class="fas fa-clock"></i> Pending</span>';
+        }
+      };
+      
+      html += `
+        <tr>
+          <td>${escapeHtml(c.id)}</td>
+          <td>${escapeHtml(formatDate(c.date))}</td>
+          <td>${escapeHtml(c.category)}</td>
+          <td>₹${(c.claimedAmount || 0).toLocaleString('en-IN')}</td>
+          <td>₹${(c.approvedAmount || 0).toLocaleString('en-IN')}</td>
+          <td>${getStatusBadge(c.status)}</td>
+        </tr>
+      `;
+    });
+    
+    const totalClaimsEl = document.getElementById('empHistoryTotalClaims');
+    if (totalClaimsEl) totalClaimsEl.textContent = claimsTotal;
+    
+    const totalApprovedEl = document.getElementById('empHistoryTotalApproved');
+    if (totalApprovedEl) totalApprovedEl.textContent = '₹' + approvedTotal.toLocaleString('en-IN');
+    
+    const tbody = document.getElementById('empHistoryTableBody');
+    if (tbody) tbody.innerHTML = html || '<tr><td colspan="6">No history found</td></tr>';
+  }
+
+  async handleToggleEmployeeStatus(employeeId) {
+    if (confirm('Are you sure you want to deactivate/activate this employee? Historical expense records and audit logs will be retained.')) {
+      const employees = await this.store.getAdminEmployees();
+      const emp = employees.find(e => e.employeeId === employeeId);
+      if (emp) {
+        const newStatus = emp.status === 'active' ? 'inactive' : 'active';
+        const res = await this.store.updateEmployeeStatus(employeeId, newStatus);
+        if (res.success) {
+          this.showToast('Employee status updated', 'success');
+          this.renderAdminEmployeesTab();
+        } else {
+          this.showToast(res.error || 'Failed to update status', 'error');
+        }
+      }
+    }
+  }
+
   async renderMonthlyExpenseReports() {
+    // Wire change listeners
+    if (!this._reportFiltersWired) {
+      this._reportFiltersWired = true;
+      ['reportFilterMonth', 'reportFilterYear', 'reportFilterEmployee', 'reportFilterCategory', 'reportFilterStatus'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('change', () => this.renderMonthlyExpenseReports());
+      });
+    }
+    
     const month = document.getElementById('reportFilterMonth')?.value;
     const year = document.getElementById('reportFilterYear')?.value;
-    const expenses = await this.store.getAdminExpenses({ month, year });
+    const employeeId = document.getElementById('reportFilterEmployee')?.value;
+    const category = document.getElementById('reportFilterCategory')?.value;
+    const status = document.getElementById('reportFilterStatus')?.value;
+    
+    const expenses = await this.store.getAdminExpenses({ month, year, employeeId, category, status });
     
     let claimed = 0, approved = 0, rejected = 0, pending = 0;
     expenses.forEach(e => {
@@ -4991,21 +5178,34 @@ class App {
     
     const s = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
     s('reportTotalClaims', expenses.length);
-    s('reportClaimedAmount', '₹' + claimed);
-    s('reportApprovedAmount', '₹' + approved);
-    s('reportRejectedAmount', '₹' + rejected);
-    s('reportPendingAmount', '₹' + pending);
+    s('reportClaimedAmount', '₹' + claimed.toLocaleString('en-IN'));
+    s('reportApprovedAmount', '₹' + approved.toLocaleString('en-IN'));
+    s('reportRejectedAmount', '₹' + rejected.toLocaleString('en-IN'));
+    s('reportPendingAmount', '₹' + pending.toLocaleString('en-IN'));
+    
+    const getStatusBadge = (st) => {
+      switch(st) {
+        case 'approved': return '<span class="status-badge status-approved"><i class="fas fa-check"></i> Approved</span>';
+        case 'partially_approve': return '<span class="status-badge status-approved" style="background:#fef08a;color:#854d0e;"><i class="fas fa-check-double"></i> Partial</span>';
+        case 'rejected': return '<span class="status-badge status-rejected"><i class="fas fa-times"></i> Rejected</span>';
+        default: return '<span class="status-badge status-pending"><i class="fas fa-clock"></i> Pending</span>';
+      }
+    };
     
     const tbody = document.getElementById('reportsTableBody');
     if (tbody) {
       tbody.innerHTML = expenses.map(e => `
         <tr>
           <td>${escapeHtml(e.id)}</td>
-          <td>${escapeHtml(e.date)}</td>
-          <td>₹${(e.claimedAmount || 0)}</td>
-          <td>₹${(e.approvedAmount || 0)}</td>
+          <td>${escapeHtml(e.employeeName)}</td>
+          <td>${escapeHtml(formatDate(e.date))}</td>
+          <td>${escapeHtml(e.category)}</td>
+          <td>₹${(e.claimedAmount || 0).toLocaleString('en-IN')}</td>
+          <td>₹${(e.approvedAmount || 0).toLocaleString('en-IN')}</td>
+          <td>${getStatusBadge(e.status)}</td>
+          <td>${escapeHtml(e.adminRemark || '-')}</td>
         </tr>
-      `).join('');
+      `).join('') || '<tr><td colspan="8">No records found</td></tr>';
     }
   }
 
@@ -5015,11 +5215,28 @@ class App {
     modal.style.display = 'flex';
     modal.classList.add('show');
     
+    const closeBtn = document.getElementById('closeReceiptViewModalBtn');
+    if (closeBtn) closeBtn.onclick = () => {
+      modal.style.display = 'none';
+      modal.classList.remove('show');
+    };
+    
     const doc = await this.store.getExpenseDocument(expenseId);
-    // render viewer logic...
+    const content = document.getElementById('receiptModalContent');
+    const newTabLink = document.getElementById('receiptModalOpenNewTab');
+    
+    if (doc && doc.docData) {
+      if (newTabLink) newTabLink.href = doc.docData;
+      
+      if (content) {
+        if (doc.docType === 'application/pdf') {
+          content.innerHTML = `<iframe src="${doc.docData}" style="width:100%; height:500px; border:none;"></iframe>`;
+        } else {
+          content.innerHTML = `<img src="${doc.docData}" style="max-width:100%;" />`;
+        }
+      }
+    }
   }
-
-
 }
 
 // Bootstrap
