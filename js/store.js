@@ -9,6 +9,7 @@ const API_BASE = ''; // same origin
 const STORAGE_KEYS = {
   ADMIN_SESSION: 'bcci_admin_session',
   APPLICANT_SESSION: 'bcci_applicant_session',
+  EMPLOYEE_SESSION: 'bcci_employee_session',
 };
 
 const REQUEST_TIMEOUT_MS = 20000;
@@ -18,7 +19,7 @@ export class Store {
 
   /**
    * @param {string} endpoint
-   * @param {{method?: string, body?: any, auth?: 'admin'|'applicant'|null, retries?: number}} options
+   * @param {{method?: string, body?: any, auth?: 'admin'|'applicant'|'employee'|null, retries?: number}} options
    */
   async apiCall(endpoint, options = {}) {
     const { method = 'GET', body, auth = null, retries = method === 'GET' ? 2 : 0 } = options;
@@ -29,6 +30,9 @@ export class Store {
       if (session?.token) headers['Authorization'] = `Bearer ${session.token}`;
     } else if (auth === 'applicant') {
       const session = this.getApplicantSession();
+      if (session?.token) headers['Authorization'] = `Bearer ${session.token}`;
+    } else if (auth === 'employee') {
+      const session = this.getEmployeeSession();
       if (session?.token) headers['Authorization'] = `Bearer ${session.token}`;
     }
 
@@ -58,6 +62,7 @@ export class Store {
           if (res.status === 401) {
             if (auth === 'admin') this.forgetAdminSession();
             if (auth === 'applicant') this.forgetApplicantSession();
+            if (auth === 'employee') this.forgetEmployeeSession();
           }
           const error = new Error(data.error || `Request failed (${res.status}).`);
           error.status = res.status;
@@ -416,6 +421,197 @@ export class Store {
 
   forgetApplicantSession() {
     try { localStorage.removeItem(STORAGE_KEYS.APPLICANT_SESSION); } catch {}
+  }
+
+  /* ════════════════════════════════════════════════════════════════════
+     EMPLOYEE SESSION & AUTHENTICATION
+     ════════════════════════════════════════════════════════════════════ */
+
+  getEmployeeSession() {
+    return this._readSession(STORAGE_KEYS.EMPLOYEE_SESSION);
+  }
+
+  setEmployeeSession(sessionData) {
+    this._writeSession(STORAGE_KEYS.EMPLOYEE_SESSION, sessionData);
+  }
+
+  forgetEmployeeSession() {
+    try { localStorage.removeItem(STORAGE_KEYS.EMPLOYEE_SESSION); } catch {}
+  }
+
+  isEmployeeAuthed() {
+    return this.getEmployeeSession() !== null;
+  }
+
+  async employeeLogin(username, password) {
+    try {
+      const result = await this.apiCall('/api/employee-auth', {
+        method: 'POST',
+        body: { action: 'login', username, password },
+      });
+
+      if (result?.success && result.session) {
+        this.setEmployeeSession(result.session);
+        return { success: true, session: result.session };
+      }
+      return {
+        success: false,
+        error: result?.error || 'Sign-in failed.',
+      };
+    } catch (err) {
+      return {
+        success: false,
+        error: err.data?.error || err.message || 'Sign-in failed.',
+      };
+    }
+  }
+
+  async employeeLogout() {
+    try {
+      await this.apiCall('/api/employee-auth', { method: 'DELETE', auth: 'employee' });
+    } catch (err) {
+      console.warn('[Store] Could not invalidate employee session server-side:', err.message);
+    } finally {
+      this.forgetEmployeeSession();
+    }
+    return { success: true };
+  }
+
+  async getEmployeeProfile() {
+    const result = await this.apiCall('/api/employee-auth', { auth: 'employee' });
+    const profile = result.session || result;
+    if (profile && typeof profile === 'object') {
+      profile.session = profile;
+      profile.success = result.success ?? true;
+    }
+    return profile;
+  }
+
+  /* ════════════════════════════════════════════════════════════════════
+     EXPENSES
+     ════════════════════════════════════════════════════════════════════ */
+
+  async submitExpense(expenseData) {
+    const result = await this.apiCall('/api/expenses', {
+      method: 'POST',
+      body: expenseData,
+      auth: 'employee',
+    });
+    const exp = result.expense || result;
+    if (exp && typeof exp === 'object') {
+      exp.expense = exp;
+      exp.success = result.success ?? true;
+      exp.message = result.message;
+    }
+    return exp;
+  }
+
+  async getEmployeeExpenses() {
+    const result = await this.apiCall('/api/expenses', { auth: 'employee' });
+    const list = result.expenses || [];
+    list.expenses = list;
+    list.total = result.total ?? list.length;
+    list.success = result.success ?? true;
+    return list;
+  }
+
+  async getExpenseDocument(id) {
+    const auth = this.isAdminAuthed() ? 'admin' : 'employee';
+    const result = await this.apiCall(`/api/expenses?id=${encodeURIComponent(id)}&document=1`, { auth });
+    const doc = result.document || result;
+    if (doc && typeof doc === 'object') {
+      doc.document = doc;
+      doc.success = result.success ?? true;
+    }
+    return doc;
+  }
+
+  async getAdminExpenses(filters = {}) {
+    const params = new URLSearchParams();
+    for (const [key, val] of Object.entries(filters)) {
+      if (val !== undefined && val !== null && val !== '') {
+        params.append(key, val);
+      }
+    }
+    const qs = params.toString();
+    const endpoint = qs ? `/api/expenses?${qs}` : '/api/expenses';
+    const result = await this.apiCall(endpoint, { auth: 'admin' });
+    const list = result.expenses || [];
+    list.expenses = list;
+    list.aggregates = result.aggregates;
+    list.total = result.total ?? list.length;
+    list.success = result.success ?? true;
+    return list;
+  }
+
+  async reviewExpense(id, reviewData) {
+    const result = await this.apiCall('/api/expenses', {
+      method: 'PATCH',
+      body: { id, ...reviewData },
+      auth: 'admin',
+    });
+    const exp = result.expense || result;
+    if (exp && typeof exp === 'object') {
+      exp.expense = exp;
+      exp.success = result.success ?? true;
+      exp.message = result.message;
+    }
+    return exp;
+  }
+
+  /* ════════════════════════════════════════════════════════════════════
+     EMPLOYEE ADMIN
+     ════════════════════════════════════════════════════════════════════ */
+
+  async getAdminEmployees() {
+    const result = await this.apiCall('/api/employees', { auth: 'admin' });
+    const list = result.employees || [];
+    list.employees = list;
+    list.total = result.total ?? list.length;
+    list.success = result.success ?? true;
+    return list;
+  }
+
+  async getEmployeeDetails(employeeId) {
+    const result = await this.apiCall(`/api/employees?id=${encodeURIComponent(employeeId)}`, {
+      auth: 'admin',
+    });
+    const emp = result.employee || result;
+    if (emp && typeof emp === 'object') {
+      emp.employee = emp;
+      emp.success = result.success ?? true;
+    }
+    return emp;
+  }
+
+  async createEmployee(employeeData) {
+    const result = await this.apiCall('/api/employees', {
+      method: 'POST',
+      body: employeeData,
+      auth: 'admin',
+    });
+    const emp = result.employee || result;
+    if (emp && typeof emp === 'object') {
+      emp.employee = emp;
+      emp.success = result.success ?? true;
+      emp.message = result.message;
+    }
+    return emp;
+  }
+
+  async updateEmployeeStatus(employeeId, status) {
+    const result = await this.apiCall('/api/employees', {
+      method: 'PATCH',
+      body: { employeeId, status },
+      auth: 'admin',
+    });
+    const emp = result.employee || result;
+    if (emp && typeof emp === 'object') {
+      emp.employee = emp;
+      emp.success = result.success ?? true;
+      emp.message = result.message;
+    }
+    return emp;
   }
 
   /* ── Session storage plumbing ─────────────────────────────────────── */
