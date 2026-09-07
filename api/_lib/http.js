@@ -76,6 +76,25 @@ export async function requireAdmin(req, res) {
   return email;
 }
 
+/** Returns the employee session object, or null. */
+export async function getEmployeeSession(req) {
+  const token = bearerToken(req);
+  if (!token) return null;
+  const raw = await withRetry(() => redis.get(`bcci:employee_session:${token}`));
+  if (!raw) return null;
+  return typeof raw === 'string' ? JSON.parse(raw) : raw;
+}
+
+/** Writes a 401 and returns null when there is no valid employee session. */
+export async function requireEmployee(req, res) {
+  const session = await getEmployeeSession(req);
+  if (!session || !session.employeeId) {
+    res.status(401).json({ success: false, error: 'Employee authentication required.' });
+    return null;
+  }
+  return session;
+}
+
 // ── Rate limiting ──────────────────────────────────────────────────
 
 export function clientIp(req) {
