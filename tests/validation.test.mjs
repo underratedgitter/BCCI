@@ -185,4 +185,27 @@ test('validateReviewInput enforces Critical Amount Rule (approved <= claimed, no
     decision: 'maybe',
   }, 1000);
   assert.equal(badDecision.ok, false);
+
+  // Partially approve with 0 amount must fail
+  const partialZero = validateReviewInput({
+    decision: 'partially_approve',
+    approvedAmount: 0,
+    remark: 'Approved nothing',
+  }, 1000);
+  assert.equal(partialZero.ok, false);
 });
+
+test('validation functions handle null input gracefully without throwing', () => {
+  const emp = validateEmployeeInput(null);
+  assert.equal(emp.ok, false);
+  assert.ok(emp.errors.length > 0);
+
+  const exp = validateExpenseInput(null);
+  assert.equal(exp.ok, false);
+  assert.ok(exp.errors.length > 0);
+
+  const rev = validateReviewInput(null);
+  assert.equal(rev.ok, false);
+  assert.ok(rev.errors.length > 0);
+});
+

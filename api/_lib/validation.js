@@ -21,6 +21,7 @@ export const EXPENSE_STATUSES = {
 const MAX_DOC_SIZE_BYTES = 1.5 * 1024 * 1024; // 1.5MB base64
 
 export function validateEmployeeInput(data = {}) {
+  data = data || {};
   const errors = [];
   const name = String(data.name || '').trim().slice(0, 120);
   const employeeId = String(data.employeeId || '').trim().toUpperCase().slice(0, 30);
@@ -53,6 +54,7 @@ export function validateEmployeeInput(data = {}) {
 }
 
 export function validateExpenseInput(data = {}) {
+  data = data || {};
   const errors = [];
   const claimedAmountNum = Number(data.claimedAmount);
   if (isNaN(claimedAmountNum) || claimedAmountNum <= 0 || claimedAmountNum > 10000000) {
@@ -116,6 +118,7 @@ export function validateExpenseInput(data = {}) {
 }
 
 export function validateReviewInput(data = {}, claimedAmount = 0) {
+  data = data || {};
   const errors = [];
   const decision = String(data.decision || '').toLowerCase().trim();
   const rawApproved = data.approvedAmount;
@@ -139,7 +142,7 @@ export function validateReviewInput(data = {}, claimedAmount = 0) {
       errors.push(`Approved amount (₹${approvedNum}) cannot exceed the claimed amount (₹${claimedAmount}).`);
     } else {
       approvedAmount = Math.round(approvedNum * 100) / 100;
-      if (decision === 'approve' && approvedAmount <= 0) {
+      if (['approve', 'partially_approve'].includes(decision) && approvedAmount <= 0) {
         errors.push('Approved amount must be greater than ₹0 for approval.');
       }
     }
