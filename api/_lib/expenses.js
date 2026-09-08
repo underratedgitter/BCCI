@@ -3,7 +3,7 @@
 
 import crypto from 'node:crypto';
 import { redis, withRetry } from './redis.js';
-import { hashPassword } from './accounts.js';
+import { hashPassword, hashPasswordAsync } from './accounts.js';
 import { EXPENSE_STATUSES } from './validation.js';
 
 export const EXP_KEYS = {
@@ -27,7 +27,7 @@ export async function saveEmployee(data) {
 
   const id = data.id || `EMP-${crypto.randomUUID()}`;
   const { hash, salt } = data.password
-    ? hashPassword(data.password)
+    ? await hashPasswordAsync(data.password)
     : { hash: data.passwordHash, salt: data.salt };
 
   const record = {
@@ -44,11 +44,30 @@ export async function saveEmployee(data) {
   };
 
   await withRetry(async () => {
-    await redis.set(EXP_KEYS.emp(id), record);
-    await redis.set(EXP_KEYS.empUsername(username), id);
-    await redis.set(EXP_KEYS.empCode(employeeId), id);
-    const score = Date.parse(record.createdAt) || Date.now();
-    await redis.zadd(EXP_KEYS.empIndex, { score, member: id });
+    const claimedCode = await redis.set(EXP_KEYS.empCode(employeeId), id, { nx: true });
+    if (!claimedCode) {
+      const err = new Error(`Employee ID "${employeeId}" is already assigned.`);
+      err.statusCode = 409;
+      throw err;
+    }
+
+    const claimedUsername = await redis.set(EXP_KEYS.empUsername(username), id, { nx: true });
+    if (!claimedUsername) {
+      await redis.del(EXP_KEYS.empCode(employeeId)).catch(() => {});
+      const err = new Error(`Username "${username}" is already taken.`);
+      err.statusCode = 409;
+      throw err;
+    }
+
+    try {
+      await redis.set(EXP_KEYS.emp(id), record);
+      const score = Date.parse(record.createdAt) || Date.now();
+      await redis.zadd(EXP_KEYS.empIndex, { score, member: id });
+    } catch (err) {
+      await redis.del(EXP_KEYS.empCode(employeeId)).catch(() => {});
+      await redis.del(EXP_KEYS.empUsername(username)).catch(() => {});
+      throw err;
+    }
   });
 
   return record;
@@ -169,11 +188,17 @@ export async function getExpenseDoc(id) {
 export async function listExpenses({ employeeId, month, year, status, category, limit = 500, offset = 0 } = {}) {
   return withRetry(async () => {
     const key = employeeId ? EXP_KEYS.expenseEmp(employeeId) : EXP_KEYS.expenseIndex;
-    const ids = await redis.zrange(key, offset, offset + limit - 1, { rev: true });
+    const ids = await redis.zrange(key, 0, -1, { rev: true });
     if (!ids || !ids.length) return [];
 
-    const rawList = await redis.mget(...ids.map(EXP_KEYS.expense));
-    let expenses = rawList.filter(Boolean).map((r) => (typeof r === 'string' ? JSON.parse(r) : r));
+    let expenses = [];
+    const batchSize = 200;
+    for (let i = 0; i < ids.length; i += batchSize) {
+      const batchIds = ids.slice(i, i + batchSize);
+      const rawBatch = await redis.mget(...batchIds.map(EXP_KEYS.expense));
+      const parsedBatch = rawBatch.filter(Boolean).map((r) => (typeof r === 'string' ? JSON.parse(r) : r));
+      expenses.push(...parsedBatch);
+    }
 
     if (status) {
       expenses = expenses.filter((e) => String(e.status).toLowerCase() === String(status).toLowerCase());
@@ -202,7 +227,7 @@ export async function listExpenses({ employeeId, month, year, status, category, 
       });
     }
 
-    return expenses;
+    return expenses.slice(offset, offset + limit);
   });
 }
 

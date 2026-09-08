@@ -16,6 +16,9 @@ import {
   getEmployeeSession,
   requireEmployee,
   requireAdmin,
+  rateLimit,
+  tooManyRequests,
+  clientIp,
   str,
   withErrorHandling,
 } from './_lib/http.js';
@@ -26,6 +29,12 @@ async function handler(req, res) {
 
   // ── GET ──────────────────────────────────────────────────────────
   if (req.method === 'GET') {
+    const ip = clientIp(req);
+    const getLimit = await rateLimit(`expenses:get:${ip}`, { max: 120, windowSec: 60 });
+    if (!getLimit.ok) {
+      return tooManyRequests(res, getLimit.retryAfter, 'Too many requests. Please slow down.');
+    }
+
     const adminEmail = await getAdminSession(req);
     const empSession = await getEmployeeSession(req);
 
@@ -101,6 +110,16 @@ async function handler(req, res) {
     const empSession = await requireEmployee(req, res);
     if (!empSession) return;
 
+    const ip = clientIp(req);
+    const postLimit = await rateLimit(`expenses:post:${ip}`, { max: 30, windowSec: 60 });
+    if (!postLimit.ok) {
+      return tooManyRequests(res, postLimit.retryAfter, 'Too many expense submissions. Please wait a moment.');
+    }
+    const empLimit = await rateLimit(`expenses:emp:${empSession.employeeId}`, { max: 30, windowSec: 60 });
+    if (!empLimit.ok) {
+      return tooManyRequests(res, empLimit.retryAfter, 'Too many expense submissions for this account. Please wait a moment.');
+    }
+
     const validation = validateExpenseInput(req.body || {});
     if (!validation.ok) {
       return res.status(400).json({ success: false, errors: validation.errors, error: validation.errors[0] });
@@ -131,6 +150,12 @@ async function handler(req, res) {
   if (req.method === 'PATCH') {
     const adminEmail = await requireAdmin(req, res);
     if (!adminEmail) return;
+
+    const ip = clientIp(req);
+    const patchLimit = await rateLimit(`expenses:patch:${ip}`, { max: 60, windowSec: 60 });
+    if (!patchLimit.ok) {
+      return tooManyRequests(res, patchLimit.retryAfter, 'Too many review actions. Please wait a moment.');
+    }
 
     const id = str(req.body?.id, 50);
     if (!id) return res.status(400).json({ success: false, error: 'Expense ID is required.' });

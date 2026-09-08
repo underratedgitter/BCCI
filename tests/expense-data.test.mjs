@@ -125,3 +125,50 @@ test('Admin review updates status, approved amount, and audit trail', async () =
   assert.ok(metrics.totalApproved >= 500);
   assert.ok(metrics.totalEmployees >= 1);
 });
+
+test('listExpenses filters before applying limit and offset pagination', async () => {
+  // Create 4 expenses: first 2 'Supplies', then 2 'Accommodation'
+  const exp1 = await saveExpense({
+    employeeId: 'BCCI-E901',
+    employeeName: 'Anil Mehta',
+    expenseDate: '2026-09-01',
+    category: 'Supplies',
+    description: 'Printer paper',
+    claimedAmount: 100,
+    docData: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  });
+  const exp2 = await saveExpense({
+    employeeId: 'BCCI-E901',
+    employeeName: 'Anil Mehta',
+    expenseDate: '2026-09-02',
+    category: 'Supplies',
+    description: 'Ink cartridge',
+    claimedAmount: 200,
+    docData: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  });
+  const exp3 = await saveExpense({
+    employeeId: 'BCCI-E901',
+    employeeName: 'Anil Mehta',
+    expenseDate: '2026-09-03',
+    category: 'Accommodation',
+    description: 'Hotel stay in Surat',
+    claimedAmount: 2500,
+    docData: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  });
+  const exp4 = await saveExpense({
+    employeeId: 'BCCI-E901',
+    employeeName: 'Anil Mehta',
+    expenseDate: '2026-09-04',
+    category: 'Supplies',
+    description: 'Staplers',
+    claimedAmount: 50,
+    docData: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  });
+
+  // Query with category Accommodation and limit 1.
+  // In the reverse-chronological index, exp4 (Supplies) is first, but Accommodation should still be found!
+  const filtered = await listExpenses({ category: 'Accommodation', limit: 1, offset: 0 });
+  assert.equal(filtered.length, 1);
+  assert.equal(filtered[0].id, exp3.id);
+  assert.equal(filtered[0].category, 'Accommodation');
+});

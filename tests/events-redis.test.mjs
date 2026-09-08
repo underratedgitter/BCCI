@@ -11,6 +11,7 @@ const {
   deleteEvent,
   getEventAttendees,
   registerForEvent,
+  confirmEventPayment,
 } = lib;
 
 let pass = 0, fail = 0;
@@ -84,6 +85,42 @@ ck('over-capacity registration rejected', reg3.success === false && reg3.error?.
 const attendees = await getEventAttendees('EVT-TEST-1');
 ck('getEventAttendees returns 2 attendees', attendees.length === 2, `got ${attendees.length}`);
 ck('attendees include Anil and Bhavik', attendees.some(a => a.email === 'anil@example.com') && attendees.some(a => a.email === 'bhavik@example.com'));
+
+// 6b. Paid Event Registration & Payment Confirmation
+const paidEvent = {
+  id: 'EVT-TEST-PAID',
+  title: 'BCCI Paid Conclave 2026',
+  date: '2026-12-15',
+  time: '10:00 AM - 05:00 PM',
+  mode: 'offline',
+  venue: 'BCCI Grand Ballroom',
+  pricingType: 'paid',
+  fee: 500,
+  capacity: 10,
+  status: 'published',
+  createdAt: '2026-09-05T10:00:00.000Z',
+};
+await putEvent(paidEvent);
+
+const paidReg = await registerForEvent('EVT-TEST-PAID', {
+  name: 'Pradeep Joshi',
+  email: 'pradeep@example.com',
+  phone: '9825199887',
+  company: 'Joshi Steels',
+  paymentRef: 'UPI/9876543210',
+});
+ck('paid event registration succeeds', paidReg.success === true);
+ck('paid attendee initial status is pending', paidReg.attendee?.status === 'pending');
+ck('paid attendee paymentStatus is pending_verification', paidReg.attendee?.paymentStatus === 'pending_verification');
+
+// Confirm payment
+const confirmed = await confirmEventPayment('EVT-TEST-PAID', paidReg.ticketId, 'admin@bcci.in');
+ck('confirmEventPayment succeeds', confirmed.success === true);
+ck('confirmed attendee status becomes confirmed', confirmed.attendee?.status === 'confirmed');
+ck('confirmed attendee paymentStatus becomes confirmed', confirmed.attendee?.paymentStatus === 'confirmed');
+ck('confirmed attendee records confirmedBy', confirmed.attendee?.confirmedBy === 'admin@bcci.in');
+
+await deleteEvent('EVT-TEST-PAID');
 
 // 7. Delete event
 const deleted = await deleteEvent('EVT-TEST-1');

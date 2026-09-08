@@ -291,7 +291,7 @@ small, .mono {
 .top-bar-contact { display: flex; align-items: center; gap: 2rem; }
 .top-bar-contact span { display: inline-flex; align-items: center; gap: 0.4rem; }
 .top-bar-contact i { color: var(--gray-500); font-size: 0.65rem; }
-.top-bar-badge { color: var(--gold); }
+.top-bar-badge { color: #E5B842; font-weight: 500; }
 
 /* ==========================================================================
    NAVBAR
@@ -873,7 +873,7 @@ small, .mono {
 .stat-label {
   font-family: var(--font-mono);
   font-size: 0.68rem;
-  color: var(--slate-light);
+  color: var(--slate);
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -1490,6 +1490,8 @@ small, .mono {
   display: grid;
   grid-template-columns: 220px 1fr;
   gap: var(--space-2xl);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .admin-sidebar {
@@ -1498,6 +1500,13 @@ small, .mono {
   align-self: start;
   position: sticky;
   top: 80px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.admin-content {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .admin-menu { list-style: none; }
@@ -1528,6 +1537,8 @@ small, .mono {
   gap: 1px;
   background: var(--gray-200);
   margin-bottom: var(--space-2xl);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .metric-card {
@@ -1567,7 +1578,7 @@ small, .mono {
 .metric-title {
   font-family: var(--font-mono);
   font-size: 0.65rem;
-  color: var(--gray-400);
+  color: var(--gray-500);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   margin-top: 0.25rem;
@@ -1576,13 +1587,13 @@ small, .mono {
 .metric-action-hint {
   font-size: 0.68rem;
   font-weight: 700;
-  color: var(--accent-gold-dark, #AA7C11);
+  color: #8A5D00;
   margin-top: 0.4rem;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
-  opacity: 0.85;
+  opacity: 1;
   transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
@@ -1689,6 +1700,8 @@ small, .mono {
   border: var(--rule);
   padding: var(--space-lg);
   margin-bottom: 1px;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .admin-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem; }
@@ -2021,6 +2034,8 @@ footer h4 {
   background: var(--white);
   border: var(--rule);
   padding: var(--space-xl);
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 /* ==========================================================================
@@ -2324,7 +2339,7 @@ footer h4 {
   }
 
   /* ── Admin ─────────────────────────────────────────────────── */
-  .admin-metrics-grid { grid-template-columns: 1fr 1fr; }
+  .admin-metrics-grid { grid-template-columns: 1fr; }
   .metric-card { padding: var(--space-md); }
   .metric-val { font-size: 1.6rem; }
   .metric-title { font-size: 0.6rem; }
@@ -2696,7 +2711,7 @@ body.modal-open {
   padding: 0.6rem 0.75rem;
   border: none;
   background: transparent;
-  color: #64748B;
+  color: #475569;
   font-family: var(--font-body);
   font-size: 0.85rem;
   font-weight: 600;
@@ -2863,7 +2878,7 @@ body.modal-open {
   padding-top: 1rem;
   border-top: 1px solid #F1F5F9;
   font-size: 0.78rem;
-  color: #94A3B8;
+  color: #475569;
   display: flex;
   align-items: center;
   justify-content: center;

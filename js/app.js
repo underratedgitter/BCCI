@@ -61,6 +61,7 @@ const VIEW_PATHS = {
   signin: '/signin',
   admin: '/admin',
   employee: '/employee',
+  verify: '/verify',
 };
 
 const PATH_VIEWS = Object.fromEntries(
@@ -80,6 +81,7 @@ const PAGE_TITLES = {
   signin: 'Secretariat Sign In — BCCI Bharuch',
   admin: 'Admin Portal — BCCI Bharuch',
   employee: 'Employee Expense Portal — BCCI Bharuch',
+  verify: 'Member Verification — BCCI Bharuch',
 };
 
 /** Resolves the view for the current URL, tolerating the old #hash links. */
@@ -89,9 +91,11 @@ function viewFromLocation() {
   if (hash === 'signin' || hash === 'login') return 'signin';
   if (hash === 'employee' || hash === 'expenses') return 'employee';
   if (hash === 'qr') return 'qrcode';
+  if (hash === 'verify') return 'verify';
   if (hash && VIEW_PATHS[hash]) return hash;
 
   const path = window.location.pathname.replace(/\/+$/, '') || '/';
+  if (path === '/verify' || path.startsWith('/verify/')) return 'verify';
   return PATH_VIEWS[path] || 'home';
 }
 
@@ -1291,9 +1295,13 @@ class App {
         }
 
         try {
-          await this.store.renewMembership(app.id, utr);
+          const resApp = await this.store.renewMembership(app.id, utr);
           this.closeModal();
-          this.showToast(`Membership ${app.id} successfully renewed for +1 Year!`, 'success');
+          if (resApp?.renewalStatus === 'Pending Verification') {
+            this.showToast(`Renewal request for ${app.id} submitted for Secretariat verification!`, 'success');
+          } else {
+            this.showToast(`Membership ${app.id} successfully renewed for +1 Year!`, 'success');
+          }
           this.updateApplicantAuthUI();
           if (this.currentView === 'card') {
             this.renderMembershipCard();
@@ -1316,28 +1324,34 @@ class App {
   setupUnifiedSignInTabs() {
     const tabAdmin = document.getElementById('signinTabAdmin');
     const tabEmp = document.getElementById('signinTabEmployee');
-    const formAdmin = document.getElementById('formAdminSignIn');
-    const formEmp = document.getElementById('formEmployeeSignIn');
+    const paneAdmin = document.getElementById('formAdminSignIn');
+    const paneEmp = document.getElementById('formEmployeeSignIn');
+    const formEmp = document.getElementById('empSignInForm');
     const btnEmpSignIn = document.getElementById('btnEmpSignIn');
 
     if (tabAdmin && tabEmp) {
       tabAdmin.addEventListener('click', () => {
         tabAdmin.classList.add('active');
+        tabAdmin.setAttribute('aria-selected', 'true');
         tabEmp.classList.remove('active');
-        if (formAdmin) formAdmin.style.display = 'block';
-        if (formEmp) formEmp.style.display = 'none';
+        tabEmp.setAttribute('aria-selected', 'false');
+        if (paneAdmin) paneAdmin.style.display = 'block';
+        if (paneEmp) paneEmp.style.display = 'none';
       });
 
       tabEmp.addEventListener('click', () => {
         tabEmp.classList.add('active');
+        tabEmp.setAttribute('aria-selected', 'true');
         tabAdmin.classList.remove('active');
-        if (formEmp) formEmp.style.display = 'block';
-        if (formAdmin) formAdmin.style.display = 'none';
+        tabAdmin.setAttribute('aria-selected', 'false');
+        if (paneEmp) paneEmp.style.display = 'block';
+        if (paneAdmin) paneAdmin.style.display = 'none';
       });
     }
 
-    if (formEmp) {
-      formEmp.addEventListener('submit', async (e) => {
+    const formToWire = formEmp || paneEmp;
+    if (formToWire) {
+      formToWire.addEventListener('submit', async (e) => {
         e.preventDefault();
         const empId = document.getElementById('empUsernameInput')?.value || document.getElementById('employeeUsername')?.value;
         const empPass = document.getElementById('empPasswordInput')?.value || document.getElementById('employeePassword')?.value;
@@ -1347,19 +1361,27 @@ class App {
           btnEmpSignIn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing In...';
         }
 
-        const res = await this.store.employeeLogin(empId, empPass);
-        
-        if (btnEmpSignIn) {
-          btnEmpSignIn.disabled = false;
-          btnEmpSignIn.innerHTML = 'Sign In';
-        }
+        try {
+          const res = await this.store.employeeLogin(empId, empPass);
 
-        if (res.success) {
-          this.showToast('Employee signed in', 'success');
-          formEmp.reset();
-          this.renderView('employee');
-        } else {
-          this.showToast(res.error || 'Login failed', 'error');
+          if (res.success) {
+            this.showToast('Employee signed in', 'success');
+            if (formEmp && typeof formEmp.reset === 'function') {
+              formEmp.reset();
+            } else if (typeof formToWire.reset === 'function') {
+              formToWire.reset();
+            }
+            this.renderView('employee');
+          } else {
+            this.showToast(res.error || 'Login failed', 'error');
+          }
+        } catch (err) {
+          this.showToast(err?.message || 'Network error during login. Please try again.', 'error');
+        } finally {
+          if (btnEmpSignIn) {
+            btnEmpSignIn.disabled = false;
+            btnEmpSignIn.innerHTML = 'Sign In';
+          }
         }
       });
     }
@@ -1711,6 +1733,7 @@ class App {
     if (this.currentView === 'card') {
       this.renderView('home');
     }
+    this._clearDraft();
     this.showToast('Signed out.', 'info');
     this.store.clearApplicantSession().catch(() => {});
   }
@@ -1785,7 +1808,9 @@ class App {
     // Give the view a real address, so it can be shared and the browser's
     // back button behaves the way people expect.
     if (updateHistory) {
-      const path = VIEW_PATHS[viewId];
+      const path = (viewId === 'verify' && window.location.pathname.startsWith('/verify/'))
+        ? window.location.pathname
+        : VIEW_PATHS[viewId];
       if (window.location.pathname !== path || window.location.hash) {
         window.history.pushState({ view: viewId }, '', path);
       }
@@ -1829,6 +1854,7 @@ class App {
     if (viewId === 'events') await this.renderEventsPage();
     if (viewId === 'membership') this.updateApplicantAuthUI();
     if (viewId === 'card') this.renderMembershipCard();
+    if (viewId === 'verify') await this.renderVerificationView();
     if (viewId === 'admin') await this.renderAdminPortal();
     if (viewId === 'employee') {
       if (!this.store.isEmployeeAuthed()) {
@@ -2121,6 +2147,181 @@ class App {
           </button>
         </div>`;
       container.querySelector('#cardErrorRetryBtn')?.addEventListener('click', () => window.location.reload());
+    }
+  }
+
+  /* ════════════════════════════════════════════════════════════════════
+     PUBLIC MEMBER VERIFICATION RENDERER (FUNC-01)
+     ════════════════════════════════════════════════════════════════════ */
+
+  async renderVerificationView() {
+    const container = document.getElementById('verificationContainer');
+    if (!container) return;
+
+    let memberId = '';
+    const path = (window.location.pathname || '').replace(/\/+$/, '');
+    if (path.startsWith('/verify/')) {
+      memberId = decodeURIComponent(path.slice('/verify/'.length)).trim();
+    }
+    if (!memberId) {
+      const params = new URLSearchParams(window.location.search);
+      memberId = (params.get('id') || params.get('verifyId') || params.get('verify') || params.get('memberId') || '').trim();
+    }
+    if (!memberId) {
+      const hash = (window.location.hash || '').replace(/^#\/?/, '');
+      if (hash.startsWith('verify/')) {
+        memberId = decodeURIComponent(hash.slice('verify/'.length)).trim();
+      } else if (hash.startsWith('verify?')) {
+        const hashParams = new URLSearchParams(hash.slice(7));
+        memberId = (hashParams.get('id') || hashParams.get('verifyId') || hashParams.get('verify') || hashParams.get('memberId') || '').trim();
+      }
+    }
+
+    if (!memberId) {
+      container.innerHTML = `
+        <div style="text-align: center; padding: 1.5rem 0.5rem;">
+          <i class="fas fa-id-badge" style="font-size: 3rem; color: var(--gold); margin-bottom: 1rem;"></i>
+          <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem;">Verify Membership Credential</h3>
+          <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 1.5rem; max-width: 460px; margin-left: auto; margin-right: auto;">
+            Scan a BCCI digital membership card QR code or enter a BCCI Membership ID below to check its standing in the official chamber registry.
+          </p>
+          <form id="verifySearchForm" style="display: flex; gap: 0.5rem; max-width: 440px; margin: 0 auto;">
+            <input type="text" id="verifySearchInput" class="form-input" placeholder="e.g. BCCI-2026-..." required style="flex: 1;" aria-label="Membership ID to verify">
+            <button type="submit" class="btn-primary" style="white-space: nowrap;"><i class="fas fa-search"></i> Verify</button>
+          </form>
+        </div>
+      `;
+      const form = document.getElementById('verifySearchForm');
+      if (form) {
+        form.onsubmit = (e) => {
+          e.preventDefault();
+          const query = document.getElementById('verifySearchInput')?.value.trim();
+          if (query) {
+            window.history.pushState({ view: 'verify' }, '', `/verify/${encodeURIComponent(query)}`);
+            this.renderVerificationView();
+          }
+        };
+      }
+      return;
+    }
+
+    container.innerHTML = `
+      <div style="text-align: center; color: var(--text-muted); padding: 2rem;">
+        <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i>
+        <p style="margin-top: 1rem; font-weight: 500;">Validating credential ${escapeHtml(memberId)} against registry...</p>
+      </div>
+    `;
+
+    try {
+      const res = await fetch(`/api/applications?verifyId=${encodeURIComponent(memberId)}`);
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data || !data.success || !data.member) {
+        container.innerHTML = `
+          <div style="text-align: center; padding: 1.5rem 0.5rem;">
+            <i class="fas fa-times-circle" style="font-size: 3rem; color: var(--danger); margin-bottom: 1rem;"></i>
+            <h3 style="font-size: 1.25rem; font-weight: 600; color: var(--danger); margin-bottom: 0.5rem;">Unverified Credential</h3>
+            <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 1rem; max-width: 460px; margin-left: auto; margin-right: auto;">
+              No recognized BCCI membership credential was found matching ID:
+            </p>
+            <div style="display: inline-block; background: var(--gray-100); padding: 0.4rem 1rem; border-radius: 4px; font-family: var(--font-mono); font-weight: 600; margin-bottom: 1.5rem; word-break: break-all;">
+              ${escapeHtml(memberId)}
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.5rem;">
+              Please check the ID or contact the BCCI Secretariat if you believe this is an error.
+            </p>
+            <button type="button" class="btn-secondary" id="verifyResetBtn">
+              <i class="fas fa-search"></i> Verify Another Credential
+            </button>
+          </div>
+        `;
+        document.getElementById('verifyResetBtn')?.addEventListener('click', () => {
+          window.history.pushState({ view: 'verify' }, '', '/verify');
+          this.renderVerificationView();
+        });
+        return;
+      }
+
+      const m = data.member;
+      const isValid = data.verified && m.isActive;
+      const isExpired = m.isExpired;
+
+      container.innerHTML = `
+        <div style="display: flex; flex-direction: column; align-items: center; text-align: center;">
+          <div style="margin-bottom: 1rem;">
+            ${isValid
+              ? `<i class="fas fa-check-circle" style="font-size: 3.5rem; color: #16a34a;"></i>`
+              : `<i class="fas fa-exclamation-triangle" style="font-size: 3.5rem; color: #d97706;"></i>`
+            }
+          </div>
+
+          <div style="margin-bottom: 0.75rem;">
+            ${isValid
+              ? `<span style="background: #dcfce7; color: #15803d; padding: 0.4rem 1rem; border-radius: 9999px; font-weight: 600; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.4rem; letter-spacing: 0.04em;">
+                  <i class="fas fa-shield-check"></i> OFFICIAL ACTIVE CREDENTIAL
+                </span>`
+              : `<span style="background: #fef3c7; color: #b45309; padding: 0.4rem 1rem; border-radius: 9999px; font-weight: 600; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.4rem; letter-spacing: 0.04em;">
+                  <i class="fas fa-exclamation-circle"></i> ${isExpired ? 'CREDENTIAL EXPIRED' : 'CREDENTIAL PENDING / INACTIVE'}
+                </span>`
+            }
+          </div>
+
+          <h3 style="font-size: 1.4rem; font-weight: 700; margin-bottom: 0.25rem; color: var(--navy);">
+            ${escapeHtml(m.company || 'BCCI Member')}
+          </h3>
+          <p style="color: var(--text-muted); font-size: 1rem; margin-bottom: 1.5rem;">
+            Representative: <strong>${escapeHtml(m.repName || 'Official Representative')}</strong>
+          </p>
+
+          <div style="width: 100%; max-width: 480px; background: var(--gray-50); border: var(--rule); border-radius: 8px; padding: 1.25rem; text-align: left; margin-bottom: 1.5rem;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; font-size: 0.9rem;">
+              <div>
+                <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-family: var(--font-mono); display: block;">Membership ID</span>
+                <strong style="font-family: var(--font-mono); font-size: 0.85rem; word-break: break-all;">${escapeHtml(m.id)}</strong>
+              </div>
+              <div>
+                <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-family: var(--font-mono); display: block;">Membership Class</span>
+                <strong>${escapeHtml(m.membershipType || 'Standard')}</strong>
+              </div>
+              <div>
+                <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-family: var(--font-mono); display: block;">Valid Until</span>
+                <strong style="color: ${isValid ? '#15803d' : '#b45309'};">${escapeHtml(formatDate(m.validUntil))}</strong>
+              </div>
+              <div>
+                <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-family: var(--font-mono); display: block;">Chamber Status</span>
+                <strong>${escapeHtml(m.status || 'Unknown')}</strong>
+              </div>
+            </div>
+          </div>
+
+          <p style="font-size: 0.8rem; color: var(--text-muted); max-width: 460px; line-height: 1.4; margin-bottom: 1.5rem;">
+            Issued by Bharuch Chamber of Commerce &amp; Industry. This record has been verified against the official chamber registry.
+          </p>
+
+          <button type="button" class="btn-secondary" id="verifyResetBtn">
+            <i class="fas fa-search"></i> Verify Another Credential
+          </button>
+        </div>
+      `;
+
+      document.getElementById('verifyResetBtn')?.addEventListener('click', () => {
+        window.history.pushState({ view: 'verify' }, '', '/verify');
+        this.renderVerificationView();
+      });
+    } catch (err) {
+      container.innerHTML = `
+        <div style="text-align: center; padding: 1.5rem 0.5rem;">
+          <i class="fas fa-wifi" style="font-size: 2.5rem; color: var(--text-muted); margin-bottom: 1rem;"></i>
+          <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem;">Verification Offline</h3>
+          <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 1.5rem;">
+            Unable to connect to the BCCI verification registry. Please verify your connection and try again.
+          </p>
+          <button type="button" class="btn-primary" id="verifyRetryBtn">
+            <i class="fas fa-redo"></i> Retry
+          </button>
+        </div>
+      `;
+      document.getElementById('verifyRetryBtn')?.addEventListener('click', () => this.renderVerificationView());
     }
   }
 
@@ -2951,6 +3152,7 @@ class App {
     const btnSignOut = document.getElementById('btnEmployeeSignOut');
     if (btnSignOut) {
       btnSignOut.onclick = () => {
+        this._clearDraft();
         this.store.employeeLogout();
         this.showToast('Signed out successfully', 'success');
         this.renderView('signin');
@@ -3135,13 +3337,22 @@ class App {
     setMetric('metricRejected', rejectedApps.length);
     setMetric('metricEnquiries', enquiries.length);
     
-    if (stats && stats.success) {
-      setMetric('metricExpensesTotal', stats.expensesTotal);
+    const expStats = stats?.expenses || stats?.stats?.expenses;
+    if (expStats) {
+      setMetric('metricExpensesTotal', expStats.totalExpenses ?? 0);
+      setMetric('metricExpensesClaimed', '₹' + (expStats.totalClaimed ?? 0).toLocaleString('en-IN'));
+      setMetric('metricExpensesApproved', '₹' + (expStats.totalApproved ?? 0).toLocaleString('en-IN'));
+      setMetric('metricExpensesPending', expStats.pendingApprovals ?? 0);
+      setMetric('metricExpensesEmployees', expStats.totalEmployees ?? 0);
+    } else if (stats && stats.success) {
+      setMetric('metricExpensesTotal', stats.expensesTotal ?? 0);
       setMetric('metricExpensesClaimed', '₹' + (stats.expensesClaimedAmount || 0));
       setMetric('metricExpensesApproved', '₹' + (stats.expensesApprovedAmount || 0));
-      setMetric('metricExpensesPending', stats.expensesPending);
-      setMetric('metricExpensesEmployees', stats.employeesCount);
+      setMetric('metricExpensesPending', stats.expensesPending ?? 0);
+      setMetric('metricExpensesEmployees', stats.employeesCount ?? 0);
     }
+
+    this.populateEmployeeDropdowns?.();
 
     const emptyState = (icon, text) =>
       `<div style="text-align: center; color: #94A3B8; padding: 2rem;"><i class="fas ${icon}" style="font-size: 1.8rem; margin-bottom: 0.5rem; display: block;"></i>${escapeHtml(text)}</div>`;
@@ -3404,6 +3615,29 @@ class App {
     }, 100);
   }
 
+  async handleApproveRenewal(id) {
+    try {
+      const updated = await this.store.approveRenewal(id);
+      if (!updated) return;
+      await this.renderAdminPortal();
+      this.showToast(`Membership renewal for ${id} approved (+1 Year). Confirmation sent to ${updated.email}.`, 'success');
+    } catch (err) {
+      this.showToast(err.message || 'Could not approve membership renewal.', 'error');
+    }
+  }
+
+  async handleRejectRenewal(id) {
+    const reason = prompt('Enter a reason for rejecting this renewal (optional):') ?? '';
+    try {
+      const updated = await this.store.rejectRenewal(id, reason);
+      if (!updated) return;
+      await this.renderAdminPortal();
+      this.showToast(`Membership renewal for ${id} rejected. Notification sent to ${updated.email}.`, 'warning');
+    } catch (err) {
+      this.showToast(err.message || 'Could not reject membership renewal.', 'error');
+    }
+  }
+
   /**
    * Renders a stored payment receipt. The value is applicant-supplied, so it
    * is only emitted when it is genuinely an inline image data URI — never a
@@ -3556,6 +3790,22 @@ class App {
                 </div>
               </div>
 
+              ${app.renewalStatus === 'Pending Verification' ? `
+                <div style="margin-bottom: 1rem; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 8px; padding: 1rem;">
+                  <h5 style="color: #92400E; font-size: 0.92rem; margin: 0 0 0.5rem 0; display: flex; align-items: center; gap: 0.5rem;">
+                    <i class="fas fa-sync-alt" style="color: #F59E0B;"></i> Membership Renewal Pending Secretariat Verification
+                  </h5>
+                  <p style="margin: 0 0 0.75rem 0; font-size: 0.85rem; color: #78350F;">
+                    Member requested +1 Year renewal with Payment UTR: <strong style="font-family: monospace; color: #92400E;">${escapeHtml(app.pendingRenewal?.paymentRef || app.paymentRef || 'N/A')}</strong>
+                    ${app.pendingRenewal?.requestedAt ? ` &bull; Submitted: <strong>${formatDate(app.pendingRenewal.requestedAt)}</strong>` : ''}.
+                  </p>
+                  <div style="display: flex; gap: 0.5rem;">
+                    <button type="button" class="btn-action-approve" id="inspectApproveRenewalBtn" style="font-size: 0.82rem; padding: 0.4rem 0.8rem;"><i class="fas fa-check"></i> Approve Renewal (+1 Year)</button>
+                    <button type="button" class="btn-action-reject" id="inspectRejectRenewalBtn" style="font-size: 0.82rem; padding: 0.4rem 0.8rem;"><i class="fas fa-times"></i> Reject Renewal</button>
+                  </div>
+                </div>
+              ` : ''}
+
               <!-- Action Buttons -->
               <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #E2E8F0;">
                 ${isPending ? `
@@ -3575,6 +3825,14 @@ class App {
         document.getElementById('inspectRejectBtn')?.addEventListener('click', () => {
           this.closeModal();
           this.handleRejectApplication(app.id);
+        });
+        document.getElementById('inspectApproveRenewalBtn')?.addEventListener('click', () => {
+          this.closeModal();
+          this.handleApproveRenewal(app.id);
+        });
+        document.getElementById('inspectRejectRenewalBtn')?.addEventListener('click', () => {
+          this.closeModal();
+          this.handleRejectRenewal(app.id);
         });
       });
     });
@@ -3820,7 +4078,16 @@ class App {
                             <td><code style="font-size:0.75rem;background:#F1F5F9;padding:2px 6px;border-radius:4px;color:var(--primary);font-weight:700;">${escapeHtml(a.ticketId || '-')}</code></td>
                             <td>${escapeHtml(a.email)}<br/><small style="color:#64748B;">${escapeHtml(a.phone)}</small></td>
                             <td>${escapeHtml(a.company || '-')}</td>
-                            <td>${a.paymentRef ? `<span style="color:#059669;font-weight:700;">PAID</span><br/><small style="color:#64748B;font-family:monospace;">UTR: ${escapeHtml(a.paymentRef)}</small>` : '<span style="color:#64748B;font-weight:600;">Complimentary</span>'}</td>
+                            <td>
+                              ${a.paymentStatus === 'pending_verification' || a.status === 'pending' ? `
+                                <span class="badge-status" style="background:#FEF3C7;color:#92400E;font-size:0.75rem;padding:2px 6px;border-radius:4px;"><i class="fas fa-clock"></i> Pending Verification</span>
+                                ${a.paymentRef ? `<br/><small style="color:#64748B;font-family:monospace;">UTR: ${escapeHtml(a.paymentRef)}</small>` : ''}
+                                <br/><button type="button" class="btn-primary btnConfirmAttendeePayment" data-event-id="${escapeAttr(event.id)}" data-ticket-id="${escapeAttr(a.ticketId)}" style="padding:0.2rem 0.5rem;font-size:0.72rem;margin-top:0.3rem;"><i class="fas fa-check"></i> Confirm Payment</button>
+                              ` : `
+                                <span style="color:#059669;font-weight:700;"><i class="fas fa-check-circle"></i> Confirmed</span>
+                                ${a.paymentRef ? `<br/><small style="color:#64748B;font-family:monospace;">UTR: ${escapeHtml(a.paymentRef)}</small>` : '<br/><small style="color:#64748B;">Complimentary</small>'}
+                              `}
+                            </td>
                             <td><small>${escapeHtml(formatDate(a.registeredAt))}</small></td>
                           </tr>
                         `).join('')}
@@ -3844,6 +4111,24 @@ class App {
               } else if (!emails) {
                 this.showToast('No emails to copy.', 'info');
               }
+            });
+
+            document.querySelectorAll('.btnConfirmAttendeePayment').forEach(confirmBtn => {
+              confirmBtn.addEventListener('click', async () => {
+                const evId = confirmBtn.getAttribute('data-event-id');
+                const tktId = confirmBtn.getAttribute('data-ticket-id');
+                confirmBtn.disabled = true;
+                confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Confirming...';
+                try {
+                  await this.store.confirmEventPayment(evId, tktId);
+                  this.showToast(`Payment confirmed for ticket ${tktId}! Official E-Ticket sent.`, 'success');
+                  btn.click();
+                } catch (err) {
+                  this.showToast(err.message || 'Failed to confirm attendee payment.', 'error');
+                  confirmBtn.disabled = false;
+                  confirmBtn.innerHTML = '<i class="fas fa-check"></i> Confirm Payment';
+                }
+              });
             });
           }, 50);
 
@@ -4305,6 +4590,37 @@ class App {
   showUniversalEventTicketModal(event, attendee, ticketId) {
     if (!event || !attendee) return;
     const tktId = ticketId || attendee.ticketId || `TKT-${event.id.replace(/^EVT-/, '')}`;
+    const isPending = attendee.status === 'pending' || attendee.paymentStatus === 'pending_verification';
+
+    if (isPending) {
+      this.showModal({
+        title: `<i class="fas fa-clock" style="color: #F59E0B;"></i> Registration Received — Payment Verification Pending`,
+        content: `
+          <div style="font-size: 0.9rem; line-height: 1.6; padding: 0.5rem 0;">
+            <div style="background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 8px; padding: 1rem; margin-bottom: 1.25rem; color: #92400E;">
+              <div style="font-weight: 700; font-size: 1rem; margin-bottom: 0.35rem;">
+                <i class="fas fa-info-circle"></i> Registration Pending Secretariat Verification
+              </div>
+              <div>
+                Thank you for registering for <strong>${escapeHtml(event.title)}</strong>. Your registration and payment reference (<code>${escapeHtml(attendee.paymentRef || 'N/A')}</code>) have been received.
+              </div>
+            </div>
+            <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 1rem; margin-bottom: 1.25rem;">
+              <div style="margin-bottom: 0.4rem;"><strong>Delegate:</strong> ${escapeHtml(attendee.name)} (${escapeHtml(attendee.email)})</div>
+              <div style="margin-bottom: 0.4rem;"><strong>Event:</strong> ${escapeHtml(event.title)}</div>
+              <div style="margin-bottom: 0.4rem;"><strong>Date &amp; Time:</strong> ${escapeHtml(event.date)} &bull; ${escapeHtml(event.time)}</div>
+              <div><strong>Registration Ref:</strong> <code style="font-family: monospace; font-weight: 700;">${escapeHtml(tktId)}</code></div>
+            </div>
+            <p style="font-size: 0.85rem; color: #64748B; margin-bottom: 1.25rem;">
+              Once the BCCI Secretariat verifies your payment reference, your confirmed admission pass and meeting credentials will be dispatched to <strong>${escapeHtml(attendee.email)}</strong>.
+            </p>
+            <button class="btn-secondary" id="modalCloseBtn" style="width: 100%; justify-content: center;">Close</button>
+          </div>
+        `
+      });
+      return;
+    }
+
     const feeDisplay = event.pricingType === 'paid'
       ? `<span style="color: #059669; font-weight: 700;">PAID (₹${escapeHtml(String(event.fee))})</span>${attendee.paymentRef ? ` • <span style="color: #64748B; font-size: 0.78rem;">UTR: ${escapeHtml(attendee.paymentRef)}</span>` : ''}`
       : `<span style="color: #059669; font-weight: 700;">COMPLIMENTARY PASS</span>`;
@@ -4802,8 +5118,11 @@ class App {
   setupExpenseFormHandlers() {
     const form = document.getElementById('employeeExpenseForm');
     if (!form) return;
+    const submitBtn = form.querySelector('button[type="submit"]');
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
+      if (form._submitting) return;
+
       const amount = parseFloat(document.getElementById('expenseClaimedAmountInput').value);
       const date = document.getElementById('expenseDateInput').value;
       const category = document.getElementById('expenseCategorySelect').value;
@@ -4813,29 +5132,85 @@ class App {
         this.showToast('Please attach a receipt', 'warning');
         return;
       }
-      
-      const res = await this.store.submitExpense({
-        claimedAmount: amount,
-        expenseDate: date,
-        category,
-        description: desc,
-        docData: this.currentExpenseFileBase64,
-        docName: this.currentExpenseFileName || 'receipt',
-        docMime: this.currentExpenseFileType || 'application/octet-stream'
-      });
-      
-      if (res.success) {
-        this.showToast('Expense submitted successfully', 'success');
-        form.reset();
-        document.getElementById('removeExpenseReceiptBtn')?.click();
-        this.renderEmployeePortal();
-      } else {
-        this.showToast(res.error || 'Failed to submit', 'error');
+
+      form._submitting = true;
+      let prevBtnHtml = '';
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        prevBtnHtml = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+      }
+
+      try {
+        const res = await this.store.submitExpense({
+          claimedAmount: amount,
+          expenseDate: date,
+          category,
+          description: desc,
+          docData: this.currentExpenseFileBase64,
+          docName: this.currentExpenseFileName || 'receipt',
+          docMime: this.currentExpenseFileType || 'application/octet-stream'
+        });
+
+        if (res.success) {
+          this.showToast('Expense submitted successfully', 'success');
+          form.reset();
+          document.getElementById('removeExpenseReceiptBtn')?.click();
+          this.renderEmployeePortal();
+        } else {
+          this.showToast(res.error || 'Failed to submit', 'error');
+        }
+      } catch (err) {
+        this.showToast(err?.message || 'Network error while submitting expense. Please try again.', 'error');
+      } finally {
+        form._submitting = false;
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = prevBtnHtml || 'Submit Expense';
+        }
       }
     });
   }
 
+  async populateEmployeeDropdowns() {
+    try {
+      const res = await this.store.getAdminEmployees();
+      const employees = Array.isArray(res) ? res : (res?.employees || []);
+      const selects = [
+        document.getElementById('adminExpenseFilterEmp'),
+        document.getElementById('reportEmpSelect'),
+      ];
+      selects.forEach(sel => {
+        if (!sel) return;
+        const currentVal = sel.value;
+        const defaultOption = sel.querySelector('option[value=""]') || sel.firstElementChild;
+        sel.innerHTML = '';
+        if (defaultOption) {
+          sel.appendChild(defaultOption);
+        } else {
+          const opt = document.createElement('option');
+          opt.value = '';
+          opt.textContent = 'All Employees';
+          sel.appendChild(opt);
+        }
+        employees.forEach(e => {
+          const opt = document.createElement('option');
+          opt.value = e.employeeId;
+          opt.textContent = `${e.name} (${e.employeeId})`;
+          sel.appendChild(opt);
+        });
+        if (currentVal) sel.value = currentVal;
+      });
+    } catch (err) {
+      console.error('Failed to populate employee dropdowns:', err);
+    }
+  }
+
   async renderAdminExpensesTab() {
+    const empSelect = document.getElementById('adminExpenseFilterEmp');
+    if (empSelect && empSelect.options.length <= 1) {
+      await this.populateEmployeeDropdowns();
+    }
     const status = document.getElementById('adminExpenseFilterStatus')?.value;
     const emp = document.getElementById('adminExpenseFilterEmp')?.value;
     const cat = document.getElementById('adminExpenseFilterCat')?.value;
@@ -4872,6 +5247,13 @@ class App {
       let html = '';
       let htmlCards = '';
       expenses.forEach(e => {
+        const approvedDisplay = (e.status === 'approved' || e.status === 'partially_approved') && e.approvedAmount != null
+          ? `₹${(Number(e.approvedAmount) || 0).toLocaleString('en-IN')}`
+          : (e.status === 'rejected' ? '₹0' : '—');
+        const hasReceipt = Boolean(e.hasReceipt || e.documentId || e.receiptUrl || e.id);
+        const receiptCell = hasReceipt
+          ? `<button class="btn-ghost btn-sm" data-view-receipt-id="${escapeAttr(e.id)}" title="View Receipt" style="padding:0.25rem 0.5rem;font-size:0.8rem;"><i class="fas fa-paperclip"></i> View</button>`
+          : '<span style="color:var(--text-muted);font-size:0.8rem;">None</span>';
         const row = `
           <tr>
             <td>${escapeHtml(e.id)}</td>
@@ -4879,7 +5261,9 @@ class App {
             <td>${escapeHtml(formatDate(e.expenseDate || e.date))}</td>
             <td>${escapeHtml(e.category)}</td>
             <td>₹${(e.claimedAmount || 0).toLocaleString('en-IN')}</td>
+            <td>${approvedDisplay}</td>
             <td>${getStatusBadge(e.status)}</td>
+            <td>${receiptCell}</td>
             <td>
               <button class="btn-secondary" data-review-expense-id="${escapeAttr(e.id)}">Review</button>
             </td>
@@ -4888,10 +5272,17 @@ class App {
         html += row;
         htmlCards += `
           <div class="admin-mobile-card">
-            <div><strong>${escapeHtml(e.id)}</strong></div>
-            <div>${escapeHtml(e.employeeName)}</div>
-            <div>₹${(e.claimedAmount || 0).toLocaleString('en-IN')}</div>
-            <button class="btn-secondary" data-review-expense-id="${escapeAttr(e.id)}">Review</button>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+              <strong>${escapeHtml(e.id)}</strong>
+              ${getStatusBadge(e.status)}
+            </div>
+            <div>${escapeHtml(e.employeeName)} (${escapeHtml(e.employeeId)})</div>
+            <div style="font-size:0.85rem;color:var(--text-muted);">${escapeHtml(formatDate(e.expenseDate || e.date))} &bull; ${escapeHtml(e.category)}</div>
+            <div style="font-weight:600;margin:0.25rem 0;">Claimed: ₹${(e.claimedAmount || 0).toLocaleString('en-IN')} | Approved: ${approvedDisplay}</div>
+            <div style="display:flex;gap:0.5rem;margin-top:0.5rem;">
+              ${hasReceipt ? `<button class="btn-ghost btn-sm" data-view-receipt-id="${escapeAttr(e.id)}" style="flex:1;"><i class="fas fa-paperclip"></i> Receipt</button>` : ''}
+              <button class="btn-secondary btn-sm" data-review-expense-id="${escapeAttr(e.id)}" style="flex:1;">Review</button>
+            </div>
           </div>
         `;
       });
@@ -4901,6 +5292,12 @@ class App {
       document.querySelectorAll('[data-review-expense-id]').forEach(btn => {
         btn.addEventListener('click', () => {
           this.openExpenseReviewModal(btn.getAttribute('data-review-expense-id'));
+        });
+      });
+
+      document.querySelectorAll('[data-view-receipt-id]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          this.openReceiptViewer(btn.getAttribute('data-view-receipt-id'));
         });
       });
     }
@@ -4943,19 +5340,30 @@ class App {
     
     const doc = await this.store.getExpenseDocument(id);
     const container = document.getElementById('expenseDocPreviewContainer'); // Corrected ID
+    const newTabLink = document.getElementById('expenseDocNewTabLink');
     if (container && doc && doc.docData) {
       const isPdf = doc.mimeType === 'application/pdf' || doc.docMime === 'application/pdf' || doc.docType === 'application/pdf' || (doc.fileName && doc.fileName.endsWith('.pdf')) || (doc.docData && doc.docData.startsWith('data:application/pdf'));
+      const safeData = escapeAttr(doc.docData);
+      const safeName = escapeHtml(doc.docName || (isPdf ? 'receipt.pdf' : 'receipt.png'));
+      if (newTabLink) {
+        newTabLink.href = doc.docData;
+        newTabLink.setAttribute('rel', 'noopener noreferrer');
+        if (doc.docName) newTabLink.setAttribute('download', doc.docName);
+      }
       if (isPdf) {
         container.innerHTML = `
-          <iframe src="${doc.docData}" style="width:100%; height:500px; border:none;"></iframe>
-          <br><a href="${doc.docData}" target="_blank">Open in New Tab</a>
+          <iframe src="${safeData}" sandbox="allow-downloads allow-popups" title="Receipt Preview" style="width:100%; height:480px; border:1px solid var(--border-color); border-radius:6px; background:#fff;"></iframe>
         `;
       } else {
         container.innerHTML = `
-          <img src="${doc.docData}" style="max-width:100%;" />
-          <br><a href="${doc.docData}" target="_blank">Open in New Tab</a>
+          <div style="text-align:center;padding:1rem;background:#f8fafc;border:1px solid var(--border-color);border-radius:6px;max-height:480px;overflow:auto;">
+            <img src="${safeData}" alt="${safeName}" style="max-width:100%;max-height:440px;border-radius:4px;box-shadow:0 1px 4px rgba(0,0,0,0.1);" />
+          </div>
         `;
       }
+    } else if (container) {
+      container.innerHTML = '<p style="color: var(--text-muted); font-size: 0.85rem;">No receipt attached</p>';
+      if (newTabLink) newTabLink.removeAttribute('href');
     }
     
     const btnApprove = document.getElementById('btnReviewApprove');
@@ -5090,6 +5498,10 @@ class App {
   }
 
   async handleAddEmployee() {
+    const addForm = document.getElementById('addEmployeeForm');
+    const submitBtn = addForm?.querySelector('button[type="submit"]');
+    if (addForm?._submitting) return;
+
     const employeeId = document.getElementById('addEmpIdInput')?.value;
     const name = document.getElementById('addEmpNameInput')?.value;
     const username = document.getElementById('addEmpUsernameInput')?.value;
@@ -5101,19 +5513,39 @@ class App {
       this.showToast('All fields are required', 'warning');
       return;
     }
-    
-    const empData = { employeeId, name, username, password, email, status, department: 'General' };
-    const res = await this.store.createEmployee(empData);
-    if (res.success) {
-      this.showToast('Employee created', 'success');
-      const m = document.getElementById('addEmployeeModal');
-      if (m) {
-        m.style.display = 'none';
-        m.classList.remove('show');
+
+    let prevBtnHtml = '';
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      prevBtnHtml = submitBtn.innerHTML;
+      submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+    }
+    if (addForm) addForm._submitting = true;
+
+    try {
+      const empData = { employeeId, name, username, password, email, status, department: 'General' };
+      const res = await this.store.createEmployee(empData);
+      if (res.success) {
+        this.showToast('Employee created', 'success');
+        if (addForm) addForm.reset();
+        const m = document.getElementById('addEmployeeModal');
+        if (m) {
+          m.style.display = 'none';
+          m.classList.remove('show');
+        }
+        await this.populateEmployeeDropdowns();
+        this.renderAdminEmployeesTab();
+      } else {
+        this.showToast(res.error || 'Failed to create employee', 'error');
       }
-      this.renderAdminEmployeesTab();
-    } else {
-      this.showToast(res.error || 'Error', 'error');
+    } catch (err) {
+      this.showToast(err?.message || 'Network error while creating employee.', 'error');
+    } finally {
+      if (addForm) addForm._submitting = false;
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = prevBtnHtml || 'Save Employee';
+      }
     }
   }
   
@@ -5143,6 +5575,7 @@ class App {
     let approvedTotal = 0;
     
     let html = '';
+    let htmlCards = '';
     details.history.forEach(c => {
       claimsTotal++;
       claimsTotalAmount += (c.claimedAmount || 0);
@@ -5172,6 +5605,18 @@ class App {
           <td>${escapeHtml(c.adminRemark || '-')}</td>
         </tr>
       `;
+
+      htmlCards += `
+        <div class="admin-mobile-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+            <strong>${escapeHtml(c.id)}</strong>
+            ${getStatusBadge(c.status)}
+          </div>
+          <div style="font-size:0.85rem;color:var(--text-muted);">${escapeHtml(formatDate(c.expenseDate || c.date))} &bull; ${escapeHtml(c.category)}</div>
+          <div style="font-weight:600;margin:0.25rem 0;">Claimed: ₹${(c.claimedAmount || 0).toLocaleString('en-IN')} | Approved: ₹${(c.approvedAmount || 0).toLocaleString('en-IN')}</div>
+          ${c.adminRemark ? `<div style="font-size:0.85rem;color:var(--text-muted);">Remark: ${escapeHtml(c.adminRemark)}</div>` : ''}
+        </div>
+      `;
     });
     
     const totalClaimsEl = document.getElementById('empHistoryClaimedAmount');
@@ -5184,6 +5629,8 @@ class App {
     
     const tbody = document.getElementById('empHistoryTableBody');
     if (tbody) tbody.innerHTML = html || '<tr><td colspan="7">No history found</td></tr>';
+    const cards = document.getElementById('empHistoryCards');
+    if (cards) cards.innerHTML = htmlCards || '<p style="color:var(--text-muted);text-align:center;padding:1rem;">No history found</p>';
   }
 
   async handleToggleEmployeeStatus(employeeId) {
@@ -5204,6 +5651,10 @@ class App {
   }
 
   async renderMonthlyExpenseReports() {
+    const empSelect = document.getElementById('reportEmpSelect');
+    if (empSelect && empSelect.options.length <= 1) {
+      await this.populateEmployeeDropdowns();
+    }
     // Wire change listeners
     if (!this._reportFiltersWired) {
       this._reportFiltersWired = true;
@@ -5265,6 +5716,22 @@ class App {
           <td>${escapeHtml(e.adminRemark || '-')}</td>
         </tr>
       `).join('') || '<tr><td colspan="8">No records found</td></tr>';
+    }
+
+    const cards = document.getElementById('reportsCards');
+    if (cards) {
+      cards.innerHTML = expenses.map(e => `
+        <div class="admin-mobile-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+            <strong>${escapeHtml(e.id)}</strong>
+            ${getStatusBadge(e.status)}
+          </div>
+          <div>${escapeHtml(e.employeeName || '')}</div>
+          <div style="font-size:0.85rem;color:var(--text-muted);">${escapeHtml(formatDate(e.expenseDate || e.date))} &bull; ${escapeHtml(e.category)}</div>
+          <div style="font-weight:600;margin:0.25rem 0;">Claimed: ₹${(e.claimedAmount || 0).toLocaleString('en-IN')} | Approved: ₹${(e.approvedAmount || 0).toLocaleString('en-IN')}</div>
+          ${e.adminRemark ? `<div style="font-size:0.85rem;color:var(--text-muted);">Remark: ${escapeHtml(e.adminRemark)}</div>` : ''}
+        </div>
+      `).join('') || '<p style="color:var(--text-muted);text-align:center;padding:1rem;">No records found</p>';
     }
   }
 

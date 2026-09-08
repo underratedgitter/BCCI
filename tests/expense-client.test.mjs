@@ -44,3 +44,20 @@ test('app.js formats expenseDate in all expense and report tables', () => {
   assert.ok(APP_JS.includes('formatDate(claimDate)'), 'Employee portal table must format claim date');
   assert.ok(APP_JS.includes('formatDate(e.expenseDate || e.date)'), 'Admin expenses and report tables must format expenseDate');
 });
+
+test('app.js renders all 9 columns in admin expenses table matching index.html', () => {
+  assert.ok(APP_JS.includes('approvedDisplay'), 'Must format approved amount cell');
+  assert.ok(APP_JS.includes('receiptCell'), 'Must render receipt cell');
+  assert.ok(APP_JS.includes('data-view-receipt-id'), 'Must provide view receipt trigger');
+  assert.ok(APP_JS.includes('colspan="9"'), 'Empty state must span 9 columns');
+});
+
+test('SEC-07: app.js sandboxes receipt preview iframes and escapes attributes across all viewers', () => {
+  const iframeMatches = [...APP_JS.matchAll(/<iframe\b[^>]*>/g)];
+  assert.ok(iframeMatches.length >= 2, 'Should have at least 2 iframe viewers (review modal and receipt modal)');
+  for (const [iframeTag] of iframeMatches) {
+    assert.ok(iframeTag.includes('sandbox="allow-downloads allow-popups"'), `Iframe must be sandboxed: ${iframeTag}`);
+    assert.ok(!iframeTag.includes('allow-scripts'), `Iframe must not allow scripts: ${iframeTag}`);
+    assert.ok(!iframeTag.includes('allow-same-origin'), `Iframe must not allow same-origin: ${iframeTag}`);
+  }
+});

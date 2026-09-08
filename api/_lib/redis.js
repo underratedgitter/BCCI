@@ -107,7 +107,16 @@ async function migrateLegacy({ legacyKey, indexKey, recordKey, emailKey, marker 
     nx: true,
     ex: 300,
   });
-  if (!claimed) return;
+  if (!claimed) {
+    // Wait for the concurrent migration to finish instead of returning empty results
+    for (let i = 0; i < 40; i++) {
+      await new Promise((r) => setTimeout(r, 50));
+      const status = await redis.get(KEYS.migrated(marker));
+      if (status === 'done') return;
+      if (!status) break;
+    }
+    return;
+  }
 
   try {
     const legacy = (await redis.get(legacyKey)) || [];
@@ -190,9 +199,22 @@ export async function getApplicationByEmail(email) {
 export async function putApplication(app) {
   const record = normalizeApplication(app);
   return withRetry(async () => {
-    await redis.set(KEYS.app(record.id), record);
-    await redis.zadd(KEYS.appIndex, { score: timeOf(record), member: record.id });
-    if (record.email) await redis.set(KEYS.appByEmail(record.email), record.id);
+    if (record.email) {
+      const claimed = await redis.set(KEYS.appByEmail(record.email), record.id, { nx: true });
+      if (!claimed) {
+        const existingId = await redis.get(KEYS.appByEmail(record.email));
+        const err = new Error(`An application for this email already exists (${existingId || 'in progress'}).`);
+        err.statusCode = 409;
+        throw err;
+      }
+    }
+    try {
+      await redis.set(KEYS.app(record.id), record);
+      await redis.zadd(KEYS.appIndex, { score: timeOf(record), member: record.id });
+    } catch (err) {
+      if (record.email) await redis.del(KEYS.appByEmail(record.email)).catch(() => {});
+      throw err;
+    }
     return record;
   });
 }
@@ -321,46 +343,132 @@ export async function registerForEvent(id, attendee) {
   const email = String(attendee.email).trim().toLowerCase();
 
   return withRetry(async () => {
-    const rawEvent = await redis.get(KEYS.event(id));
-    if (!rawEvent) {
-      return { success: false, error: 'Event not found.' };
+    const lockKey = `bcci:lock:eventreg:${id}`;
+    let lockAcquired = false;
+    for (let attempt = 0; attempt < 30; attempt++) {
+      const res = await redis.set(lockKey, '1', { nx: true, ex: 5 });
+      if (res) {
+        lockAcquired = true;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 40));
     }
-    const event = typeof rawEvent === 'string' ? JSON.parse(rawEvent) : rawEvent;
-
-    const capacity = Number(event.capacity) || 0;
-    const currentCount = Number(event.registeredCount) || 0;
-    if (capacity > 0 && currentCount >= capacity) {
-      return { success: false, error: 'This event has reached maximum capacity.' };
-    }
-
-    const rawAttendees = await redis.get(KEYS.eventAttendees(id));
-    let attendees = [];
-    if (rawAttendees) {
-      attendees = Array.isArray(rawAttendees) ? rawAttendees : (typeof rawAttendees === 'string' ? JSON.parse(rawAttendees) : []);
+    if (!lockAcquired) {
+      return { success: false, error: 'Registration service is busy. Please try again in a moment.' };
     }
 
-    if (attendees.some(a => String(a.email || '').trim().toLowerCase() === email)) {
-      return { success: false, error: 'You are already registered for this event.' };
+    try {
+      const rawEvent = await redis.get(KEYS.event(id));
+      if (!rawEvent) {
+        return { success: false, error: 'Event not found.' };
+      }
+      const event = typeof rawEvent === 'string' ? JSON.parse(rawEvent) : rawEvent;
+
+      const capacity = Number(event.capacity) || 0;
+      const currentCount = Number(event.registeredCount) || 0;
+      if (capacity > 0 && currentCount >= capacity) {
+        return { success: false, error: 'This event has reached maximum capacity.' };
+      }
+
+      const rawAttendees = await redis.get(KEYS.eventAttendees(id));
+      let attendees = [];
+      if (rawAttendees) {
+        attendees = Array.isArray(rawAttendees) ? rawAttendees : (typeof rawAttendees === 'string' ? JSON.parse(rawAttendees) : []);
+      }
+
+      if (attendees.some(a => String(a.email || '').trim().toLowerCase() === email)) {
+        return { success: false, error: 'You are already registered for this event.' };
+      }
+
+      const isPaid = event.pricingType === 'paid' && Number(event.fee) > 0;
+      const initialStatus = isPaid ? 'pending' : 'confirmed';
+      const initialPaymentStatus = isPaid ? 'pending_verification' : 'confirmed';
+
+      const ticketId = attendee.ticketId || `TKT-${id.replace(/^EVT-/, '')}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+      const newAttendee = {
+        ticketId,
+        name: String(attendee.name || '').trim(),
+        email,
+        phone: String(attendee.phone || '').trim(),
+        company: String(attendee.company || '').trim() || 'Delegate / Independent',
+        paymentRef: String(attendee.paymentRef || '').trim() || null,
+        status: initialStatus,
+        paymentStatus: initialPaymentStatus,
+        registeredAt: new Date().toISOString(),
+      };
+
+      attendees.push(newAttendee);
+      event.registeredCount = currentCount + 1;
+
+      await redis.set(KEYS.eventAttendees(id), attendees);
+      await redis.set(KEYS.event(id), event);
+
+      return { success: true, event, attendee: newAttendee, ticketId };
+    } finally {
+      await redis.del(lockKey).catch(() => {});
+    }
+  });
+}
+
+export async function confirmEventPayment(id, ticketId, confirmedBy = 'admin') {
+  if (!id || !ticketId) {
+    return { success: false, error: 'Event ID and ticket ID are required.' };
+  }
+  return withRetry(async () => {
+    const lockKey = `bcci:lock:eventreg:${id}`;
+    let lockAcquired = false;
+    for (let attempt = 0; attempt < 30; attempt++) {
+      const res = await redis.set(lockKey, '1', { nx: true, ex: 5 });
+      if (res) {
+        lockAcquired = true;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 40));
+    }
+    if (!lockAcquired) {
+      return { success: false, error: 'Event service is busy. Please try again in a moment.' };
     }
 
-    const ticketId = attendee.ticketId || `TKT-${id.replace(/^EVT-/, '')}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-    const newAttendee = {
-      ticketId,
-      name: String(attendee.name || '').trim(),
-      email,
-      phone: String(attendee.phone || '').trim(),
-      company: String(attendee.company || '').trim() || 'Delegate / Independent',
-      paymentRef: String(attendee.paymentRef || '').trim() || null,
-      registeredAt: new Date().toISOString(),
-    };
+    try {
+      const rawEvent = await redis.get(KEYS.event(id));
+      if (!rawEvent) {
+        return { success: false, error: 'Event not found.' };
+      }
+      const event = typeof rawEvent === 'string' ? JSON.parse(rawEvent) : rawEvent;
 
-    attendees.push(newAttendee);
-    event.registeredCount = currentCount + 1;
+      const rawAttendees = await redis.get(KEYS.eventAttendees(id));
+      let attendees = [];
+      if (rawAttendees) {
+        attendees = Array.isArray(rawAttendees) ? rawAttendees : (typeof rawAttendees === 'string' ? JSON.parse(rawAttendees) : []);
+      }
 
-    await redis.set(KEYS.eventAttendees(id), attendees);
-    await redis.set(KEYS.event(id), event);
+      const idx = attendees.findIndex(a => a.ticketId === ticketId);
+      if (idx === -1) {
+        return { success: false, error: 'Attendee ticket not found.' };
+      }
 
-    return { success: true, event, attendee: newAttendee, ticketId };
+      const alreadyConfirmed = attendees[idx].paymentStatus === 'confirmed' || attendees[idx].status === 'confirmed';
+
+      if (!alreadyConfirmed) {
+        attendees[idx] = {
+          ...attendees[idx],
+          status: 'confirmed',
+          paymentStatus: 'confirmed',
+          confirmedAt: new Date().toISOString(),
+          confirmedBy,
+        };
+        await redis.set(KEYS.eventAttendees(id), attendees);
+      }
+
+      return {
+        success: true,
+        event,
+        attendee: attendees[idx],
+        alreadyConfirmed,
+      };
+    } finally {
+      await redis.del(lockKey).catch(() => {});
+    }
   });
 }
 

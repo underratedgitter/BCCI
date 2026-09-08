@@ -249,6 +249,31 @@ export const TEMPLATES = {
     }),
   }),
 
+  event_registration_pending: (d) => ({
+    subject: `Registration Acknowledged — ${d.eventTitle || 'BCCI Event'} (Pending Verification)`,
+    html: shell({
+      accent: '#0F2C59',
+      heading: 'Event Registration Acknowledged',
+      sub: 'Bharuch Chamber of Commerce & Industry',
+      body: `
+        <p style="margin:0 0 8px;font-size:15px;color:#1E293B;">Dear <strong>${esc(d.attendeeName || 'Delegate')}</strong>,</p>
+        <p style="margin:0 0 20px;font-size:14px;color:#475569;line-height:1.6;">
+          Thank you for registering for <strong>${esc(d.eventTitle)}</strong>. Your registration and payment reference (<strong>${esc(d.paymentRef || 'N/A')}</strong>) have been received and are currently pending verification by the BCCI Secretariat.
+        </p>
+        ${panel(
+          row('Event', d.eventTitle) +
+          row('Date & Time', `${d.date} • ${d.time}`) +
+          row('Delegate Name', d.attendeeName) +
+          row('Payment Reference (UTR)', d.paymentRef || 'Pending') +
+          `<tr><td style="padding:4px 0;font-size:13px;color:#D97706;font-weight:700;">Status: PAYMENT VERIFICATION PENDING</td></tr>`
+        )}
+        <p style="margin:0 0 20px;font-size:13px;color:#64748B;line-height:1.5;">
+          Once the Secretariat confirms your payment, you will receive an official E-Ticket and admission credentials at this email address.
+        </p>
+        ${helpBox}`,
+    }),
+  }),
+
 };
 
 // ── Delivery ───────────────────────────────────────────────────────

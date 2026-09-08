@@ -86,6 +86,48 @@ let createdEventId = null;
   const ev = getJson()?.events?.find(e => e.id === createdEventId);
   ck('Event present in listing', !!ev);
   ck('Initial seatsLeft equals capacity', ev?.seatsLeft === 2 && ev?.registeredCount === 0);
+  ck('Paid event venue redacted on public GET', ev?.venue?.includes('Meeting details will be sent to registered attendees'));
+
+  // Admin GET should reveal the real venue
+  const adminGet = mockReqRes({ method: 'GET', headers: { authorization: `Bearer ${adminToken}` } });
+  await eventsHandler(adminGet.req, adminGet.res);
+  const adminEv = adminGet.getJson()?.events?.find(e => e.id === createdEventId);
+  ck('Admin GET reveals real venue for paid event', adminEv?.venue === 'BCCI Convention Center, Bharuch');
+}
+
+// 4b. SEC-05: Virtual/Online event meeting URL is redacted on public GET
+let onlineEventId = '';
+{
+  const { req, res, getStatus, getJson } = mockReqRes({
+    method: 'POST',
+    headers: { authorization: `Bearer ${adminToken}` },
+    body: {
+      title: 'BCCI Virtual Webinar on GST Updates',
+      date: '2026-12-01',
+      time: '03:00 PM - 05:00 PM',
+      capacity: 100,
+      pricingType: 'free',
+      fee: 0,
+      mode: 'online',
+      venue: 'https://meet.google.com/audit-secret-room',
+      description: 'Online GST awareness session for BCCI members.',
+    },
+  });
+  await eventsHandler(req, res);
+  ck('Admin can create online virtual event', getStatus() === 201);
+  onlineEventId = getJson()?.event?.id;
+}
+{
+  const { req, res, getStatus, getJson } = mockReqRes({ method: 'GET' });
+  await eventsHandler(req, res);
+  const ev = getJson()?.events?.find(e => e.id === onlineEventId);
+  ck('SEC-05: Public GET redacts online meeting URL', !ev?.venue?.includes('meet.google.com') && ev?.venue?.includes('Meeting details will be sent to registered attendees'));
+
+  // Admin GET should reveal the real URL
+  const adminGet = mockReqRes({ method: 'GET', headers: { authorization: `Bearer ${adminToken}` } });
+  await eventsHandler(adminGet.req, adminGet.res);
+  const adminEv = adminGet.getJson()?.events?.find(e => e.id === onlineEventId);
+  ck('SEC-05: Admin GET reveals real virtual meeting URL', adminEv?.venue === 'https://meet.google.com/audit-secret-room');
 }
 
 // 5. POST /api/events?action=register on paid event requires paymentRef
@@ -124,9 +166,84 @@ let firstTicketId = null;
   await eventsHandler(req, res);
   ck('Attendee registration returns 200', getStatus() === 200);
   ck('Registration confirms success', getJson()?.success === true);
-  ck('Registration returns ticketId', !!getJson()?.ticketId);
+  ck('SEC-04: Paid registration response does NOT expose ticketId', getJson()?.ticketId === undefined);
+  ck('SEC-04: Paid attendee record does NOT expose ticketId', getJson()?.attendee?.ticketId === undefined);
   ck('Attendee record contains paymentRef', getJson()?.attendee?.paymentRef === 'UPI/982512345678');
-  firstTicketId = getJson()?.ticketId;
+  ck('SEC-04: Paid attendee is pending payment verification', getJson()?.attendee?.status === 'pending' && getJson()?.attendee?.paymentStatus === 'pending_verification');
+  ck('SEC-04: Response message informs verification pending', getJson()?.message?.toLowerCase().includes('pending'));
+  ck('VULN-P4-01: Paid event registration redacts venue in response body', getJson()?.event?.venue?.includes('Meeting details will be sent to registered attendees'));
+  ck('VULN-P4-01: Response does NOT leak secret venue before payment verification', !getJson()?.event?.venue?.includes('BCCI Convention Center, Bharuch'));
+
+  // Admin retrieves attendees to verify ticketId is only accessible with admin authorization
+  const adminAttendees = mockReqRes({
+    method: 'GET',
+    headers: { authorization: `Bearer ${adminToken}` },
+    query: { id: createdEventId, includeAttendees: 'true' },
+  });
+  await eventsHandler(adminAttendees.req, adminAttendees.res);
+  firstTicketId = adminAttendees.getJson()?.event?.attendees?.[0]?.ticketId;
+  ck('SEC-04: Admin can retrieve attendee ticket ID for verification', !!firstTicketId);
+}
+
+// 5c. SEC-04: Secretariat payment confirmation workflow
+{
+  // Non-admin rejected
+  const unauth = mockReqRes({
+    method: 'POST',
+    body: { action: 'confirm-payment', eventId: createdEventId, ticketId: firstTicketId },
+  });
+  await eventsHandler(unauth.req, unauth.res);
+  ck('SEC-04: Non-admin cannot confirm payment → 401', unauth.getStatus() === 401);
+
+  // Missing fields rejected
+  const missing = mockReqRes({
+    method: 'POST',
+    headers: { authorization: `Bearer ${adminToken}` },
+    body: { action: 'confirm-payment', eventId: createdEventId },
+  });
+  await eventsHandler(missing.req, missing.res);
+  ck('SEC-04: Missing ticket ID rejected → 400', missing.getStatus() === 400);
+
+  // Admin confirms payment
+  const confirm = mockReqRes({
+    method: 'POST',
+    headers: { authorization: `Bearer ${adminToken}` },
+    body: { action: 'confirm-payment', eventId: createdEventId, ticketId: firstTicketId },
+  });
+  await eventsHandler(confirm.req, confirm.res);
+  ck('SEC-04: Admin confirms attendee payment → 200', confirm.getStatus() === 200);
+  ck('SEC-04: Attendee status becomes confirmed', confirm.getJson()?.attendee?.status === 'confirmed');
+  ck('SEC-04: Attendee paymentStatus becomes confirmed', confirm.getJson()?.attendee?.paymentStatus === 'confirmed');
+
+  // VULN-P4-04: Replay confirmation is idempotent and marks alreadyConfirmed
+  const replayConfirm = mockReqRes({
+    method: 'POST',
+    headers: { authorization: `Bearer ${adminToken}` },
+    body: { action: 'confirm-payment', eventId: createdEventId, ticketId: firstTicketId },
+  });
+  await eventsHandler(replayConfirm.req, replayConfirm.res);
+  ck('VULN-P4-04: Replay confirmation succeeds idempotently → 200', replayConfirm.getStatus() === 200);
+  ck('VULN-P4-04: Replay confirmation flags alreadyConfirmed: true', replayConfirm.getJson()?.alreadyConfirmed === true);
+  ck('VULN-P4-04: Message indicates already verified', replayConfirm.getJson()?.message?.includes('already verified'));
+}
+
+// 5d. SEC-04: Free event registration is instantly confirmed
+{
+  const freeReg = mockReqRes({
+    method: 'POST',
+    query: { action: 'register' },
+    body: {
+      eventId: onlineEventId,
+      name: 'Free Attendee',
+      email: 'freeattendee@example.com',
+      phone: '9825111222',
+      company: 'Free Corp',
+    },
+  });
+  await eventsHandler(freeReg.req, freeReg.res);
+  ck('Free event registration returns 200', freeReg.getStatus() === 200);
+  ck('Free attendee status is confirmed immediately', freeReg.getJson()?.attendee?.status === 'confirmed');
+  ck('Free attendee paymentStatus is confirmed immediately', freeReg.getJson()?.attendee?.paymentStatus === 'confirmed');
 }
 
 // 6. Second registration succeeds with paymentRef (reaching capacity 2 of 2)

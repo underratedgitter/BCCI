@@ -9,7 +9,9 @@ import {
   updateEmployeeStatus,
   getEmployeeExpenseStats,
   listExpenses,
+  EXP_KEYS,
 } from './_lib/expenses.js';
+import { redis } from './_lib/redis.js';
 import { validateEmployeeInput } from './_lib/validation.js';
 import {
   applyCors,
@@ -91,20 +93,27 @@ async function handler(req, res) {
       return res.status(409).json({ success: false, error: `Username "${username}" is already taken.` });
     }
 
-    const created = await saveEmployee({ name, employeeId, username, password, email, status });
-    return res.status(201).json({
-      success: true,
-      message: 'Employee created successfully.',
-      employee: {
-        id: created.id,
-        employeeId: created.employeeId,
-        name: created.name,
-        username: created.username,
-        email: created.email,
-        status: created.status,
-        createdAt: created.createdAt,
-      },
-    });
+    try {
+      const created = await saveEmployee({ name, employeeId, username, password, email, status });
+      return res.status(201).json({
+        success: true,
+        message: 'Employee created successfully.',
+        employee: {
+          id: created.id,
+          employeeId: created.employeeId,
+          name: created.name,
+          username: created.username,
+          email: created.email,
+          status: created.status,
+          createdAt: created.createdAt,
+        },
+      });
+    } catch (err) {
+      if (err.statusCode === 409) {
+        return res.status(409).json({ success: false, error: err.message });
+      }
+      throw err;
+    }
   }
 
   // ── PATCH ────────────────────────────────────────────────────────
@@ -116,6 +125,16 @@ async function handler(req, res) {
     if (!emp) return res.status(404).json({ success: false, error: 'Employee not found.' });
 
     const updated = await updateEmployeeStatus(emp.id, targetStatus);
+
+    if (targetStatus === 'inactive') {
+      const rawTokens = await redis.get(`bcci:emp_tokens:${emp.id}`);
+      const tokens = rawTokens ? (typeof rawTokens === 'string' ? JSON.parse(rawTokens) : rawTokens) : [];
+      for (const t of tokens) {
+        await redis.del(EXP_KEYS.empSession(t)).catch(() => {});
+      }
+      await redis.del(`bcci:emp_tokens:${emp.id}`).catch(() => {});
+    }
+
     return res.status(200).json({
       success: true,
       message: `Employee status updated to ${targetStatus}.`,

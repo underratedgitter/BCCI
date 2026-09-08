@@ -145,12 +145,34 @@ export class Store {
     return result.application;
   }
 
-  /** Extends the member's own membership by one year. */
+  /** Requests or executes membership renewal with payment reference. */
   async renewMembership(appId, utrRef = '') {
     const result = await this.apiCall('/api/applications', {
       method: 'PATCH',
       body: { id: appId, action: 'renew', paymentRef: utrRef },
       auth: this.isAdminAuthed() ? 'admin' : 'applicant',
+    });
+    return result.application;
+  }
+
+  /** Secretariat approval of a pending renewal (Admin Only). */
+  async approveRenewal(appId, utrRef = '') {
+    const body = { id: appId, action: 'approve-renewal' };
+    if (utrRef) body.paymentRef = utrRef;
+    const result = await this.apiCall('/api/applications', {
+      method: 'PATCH',
+      body,
+      auth: 'admin',
+    });
+    return result.application;
+  }
+
+  /** Secretariat rejection of a pending renewal (Admin Only). */
+  async rejectRenewal(appId, reason = '') {
+    const result = await this.apiCall('/api/applications', {
+      method: 'PATCH',
+      body: { id: appId, action: 'reject-renewal', reason },
+      auth: 'admin',
     });
     return result.application;
   }
@@ -252,6 +274,15 @@ export class Store {
     const result = await this.apiCall('/api/events?action=register', {
       method: 'POST',
       body: { eventId: id, ...attendeeData },
+    });
+    return result;
+  }
+
+  async confirmEventPayment(eventId, ticketId) {
+    const result = await this.apiCall('/api/events?action=confirm-payment', {
+      method: 'POST',
+      body: { eventId, ticketId },
+      auth: 'admin',
     });
     return result;
   }

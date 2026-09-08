@@ -231,6 +231,9 @@ ck('store has getEvents method', typeof store.getEvents === 'function');
 ck('store has broadcastEvent method', typeof store.broadcastEvent === 'function');
 ck('store has deleteEvent method', typeof store.deleteEvent === 'function');
 ck('store has registerForEvent method', typeof store.registerForEvent === 'function');
+ck('store has confirmEventPayment method', typeof store.confirmEventPayment === 'function');
+ck('store has approveRenewal method', typeof store.approveRenewal === 'function');
+ck('store has rejectRenewal method', typeof store.rejectRenewal === 'function');
 
 // Test 2: applicantLogin success
 localStorage.clear();
@@ -1374,8 +1377,8 @@ ck('closeModal removes modal-open class from body', SRC.includes("document.body.
 const cssContent = fs.readFileSync(new URL('../css/styles.css', import.meta.url), 'utf8');
 ck('styles.css has body.modal-open overflow hidden', cssContent.includes('body.modal-open') && cssContent.includes('overflow: hidden'));
 ck('styles.css hides main on print when modal-open', cssContent.includes('body.modal-open main') || cssContent.includes('body:has(.modal-backdrop.show) main'));
-ck('index.html favicon uses relative assets/ path', indexHtml.includes('href="assets/favicon-32.png"'));
-ck('index.html apple-touch-icon uses relative assets/ path', indexHtml.includes('href="assets/apple-touch-icon.png"'));
+ck('index.html favicon uses relative assets/ path', /href="\/?assets\/favicon-32\.png"/.test(indexHtml));
+ck('index.html apple-touch-icon uses relative assets/ path', /href="\/?assets\/apple-touch-icon\.png"/.test(indexHtml));
 
 console.log('\nMember Profile Dropdown & Membership Details Modal');
 console.log('──────────────────────────────────────────────────');
@@ -1454,6 +1457,28 @@ ck('annualTurnover has inputmode="numeric" in index.html', indexHtml.includes('n
 ck('employees has inputmode="numeric" in index.html', indexHtml.includes('name="employees"') && indexHtml.includes('inputmode="numeric"'));
 ck('app.js blocks non-digits on keydown for turnover & employees', SRC.includes('blockNonDigits') && SRC.includes('turnoverInput.addEventListener(\'keydown\', blockNonDigits)'));
 ck('app.js sanitizes non-digits on input for employees', SRC.includes('employeesInput.addEventListener(\'input\', (e) => {') && SRC.includes('replace(/\\D/g, \'\')'));
+
+console.log('\nFUNC-01  Public QR Verification Routing & UI');
+console.log('──────────────────────────────────────────────');
+ck('app.js includes verify in VIEW_PATHS', SRC.includes("verify: '/verify'"));
+ck('app.js includes verify in PAGE_TITLES', SRC.includes("verify: 'Member Verification — BCCI Bharuch'"));
+ck('app.js routes /verify and /verify/* in viewFromLocation', SRC.includes("path === '/verify' || path.startsWith('/verify/')"));
+ck('index.html contains #view-verify section', indexHtml.includes('id="view-verify"'));
+ck('index.html contains #verificationContainer', indexHtml.includes('id="verificationContainer"'));
+ck('app.js defines renderVerificationView', SRC.includes('async renderVerificationView()'));
+ck('renderVerificationView queries /api/applications?verifyId=', SRC.includes('/api/applications?verifyId='));
+ck('renderVerificationView handles verifyResetBtn', SRC.includes('verifyResetBtn'));
+
+console.log('\nUX-01 / UX-02  Mobile Layout, Responsive Cards & Grid Constraints');
+console.log('─────────────────────────────────────────────────────────────────');
+ck('index.html contains reportsCards container for mobile cards', indexHtml.includes('id="reportsCards"'));
+ck('index.html contains empHistoryCards container for mobile cards', indexHtml.includes('id="empHistoryCards"'));
+ck('app.js populates reportsCards in renderMonthlyExpenseReports', SRC.includes("document.getElementById('reportsCards')"));
+ck('app.js populates empHistoryCards in openEmployeeHistoryModal', SRC.includes("document.getElementById('empHistoryCards')"));
+ck('styles.css constrains .admin-layout min-width: 0 and max-width: 100%', cssContent.includes('.admin-layout {') && cssContent.includes('min-width: 0;') && cssContent.includes('max-width: 100%;'));
+ck('styles.css defines .admin-content min-width: 0', cssContent.includes('.admin-content {') && cssContent.includes('min-width: 0;'));
+ck('styles.css enforces single column on .admin-metrics-grid at <= 480px', /@media\s*\(max-width:\s*480px\)[\s\S]*?\.admin-metrics-grid\s*\{\s*grid-template-columns:\s*1fr;/m.test(cssContent));
+ck('styles.css enforces word-break on .admin-mobile-card', cssContent.includes('.admin-mobile-card {') && cssContent.includes('word-break: break-word;'));
 
 console.log(`\n${'═'.repeat(52)}\n  ${pass} passed, ${fail} failed\n${'═'.repeat(52)}`);
 process.exit(fail?1:0);

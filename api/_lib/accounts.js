@@ -3,12 +3,21 @@
 import crypto from 'node:crypto';
 import { redis, KEYS, withRetry } from './redis.js';
 
+import util from 'node:util';
+const scryptAsync = util.promisify(crypto.scrypt);
+
 /**
  * Hash a plaintext password using scrypt with a 16-byte random salt and 64-byte key.
  * @param {string} password - Candidate or new password.
  * @param {string} [existingSalt] - Optional salt (for re-hashing or testing).
- * @returns {{ hash: string, salt: string }}
+ * @returns {Promise<{ hash: string, salt: string }>}
  */
+export async function hashPasswordAsync(password, existingSalt = null) {
+  const salt = existingSalt || crypto.randomBytes(16).toString('hex');
+  const buf = await scryptAsync(password, salt, 64);
+  return { hash: buf.toString('hex'), salt };
+}
+
 export function hashPassword(password, existingSalt = null) {
   const salt = existingSalt || crypto.randomBytes(16).toString('hex');
   const hash = crypto.scryptSync(password, salt, 64).toString('hex');
@@ -20,8 +29,23 @@ export function hashPassword(password, existingSalt = null) {
  * @param {string} candidatePassword - Plaintext password attempt.
  * @param {string} storedHash - Stored hex-encoded scrypt hash.
  * @param {string} salt - Stored hex-encoded salt.
- * @returns {boolean}
+ * @returns {Promise<boolean>}
  */
+export async function verifyPasswordAsync(candidatePassword, storedHash, salt) {
+  if (!candidatePassword || !storedHash || !salt) return false;
+  if (typeof candidatePassword !== 'string' || typeof storedHash !== 'string' || typeof salt !== 'string') {
+    return false;
+  }
+  try {
+    const buf = await scryptAsync(candidatePassword, salt, 64);
+    const b = Buffer.from(storedHash, 'hex');
+    if (buf.length !== b.length) return false;
+    return crypto.timingSafeEqual(buf, b);
+  } catch {
+    return false;
+  }
+}
+
 export function verifyPassword(candidatePassword, storedHash, salt) {
   if (!candidatePassword || !storedHash || !salt) return false;
   if (typeof candidatePassword !== 'string' || typeof storedHash !== 'string' || typeof salt !== 'string') {
@@ -64,7 +88,7 @@ export async function getAccount(email) {
  */
 export async function saveAccount(email, password) {
   const cleanEmail = String(email).trim().toLowerCase();
-  const { hash, salt } = hashPassword(password);
+  const { hash, salt } = await hashPasswordAsync(password);
   const now = new Date().toISOString();
   const current = await getAccount(cleanEmail);
   const account = {
@@ -73,6 +97,7 @@ export async function saveAccount(email, password) {
     salt,
     createdAt: current?.createdAt || now,
     updatedAt: now,
+    passwordUpdatedAt: now,
   };
   await withRetry(async () => {
     await redis.set(KEYS.account(cleanEmail), account);

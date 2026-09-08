@@ -61,8 +61,9 @@ async function handler(req, res) {
   const otp = crypto.randomInt(100000, 1000000).toString();
 
   await withRetry(() => redis.set(`bcci:otp:${email}`, otp, { ex: OTP_TTL_SECONDS }));
-  // A fresh code clears the failed-attempt counter for the previous one.
+  // A fresh code clears the failed-attempt counter for the previous one and any consumption lock.
   await redis.del(`bcci:rl:otpverify:${email}`).catch(() => {});
+  await redis.del(`bcci:otp:claimed:${email}`).catch(() => {});
 
   const result = await sendRaw({
     to: email,

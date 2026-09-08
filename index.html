@@ -676,12 +676,12 @@
           <form id="enquiryForm">
             <div class="form-grid">
               <div class="form-group">
-                <label class="form-label">Company Name</label>
-                <input type="text" class="form-control" name="company" placeholder="Enter Your Company Name" />
+                <label class="form-label" for="enquiryCompany">Company Name</label>
+                <input type="text" id="enquiryCompany" class="form-control" name="company" placeholder="Enter Your Company Name" />
               </div>
               <div class="form-group">
-                <label class="form-label">Membership Interest</label>
-                <select class="form-select" name="membershipType">
+                <label class="form-label" for="enquiryMembershipType">Membership Interest</label>
+                <select id="enquiryMembershipType" class="form-select" name="membershipType">
                   <option value="None">None / General Question</option>
                   <option value="Corporate">Corporate Membership</option>
                   <option value="Associate">Associate Membership</option>
@@ -689,24 +689,24 @@
                 </select>
               </div>
               <div class="form-group">
-                <label class="form-label">Full Name <span class="req">*</span></label>
-                <input type="text" class="form-control" name="name" placeholder="Enter Your Full Name" required />
+                <label class="form-label" for="enquiryName">Full Name <span class="req">*</span></label>
+                <input type="text" id="enquiryName" class="form-control" name="name" placeholder="Enter Your Full Name" required />
               </div>
               <div class="form-group">
-                <label class="form-label">Phone Number <span class="req">*</span></label>
-                <input type="tel" class="form-control" name="phone" placeholder="Enter Contact Number" required />
+                <label class="form-label" for="enquiryPhone">Phone Number <span class="req">*</span></label>
+                <input type="tel" id="enquiryPhone" class="form-control" name="phone" placeholder="Enter Contact Number" required />
               </div>
               <div class="form-group full-width">
-                <label class="form-label">Email Address <span class="req">*</span></label>
-                <input type="email" class="form-control" name="email" placeholder="Enter Official Email ID" required />
+                <label class="form-label" for="enquiryEmail">Email Address <span class="req">*</span></label>
+                <input type="email" id="enquiryEmail" class="form-control" name="email" placeholder="Enter Official Email ID" required />
               </div>
               <div class="form-group full-width">
-                <label class="form-label">Subject <span class="req">*</span></label>
-                <input type="text" class="form-control" name="subject" value="BCCI General Inquiry" required />
+                <label class="form-label" for="enquirySubject">Subject <span class="req">*</span></label>
+                <input type="text" id="enquirySubject" class="form-control" name="subject" value="BCCI General Inquiry" required />
               </div>
               <div class="form-group full-width">
-                <label class="form-label">Message / Question <span class="req">*</span></label>
-                <textarea class="form-control" name="message" placeholder="Type your message here..."
+                <label class="form-label" for="enquiryMessage">Message / Question <span class="req">*</span></label>
+                <textarea id="enquiryMessage" class="form-control" name="message" placeholder="Type your message here..."
                   required></textarea>
               </div>
             </div>
@@ -999,13 +999,13 @@
                 </h3>
             <div class="form-grid">
               <div class="form-group full-width">
-                <label class="form-label">Registered Enterprise / Firm Name <span class="req">*</span></label>
-                <input type="text" class="form-control" name="company"
+                <label class="form-label" for="appCompany">Registered Enterprise / Firm Name <span class="req">*</span></label>
+                <input type="text" id="appCompany" class="form-control" name="company"
                   placeholder="e.g. Gujarat Petrochem Synthetics Ltd." required />
               </div>
               <div class="form-group">
-                <label class="form-label">Legal Status <span class="req">*</span></label>
-                <select class="form-select" name="legalStatus" required>
+                <label class="form-label" for="appLegalStatus">Legal Status <span class="req">*</span></label>
+                <select id="appLegalStatus" class="form-select" name="legalStatus" required>
                   <option value="Pvt. Ltd.">Private Limited (Pvt. Ltd.)</option>
                   <option value="Public Ltd.">Public Limited</option>
                   <option value="Partnership">Partnership Firm</option>
@@ -1015,8 +1015,8 @@
                 </select>
               </div>
               <div class="form-group">
-                <label class="form-label">Enterprise Category <span class="req">*</span></label>
-                <select class="form-select" name="enterpriseType" required>
+                <label class="form-label" for="appEnterpriseType">Enterprise Category <span class="req">*</span></label>
+                <select id="appEnterpriseType" class="form-select" name="enterpriseType" required>
                   <option value="Micro">Micro Enterprise</option>
                   <option value="Small">Small Enterprise</option>
                   <option value="Medium">Medium Enterprise</option>
@@ -1024,8 +1024,8 @@
                 </select>
               </div>
               <div class="form-group">
-                <label class="form-label">Primary Business Services <span class="req">*</span></label>
-                <select class="form-select" name="businessServices" required>
+                <label class="form-label" for="appBusinessServices">Primary Business Services <span class="req">*</span></label>
+                <select id="appBusinessServices" class="form-select" name="businessServices" required>
                   <option value="Chemical & Petrochemicals">Chemical &amp; Petrochemicals</option>
                   <option value="Pharmaceuticals">Pharmaceuticals</option>
                   <option value="Information Technology">Information Technology &amp; AI</option>
@@ -1049,21 +1049,21 @@
                   autocomplete="off" required />
               </div>
               <div class="form-group">
-                <label class="form-label">GSTIN Number <span class="req">*</span></label>
-                <input type="text" class="form-control" name="gstNo" placeholder="e.g. 24AAAAA0000A1Z5" maxlength="15"
+                <label class="form-label" for="appGstNo">GSTIN Number <span class="req">*</span></label>
+                <input type="text" id="appGstNo" class="form-control" name="gstNo" placeholder="e.g. 24AAAAA0000A1Z5" maxlength="15"
                   pattern="^[0-9]{2}[A-Za-z]{5}[0-9]{4}[A-Za-z]{1}[1-9A-Za-z]{1}[Zz][0-9A-Za-z]{1}$" autocomplete="off"
                   required />
                 <small class="form-hint">15-character GSTIN (auto-uppercase)</small>
               </div>
               <div class="form-group">
-                <label class="form-label">PAN Number <span class="req">*</span></label>
-                <input type="text" class="form-control" name="panNo" placeholder="e.g. ABCDE1234F" maxlength="10"
+                <label class="form-label" for="appPanNo">PAN Number <span class="req">*</span></label>
+                <input type="text" id="appPanNo" class="form-control" name="panNo" placeholder="e.g. ABCDE1234F" maxlength="10"
                   pattern="^[A-Za-z]{5}[0-9]{4}[A-Za-z]{1}$" autocomplete="off" required />
                 <small class="form-hint">10-character PAN (auto-uppercase)</small>
               </div>
               <div class="form-group">
-                <label class="form-label">CIN (If Corporate)</label>
-                <input type="text" class="form-control" name="cin" placeholder="e.g. L24110GJ1998PLC034120"
+                <label class="form-label" for="appCin">CIN (If Corporate)</label>
+                <input type="text" id="appCin" class="form-control" name="cin" placeholder="e.g. L24110GJ1998PLC034120"
                   maxlength="21" pattern="^[LUu][0-9]{5}[A-Za-z]{2}[0-9]{4}[A-Za-z]{3}[0-9]{6}$" autocomplete="off" />
                 <small class="form-hint">21-character Corporate ID (if applicable)</small>
               </div>
@@ -1074,13 +1074,13 @@
                 </h3>
               </div>
               <div class="form-group full-width">
-                <label class="form-label">Office / Plant Address <span class="req">*</span></label>
-                <input type="text" class="form-control" name="address" placeholder="Enter Full Street / GIDC Address"
+                <label class="form-label" for="appAddress">Office / Plant Address <span class="req">*</span></label>
+                <input type="text" id="appAddress" class="form-control" name="address" placeholder="Enter Full Street / GIDC Address"
                   required />
               </div>
               <div class="form-group">
-                <label class="form-label">District <span class="req">*</span></label>
-                <select class="form-select" name="district" required>
+                <label class="form-label" for="appDistrict">District <span class="req">*</span></label>
+                <select id="appDistrict" class="form-select" name="district" required>
                   <option value="Bharuch" selected>Bharuch</option>
                   <option value="Surat">Surat</option>
                   <option value="Vadodara">Vadodara</option>
@@ -1089,8 +1089,8 @@
                 </select>
               </div>
               <div class="form-group">
-                <label class="form-label">Pincode <span class="req">*</span></label>
-                <input type="text" class="form-control" name="pincode" placeholder="e.g. 392001" maxlength="6"
+                <label class="form-label" for="appPincode">Pincode <span class="req">*</span></label>
+                <input type="text" id="appPincode" class="form-control" name="pincode" placeholder="e.g. 392001" maxlength="6"
                   pattern="^[1-9][0-9]{5}$" autocomplete="off" required />
                 <small class="form-hint">6-digit postal pincode</small>
               </div>
@@ -1101,22 +1101,22 @@
                 </h3>
               </div>
               <div class="form-group">
-                <label class="form-label">Representative Name <span class="req">*</span></label>
-                <input type="text" class="form-control" name="repName" placeholder="Full Name" required />
+                <label class="form-label" for="appRepName">Representative Name <span class="req">*</span></label>
+                <input type="text" id="appRepName" class="form-control" name="repName" placeholder="Full Name" required />
               </div>
               <div class="form-group">
-                <label class="form-label">Designation <span class="req">*</span></label>
-                <input type="text" class="form-control" name="repDesignation" placeholder="e.g. Managing Director / CEO"
+                <label class="form-label" for="appRepDesignation">Designation <span class="req">*</span></label>
+                <input type="text" id="appRepDesignation" class="form-control" name="repDesignation" placeholder="e.g. Managing Director / CEO"
                   required />
               </div>
               <div class="form-group">
-                <label class="form-label">Official Email <span class="req">*</span></label>
-                <input type="email" class="form-control" name="email" placeholder="admin@company.com" required />
+                <label class="form-label" for="appOfficialEmail">Official Email <span class="req">*</span></label>
+                <input type="email" id="appOfficialEmail" class="form-control" name="email" placeholder="admin@company.com" required />
                 <small class="form-hint">Valid official email ID</small>
               </div>
               <div class="form-group">
-                <label class="form-label">Mobile Number <span class="req">*</span></label>
-                <input type="tel" class="form-control" name="phone" placeholder="e.g. 9825012345" maxlength="16"
+                <label class="form-label" for="appMobileNumber">Mobile Number <span class="req">*</span></label>
+                <input type="tel" id="appMobileNumber" class="form-control" name="phone" placeholder="e.g. 9825012345" maxlength="16"
                   pattern="^[6-9][0-9]{9}$" autocomplete="off" required />
                 <small class="form-hint">10-digit Indian Mobile Number</small>
               </div>
@@ -1167,8 +1167,8 @@
                       </div>
 
                       <div class="form-group">
-                        <label class="form-label">Payment UTR / Transaction Ref No. (Optional)</label>
-                        <input type="text" class="form-control" name="paymentRef" placeholder="e.g. UPI/423589012345" />
+                        <label class="form-label" for="paymentRefInput">Payment UTR / Transaction Ref No. (Optional)</label>
+                        <input type="text" id="paymentRefInput" class="form-control" name="paymentRef" placeholder="e.g. UPI/423589012345" />
                         <small style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.2rem;">
                           If you have already paid via UPI, enter your transaction ID here for instant payment matching
                           by BCCI Admin.
@@ -1192,7 +1192,7 @@
                     <div class="file-upload-box" id="paymentProofDropzone"
                       style="background: #FFFFFF; border: 2px dashed #93C5FD; border-radius: var(--radius-md); padding: 1.75rem 1.25rem; text-align: center; cursor: pointer;">
                       <input type="file" name="paymentProof" id="paymentProofInput" accept="image/png, image/jpeg, image/webp"
-                        class="file-upload-input" required />
+                        class="file-upload-input" aria-label="Upload Payment Receipt Screenshot" required />
                       <div class="file-upload-content" id="paymentProofPlaceholder">
                         <div
                           style="width: 56px; height: 56px; background: #EFF6FF; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--primary); font-size: 1.5rem; margin-bottom: 0.75rem;">
@@ -1329,6 +1329,26 @@
     </section>
   </main>
 
+  <!-- 7c. PUBLIC MEMBER VERIFICATION VIEW (FUNC-01) -->
+  <main id="view-verify" class="view-page" style="display: none;">
+    <section class="section-padding">
+      <div class="container" style="max-width: 620px; margin: 0 auto;">
+        <div class="section-header" style="text-align: center;">
+          <span class="section-tag"><i class="fas fa-shield-alt"></i> Official Credential Verification</span>
+          <h2 class="section-title">Membership Verification</h2>
+          <p class="section-desc">Public registry verification for Bharuch Chamber of Commerce &amp; Industry credentials.</p>
+        </div>
+
+        <div id="verificationContainer" style="background: var(--white); border: var(--rule); border-radius: var(--radius-md); padding: 2rem; box-shadow: var(--shadow-sm); min-height: 200px;">
+          <div style="text-align: center; color: var(--text-muted); padding: 2rem;">
+            <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i>
+            <p style="margin-top: 1rem; font-weight: 500;">Validating membership credential...</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
   <!-- 8. ADMIN SIGN IN PAGE VIEW -->
   <main id="view-signin" class="view-page" style="display: none;">
     <section class="section-padding section-alt">
@@ -1362,13 +1382,13 @@
               <p class="signin-subtitle">BCCI Secretariat Access</p>
 
               <div class="form-group" style="margin-bottom: 1.5rem;">
-                <label class="form-label">Username / Official Email <span class="req">*</span></label>
+                <label class="form-label" for="pageAdminUser">Username / Official Email <span class="req">*</span></label>
                 <input type="text" id="pageAdminUser" class="form-control" placeholder="admin@bccibharuch.in"
                   required autocomplete="username" />
               </div>
 
               <div class="form-group" style="margin-bottom: 2rem;">
-                <label class="form-label">Password <span class="req">*</span></label>
+                <label class="form-label" for="pageAdminPass">Password <span class="req">*</span></label>
                 <input type="password" id="pageAdminPass" class="form-control" placeholder="Enter your password" required
                   autocomplete="current-password" />
               </div>
@@ -1539,7 +1559,7 @@
 
               <!-- Document Dropzone -->
               <div class="form-group" style="margin-bottom: 1.75rem;">
-                <label class="form-label">Attach Bill / Receipt Document <span class="req">*</span> <small style="color: var(--text-muted); font-weight: 400;">(PDF, PNG, JPG, WEBP — Max 1.5MB)</small></label>
+                <label class="form-label" for="expenseReceiptInput">Attach Bill / Receipt Document <span class="req">*</span> <small style="color: var(--text-muted); font-weight: 400;">(PDF, PNG, JPG, WEBP — Max 1.5MB)</small></label>
                 <div id="expenseReceiptDropzone" class="expense-dropzone">
                   <input type="file" id="expenseReceiptInput" accept=".pdf,image/png,image/jpeg,image/webp" style="display: none;" />
                   
@@ -2134,6 +2154,7 @@
                   <tbody id="reportsTableBody"></tbody>
                 </table>
               </div>
+              <div class="admin-mobile-cards" id="reportsCards"></div>
             </div>
           </div>
         </div>
@@ -2314,6 +2335,7 @@
           <tbody id="empHistoryTableBody"></tbody>
         </table>
       </div>
+      <div class="admin-mobile-cards" id="empHistoryCards"></div>
     </div>
   </div>
 

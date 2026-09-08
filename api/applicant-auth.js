@@ -3,8 +3,8 @@
 // and OTP-driven password reset.
 
 import crypto from 'crypto';
-import { redis, KEYS, withRetry } from './_lib/redis.js';
-import { getAccount, saveAccount, verifyPassword } from './_lib/accounts.js';
+import { redis, KEYS, withRetry, getApplicationByEmail } from './_lib/redis.js';
+import { getAccount, saveAccount, verifyPassword, verifyPasswordAsync } from './_lib/accounts.js';
 import { sendRaw } from './_lib/email.js';
 import {
   applyCors,
@@ -22,6 +22,10 @@ import {
 const SESSION_TTL_SECONDS = 24 * 60 * 60; // 24 hours
 const OTP_TTL_SECONDS = 600; // 10 minutes
 const MAX_OTP_ATTEMPTS = 5;
+
+// Pre-computed dummy salt & hash to ensure constant-time response for absent accounts (SEC-01)
+const DUMMY_SALT = '0123456789abcdef0123456789abcdef';
+const DUMMY_HASH = '0123456789abcdef'.repeat(8);
 
 const resetOtpEmail = (code) => `
 <div style="font-family:Arial,sans-serif;text-align:center;padding:40px;background:#F1F5F9;">
@@ -67,21 +71,23 @@ async function handler(req, res) {
     }
 
     const account = await getAccount(email);
+
+    // SEC-01: Uniform response and constant-time verification for all invalid logins:
+    // Nonexistent accounts, accounts without password set, and wrong passwords all return 401
+    // with identical structure and execute scrypt password hashing to eliminate timing differences.
     if (!account || !account.passwordHash) {
-      return res.status(400).json({
-        success: false,
-        code: 'PASSWORD_NOT_SET',
-        error: 'No password set for this account yet. Please register or reset password using OTP.',
-      });
+      await verifyPasswordAsync(password, DUMMY_HASH, DUMMY_SALT).catch(() => false);
+      return res.status(401).json({ success: false, error: 'Invalid email or password.' });
     }
 
-    if (!verifyPassword(password, account.passwordHash, account.salt)) {
+    if (!await verifyPasswordAsync(password, account.passwordHash, account.salt)) {
       return res.status(401).json({ success: false, error: 'Invalid email or password.' });
     }
 
     const token = crypto.randomUUID();
+    const sessionData = { email, issuedAt: Date.now() };
     await withRetry(() =>
-      redis.set(KEYS.applicantSession(token), email, { ex: SESSION_TTL_SECONDS })
+      redis.set(KEYS.applicantSession(token), sessionData, { ex: SESSION_TTL_SECONDS })
     );
 
     return res.status(200).json({
@@ -137,6 +143,15 @@ async function handler(req, res) {
       });
     }
 
+    // Atomic single-use claim: only the first concurrent request can claim this OTP
+    const claimed = await redis.set(`bcci:otp:claimed:${email}`, '1', { nx: true, ex: 60 });
+    if (!claimed) {
+      return res.status(400).json({
+        success: false,
+        error: 'That code has expired or was already used. Please request a new one.',
+      });
+    }
+
     // Save account with password hash and salt
     await saveAccount(email, password);
 
@@ -146,8 +161,9 @@ async function handler(req, res) {
 
     // Issue session token
     const token = crypto.randomUUID();
+    const sessionData = { email, issuedAt: Date.now() };
     await withRetry(() =>
-      redis.set(KEYS.applicantSession(token), email, { ex: SESSION_TTL_SECONDS })
+      redis.set(KEYS.applicantSession(token), sessionData, { ex: SESSION_TTL_SECONDS })
     );
 
     return res.status(201).json({
@@ -184,22 +200,29 @@ async function handler(req, res) {
       return tooManyRequests(res, perIp.retryAfter, 'Too many requests from this network. Please try again later.');
     }
 
-    const otp = crypto.randomInt(100000, 1000000).toString();
-    await withRetry(() => redis.set(KEYS.otpReset(email), otp, { ex: OTP_TTL_SECONDS }));
-    await redis.del(`bcci:rl:otpresetverify:${email}`).catch(() => {});
+    // Verify account or application exists before dispatching mail, but always return uniform response (SEC-01)
+    const account = await getAccount(email);
+    const legacyApp = !account ? await getApplicationByEmail(email) : null;
 
-    const result = await sendRaw({
-      to: email,
-      subject: 'BCCI Password Reset Code',
-      html: resetOtpEmail(otp),
-    });
+    if (account || legacyApp) {
+      const otp = crypto.randomInt(100000, 1000000).toString();
+      await withRetry(() => redis.set(KEYS.otpReset(email), otp, { ex: OTP_TTL_SECONDS }));
+      await redis.del(`bcci:rl:otpresetverify:${email}`).catch(() => {});
+      await redis.del(`bcci:otp:reset:claimed:${email}`).catch(() => {});
 
-    if (!result.success) {
-      await redis.del(KEYS.otpReset(email)).catch(() => {});
-      return res.status(502).json({
-        success: false,
-        error: 'We could not send the password reset email. Please try again in a moment.',
+      const result = await sendRaw({
+        to: email,
+        subject: 'BCCI Password Reset Code',
+        html: resetOtpEmail(otp),
       });
+
+      if (!result.success) {
+        await redis.del(KEYS.otpReset(email)).catch(() => {});
+        return res.status(502).json({
+          success: false,
+          error: 'We could not send the password reset email. Please try again in a moment.',
+        });
+      }
     }
 
     return res.status(200).json({
@@ -248,6 +271,15 @@ async function handler(req, res) {
       });
     }
 
+    // Atomic single-use claim: only the first concurrent request can claim this reset OTP
+    const claimed = await redis.set(`bcci:otp:reset:claimed:${email}`, '1', { nx: true, ex: 60 });
+    if (!claimed) {
+      return res.status(400).json({
+        success: false,
+        error: 'That code has expired or was already used. Please request a new one.',
+      });
+    }
+
     // Upsert account with new password hash and salt
     await saveAccount(email, newPassword);
 
@@ -257,8 +289,9 @@ async function handler(req, res) {
 
     // Issue session token
     const token = crypto.randomUUID();
+    const sessionData = { email, issuedAt: Date.now() };
     await withRetry(() =>
-      redis.set(KEYS.applicantSession(token), email, { ex: SESSION_TTL_SECONDS })
+      redis.set(KEYS.applicantSession(token), sessionData, { ex: SESSION_TTL_SECONDS })
     );
 
     return res.status(200).json({

@@ -71,6 +71,15 @@ async function handler(req, res) {
     });
   }
 
+  // Atomic single-use claim: only the first concurrent request can claim this OTP
+  const claimed = await redis.set(`bcci:otp:claimed:${email}`, '1', { nx: true, ex: 60 });
+  if (!claimed) {
+    return res.status(400).json({
+      success: false,
+      error: 'That code has expired or was already used. Please request a new one.',
+    });
+  }
+
   // Success — clear the code and the attempt counter.
   await redis.del(`bcci:otp:${email}`).catch(() => {});
   await redis.del(`bcci:rl:otpverify:${email}`).catch(() => {});
@@ -79,8 +88,9 @@ async function handler(req, res) {
   // object the browser simply stored, so anyone could hand-write one in the
   // console and be treated as any member.
   const token = crypto.randomUUID();
+  const sessionData = { email, issuedAt: Date.now() };
   await withRetry(() =>
-    redis.set(KEYS.applicantSession(token), email, { ex: SESSION_TTL_SECONDS })
+    redis.set(KEYS.applicantSession(token), sessionData, { ex: SESSION_TTL_SECONDS })
   );
 
   console.log(`[OTP] verified ${email}`);

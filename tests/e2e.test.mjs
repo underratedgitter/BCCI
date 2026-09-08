@@ -54,6 +54,10 @@ ck('GET / returns the portal', r.status === 200 && r.text.includes('Bharuch Cham
 r = await req('/about');
 ck('GET /about resolves via the SPA fallback', r.status === 200 && r.text.includes('<!DOCTYPE html>'), `status ${r.status}`);
 
+r = await req('/verify/BCCI-2026-TEST');
+ck('FUNC-01: GET /verify/:id resolves via SPA fallback to public verification view', r.status === 200 && r.text.includes('id="view-verify"'), `status ${r.status}`);
+ck('FUNC-01: verification page links root-relative scripts avoiding sub-path 404', r.text.includes('src="/js/app.js'));
+
 r = await req('/css/styles.css');
 ck('stylesheet served', r.status === 200 && r.headers.get('content-type').includes('text/css'));
 
@@ -176,7 +180,10 @@ ck('dashboard counts 1 approved', r.json?.stats?.approved === 1, JSON.stringify(
 
 sec('A year later, the renewal reminder');
 r = await req('/api/applications', { method: 'PATCH', token: memberToken, body: { id: appId, action: 'renew', paymentRef: 'UPI/999' } });
-ck('member renews their own membership', r.status === 200 && r.json?.application?.renewalYears === 2);
+ck('member requests renewal (pending verification)', r.status === 200 && r.json?.application?.renewalStatus === 'Pending Verification');
+
+r = await req('/api/applications', { method: 'PATCH', token: adminToken, body: { id: appId, action: 'approve-renewal' } });
+ck('secretariat approves renewal extending tenure to 2 years', r.status === 200 && r.json?.application?.renewalYears === 2);
 
 sec('Enquiries from the public');
 r = await req('/api/enquiries', { method: 'POST', body: { name: 'Amit Desai', email: 'amit@example.com', phone: '9898123456', subject: 'Certificate of Origin', message: 'How do I apply for a CoO?' } });

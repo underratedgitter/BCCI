@@ -10,10 +10,12 @@ import {
   deleteEvent,
   getEventAttendees,
   registerForEvent,
+  confirmEventPayment,
 } from './_lib/redis.js';
 import {
   applyCors,
   handlePreflight,
+  getAdminSession,
   requireAdmin,
   rateLimit,
   tooManyRequests,
@@ -32,12 +34,26 @@ function newEventId() {
     .toUpperCase()}`;
 }
 
+function getPublicVenue(event, isAdmin = false) {
+  if (!event) return '';
+  if (isAdmin) return event.venue;
+  const isPaid = event.pricingType === 'paid' && Number(event.fee) > 0;
+  const isOnline = event.mode === 'online' || /^https?:\/\//i.test(String(event.venue || '').trim());
+  if (isPaid || isOnline) {
+    return 'Meeting details will be sent to registered attendees upon payment confirmation.';
+  }
+  return event.venue;
+}
+
 async function handler(req, res) {
   applyCors(req, res, 'GET, POST, DELETE, OPTIONS');
   if (handlePreflight(req, res)) return;
 
   // ── 1. GET — List events (public) or single event ────────────────
   if (req.method === 'GET') {
+    const adminEmail = await getAdminSession(req);
+    const isAdmin = !!adminEmail;
+
     const eventId = str(req.query?.id, 100);
     if (eventId) {
       const event = await getEvent(eventId);
@@ -48,13 +64,14 @@ async function handler(req, res) {
       const registered = Number(event.registeredCount) || 0;
       const enriched = {
         ...event,
+        venue: getPublicVenue(event, isAdmin),
         seatsLeft: Math.max(0, capacity - registered),
         isFull: capacity > 0 && registered >= capacity,
       };
 
       if (req.query?.includeAttendees === 'true') {
-        const isAdmin = await requireAdmin(req, res);
-        if (!isAdmin) return;
+        const isAdminSession = await requireAdmin(req, res);
+        if (!isAdminSession) return;
         enriched.attendees = await getEventAttendees(eventId);
       }
       return res.status(200).json({ success: true, event: enriched });
@@ -66,6 +83,7 @@ async function handler(req, res) {
       const reg = Number(e.registeredCount) || 0;
       return {
         ...e,
+        venue: getPublicVenue(e, isAdmin),
         seatsLeft: Math.max(0, cap - reg),
         isFull: cap > 0 && reg >= cap,
       };
@@ -128,7 +146,59 @@ async function handler(req, res) {
 
       const ticketId = result.ticketId || result.attendee?.ticketId || `TKT-${eventId.slice(-6)}-${Date.now().toString(36).toUpperCase()}`;
 
-      // Dispatch ticket email in background
+      // SEC-04: If event is paid, acknowledge registration pending Secretariat verification.
+      // Do NOT send the confidential meeting link / access pass until payment is confirmed.
+      const isPaid = targetEvent.pricingType === 'paid' && Number(targetEvent.fee) > 0;
+      if (isPaid) {
+        sendEmail({
+          type: 'event_registration_pending',
+          to: email,
+          data: {
+            ticketId,
+            eventTitle: result.event.title,
+            date: result.event.date,
+            time: result.event.time,
+            pricingType: result.event.pricingType,
+            fee: result.event.fee,
+            paymentRef: result.attendee.paymentRef,
+            attendeeName: result.attendee.name,
+            company: result.attendee.company,
+            phone: result.attendee.phone,
+            email: result.attendee.email,
+          },
+        }).catch((err) => {
+          console.warn('[BCCI Event] Failed to dispatch registration pending email:', err.message);
+        });
+
+        console.log(`[BCCI Event] Registered ${email} (pending verification) for event ${eventId}`);
+        return res.status(200).json({
+          success: true,
+          message: 'Registration received! Your registration is pending payment verification. You will receive your official E-Ticket once payment is verified.',
+          event: {
+            id: result.event.id,
+            title: result.event.title,
+            date: result.event.date,
+            time: result.event.time,
+            mode: result.event.mode,
+            pricingType: result.event.pricingType,
+            fee: result.event.fee,
+            venue: getPublicVenue(result.event, false),
+          },
+          attendee: {
+            name: result.attendee.name,
+            email: result.attendee.email,
+            phone: result.attendee.phone,
+            company: result.attendee.company,
+            paymentRef: result.attendee.paymentRef,
+            status: result.attendee.status,
+            paymentStatus: result.attendee.paymentStatus,
+            registeredAt: result.attendee.registeredAt,
+          },
+          status: 'pending',
+        });
+      }
+
+      // Free event: instant confirmation with full admission pass
       sendEmail({
         type: 'event_ticket',
         to: email,
@@ -161,7 +231,62 @@ async function handler(req, res) {
       });
     }
 
-    // ── 2b. Broadcast New Event (Admin Only) ──────────────────────────
+    // ── 2b. Secretariat Payment Confirmation (Admin Only) ─────────────
+    if (action === 'confirm-payment') {
+      if (!(await requireAdmin(req, res))) return;
+
+      const body = req.body || {};
+      const eventId = str(body.eventId || req.query?.eventId, 100);
+      const ticketId = str(body.ticketId || req.query?.ticketId, 100);
+      const adminEmail = await getAdminSession(req);
+
+      if (!eventId || !ticketId) {
+        return res.status(400).json({ success: false, error: 'Event ID and Ticket ID are required.' });
+      }
+
+      const result = await confirmEventPayment(eventId, ticketId, adminEmail || 'admin');
+      if (!result.success) {
+        return res.status(400).json({ success: false, error: result.error || 'Failed to confirm attendee payment.' });
+      }
+
+      // Dispatch the confirmed official E-Ticket with real venue / meeting credentials only if not already confirmed
+      if (!result.alreadyConfirmed) {
+        sendEmail({
+          type: 'event_ticket',
+          to: result.attendee.email,
+          data: {
+            ticketId: result.attendee.ticketId,
+            eventTitle: result.event.title,
+            date: result.event.date,
+            time: result.event.time,
+            venue: result.event.venue,
+            mode: result.event.mode,
+            pricingType: result.event.pricingType,
+            fee: result.event.fee,
+            paymentRef: result.attendee.paymentRef,
+            attendeeName: result.attendee.name,
+            company: result.attendee.company,
+            phone: result.attendee.phone,
+            email: result.attendee.email,
+          },
+        }).catch((err) => {
+          console.warn('[BCCI Event] Failed to dispatch confirmed ticket email:', err.message);
+        });
+      }
+
+      console.log(`[BCCI Event] Payment confirmed for ticket ${ticketId} (${result.attendee.email}) on event ${eventId} (alreadyConfirmed: ${!!result.alreadyConfirmed})`);
+      return res.status(200).json({
+        success: true,
+        message: result.alreadyConfirmed
+          ? 'Attendee payment is already verified.'
+          : 'Attendee payment verified and official E-Ticket issued.',
+        event: result.event,
+        attendee: result.attendee,
+        alreadyConfirmed: !!result.alreadyConfirmed,
+      });
+    }
+
+    // ── 2c. Broadcast New Event (Admin Only) ──────────────────────────
     if (!(await requireAdmin(req, res))) return;
 
     const body = req.body || {};

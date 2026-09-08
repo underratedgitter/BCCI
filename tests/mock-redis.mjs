@@ -37,6 +37,13 @@ function run(cmd) {
     }
     case 'GET':
       return store.has(key) ? store.get(key) : null;
+    case 'GETDEL': {
+      if (!store.has(key)) return null;
+      const val = store.get(key);
+      store.delete(key);
+      expiries.delete(key);
+      return val;
+    }
     case 'EXISTS':
       return cmd.slice(1).filter((k) => alive(k) && (store.has(k) || zsets.has(k))).length;
     case 'MGET':

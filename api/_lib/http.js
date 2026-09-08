@@ -62,8 +62,44 @@ export async function getAdminSession(req) {
 export async function getApplicantSession(req) {
   const token = bearerToken(req);
   if (!token) return null;
-  const email = await withRetry(() => redis.get(KEYS.applicantSession(token)));
-  return email ? String(email).toLowerCase() : null;
+  const raw = await withRetry(() => redis.get(KEYS.applicantSession(token)));
+  if (!raw) return null;
+
+  let email = null;
+  let issuedAt = null;
+  if (typeof raw === 'object' && raw !== null) {
+    email = raw.email;
+    issuedAt = raw.issuedAt;
+  } else if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && parsed.email) {
+        email = parsed.email;
+        issuedAt = parsed.issuedAt;
+      } else {
+        email = raw;
+      }
+    } catch {
+      email = raw;
+    }
+  }
+  if (!email) return null;
+  const cleanEmail = String(email).toLowerCase();
+
+  const accountRaw = await redis.get(KEYS.account(cleanEmail)).catch(() => null);
+  if (accountRaw) {
+    const account = typeof accountRaw === 'string' ? JSON.parse(accountRaw) : accountRaw;
+    if (account?.passwordUpdatedAt) {
+      const pwdUpdatedMs = Date.parse(account.passwordUpdatedAt);
+      const issuedMs = typeof issuedAt === 'number' ? issuedAt : (issuedAt ? Date.parse(issuedAt) : NaN);
+      if (!Number.isFinite(issuedMs) || issuedMs < pwdUpdatedMs) {
+        await redis.del(KEYS.applicantSession(token)).catch(() => {});
+        return null;
+      }
+    }
+  }
+
+  return cleanEmail;
 }
 
 /** Writes a 401 and returns null when there is no valid admin session. */
@@ -82,7 +118,29 @@ export async function getEmployeeSession(req) {
   if (!token) return null;
   const raw = await withRetry(() => redis.get(`bcci:employee_session:${token}`));
   if (!raw) return null;
-  return typeof raw === 'string' ? JSON.parse(raw) : raw;
+  const session = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  if (!session || !session.employeeId) return null;
+
+  // Revalidate employee status in database
+  let emp = null;
+  if (session.id) {
+    const rawEmp = await withRetry(() => redis.get(`bcci:emp:${session.id}`));
+    if (rawEmp) emp = typeof rawEmp === 'string' ? JSON.parse(rawEmp) : rawEmp;
+  }
+  if (!emp && session.employeeId) {
+    const empId = await withRetry(() => redis.get(`bcci:emp_code:${session.employeeId.toUpperCase()}`));
+    if (empId) {
+      const rawEmp = await withRetry(() => redis.get(`bcci:emp:${empId}`));
+      if (rawEmp) emp = typeof rawEmp === 'string' ? JSON.parse(rawEmp) : rawEmp;
+    }
+  }
+
+  if (emp && emp.status === 'inactive') {
+    await redis.del(`bcci:employee_session:${token}`).catch(() => {});
+    return null;
+  }
+
+  return session;
 }
 
 /** Writes a 401 and returns null when there is no valid employee session. */

@@ -50,6 +50,11 @@ async function handler(req, res) {
     applications: applications.length,
     enquiries: totalEnquiries,
     expenses,
+    expensesTotal: expenses.totalExpenses,
+    expensesClaimedAmount: expenses.totalClaimed,
+    expensesApprovedAmount: expenses.totalApproved,
+    expensesPending: expenses.pendingApprovals,
+    employeesCount: expenses.totalEmployees,
     checkedAt: new Date().toISOString(),
   });
 }

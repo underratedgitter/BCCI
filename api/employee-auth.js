@@ -3,12 +3,13 @@
 
 import crypto from 'node:crypto';
 import { redis, withRetry } from './_lib/redis.js';
-import { verifyPassword } from './_lib/accounts.js';
+import { verifyPassword, verifyPasswordAsync } from './_lib/accounts.js';
 import { getEmployeeByUsername, EXP_KEYS } from './_lib/expenses.js';
 import {
   applyCors,
   handlePreflight,
   bearerToken,
+  getEmployeeSession,
   rateLimit,
   tooManyRequests,
   clientIp,
@@ -18,6 +19,10 @@ import {
 
 const SESSION_TTL_SECONDS = 24 * 60 * 60; // 24 hours
 
+// Pre-computed dummy salt & hash to ensure constant-time response for absent accounts (SEC-01)
+const DUMMY_SALT = '0123456789abcdef0123456789abcdef';
+const DUMMY_HASH = '0123456789abcdef'.repeat(8);
+
 async function handler(req, res) {
   applyCors(req, res, 'GET, POST, DELETE, OPTIONS');
   if (handlePreflight(req, res)) return;
@@ -25,7 +30,20 @@ async function handler(req, res) {
   // ── Logout ───────────────────────────────────────────────────────
   if (req.method === 'DELETE') {
     const token = bearerToken(req);
-    if (token) await redis.del(EXP_KEYS.empSession(token)).catch(() => {});
+    if (token) {
+      const raw = await redis.get(EXP_KEYS.empSession(token));
+      if (raw) {
+        const sess = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (sess?.id) {
+          const rawTokens = await redis.get(`bcci:emp_tokens:${sess.id}`);
+          const tokens = rawTokens ? (typeof rawTokens === 'string' ? JSON.parse(rawTokens) : rawTokens) : [];
+          const remaining = tokens.filter((t) => t !== token);
+          if (remaining.length) await redis.set(`bcci:emp_tokens:${sess.id}`, remaining, { ex: SESSION_TTL_SECONDS });
+          else await redis.del(`bcci:emp_tokens:${sess.id}`).catch(() => {});
+        }
+      }
+      await redis.del(EXP_KEYS.empSession(token)).catch(() => {});
+    }
     return res.status(200).json({ success: true, message: 'Signed out successfully.' });
   }
 
@@ -33,9 +51,8 @@ async function handler(req, res) {
   if (req.method === 'GET') {
     const token = bearerToken(req);
     if (!token) return res.status(401).json({ success: false, error: 'No token provided.' });
-    const raw = await redis.get(EXP_KEYS.empSession(token));
-    if (!raw) return res.status(401).json({ success: false, error: 'Invalid or expired session.' });
-    const session = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    const session = await getEmployeeSession(req);
+    if (!session) return res.status(401).json({ success: false, error: 'Invalid, deactivated, or expired session.' });
     return res.status(200).json({ success: true, session });
   }
 
@@ -63,7 +80,12 @@ async function handler(req, res) {
   }
 
   const emp = await getEmployeeByUsername(username);
-  if (!emp || !verifyPassword(password, emp.passwordHash, emp.salt)) {
+  if (!emp) {
+    await verifyPasswordAsync(password, DUMMY_HASH, DUMMY_SALT).catch(() => false);
+    return res.status(401).json({ success: false, error: 'Invalid username or password.' });
+  }
+
+  if (!await verifyPasswordAsync(password, emp.passwordHash, emp.salt)) {
     return res.status(401).json({ success: false, error: 'Invalid username or password.' });
   }
 
@@ -86,9 +108,13 @@ async function handler(req, res) {
     expiresIn: SESSION_TTL_SECONDS,
   };
 
-  await withRetry(() =>
-    redis.set(EXP_KEYS.empSession(token), session, { ex: SESSION_TTL_SECONDS })
-  );
+  await withRetry(async () => {
+    await redis.set(EXP_KEYS.empSession(token), session, { ex: SESSION_TTL_SECONDS });
+    const rawTokens = await redis.get(`bcci:emp_tokens:${emp.id}`);
+    const tokens = rawTokens ? (typeof rawTokens === 'string' ? JSON.parse(rawTokens) : rawTokens) : [];
+    tokens.push(token);
+    await redis.set(`bcci:emp_tokens:${emp.id}`, tokens, { ex: SESSION_TTL_SECONDS });
+  });
 
   return res.status(200).json({ success: true, session });
 }

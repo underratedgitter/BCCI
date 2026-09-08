@@ -212,3 +212,29 @@ test('Admin stats response includes expenses summary without breaking existing s
   assert.ok(res.body.expenses !== undefined);
   assert.ok(res.body.expenses.totalExpenses >= 1);
 });
+
+test('SEC-09: Expense submission endpoint enforces rate limiting after burst', async () => {
+  const ip = '198.51.100.222';
+  let lastStatus = 200;
+  for (let i = 0; i < 35; i++) {
+    const req = {
+      method: 'POST',
+      headers: {
+        host: 'localhost',
+        authorization: `Bearer ${EMP_A_TOKEN}`,
+        'x-forwarded-for': ip,
+      },
+      body: {
+        claimedAmount: 100,
+        expenseDate: '2026-03-15',
+        category: 'Travel',
+        description: `Rate limit test ${i}`,
+      },
+    };
+    const res = mockRes();
+    await expensesHandler(req, res);
+    lastStatus = res.statusCode;
+    if (res.statusCode === 429) break;
+  }
+  assert.equal(lastStatus, 429, 'Excessive submissions must be rate-limited with 429');
+});

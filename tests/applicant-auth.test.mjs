@@ -10,7 +10,7 @@ process.env.UPSTASH_REDIS_REST_TOKEN = 'test-token';
 process.env.ALLOWED_ORIGIN = 'https://bccibharuch.in';
 process.env.SMTP_TRANSPORT = 'json';
 
-const { hashPassword, verifyPassword, getAccount, saveAccount } = await import('../api/_lib/accounts.js');
+const { hashPassword, hashPasswordAsync, verifyPassword, verifyPasswordAsync, getAccount, saveAccount } = await import('../api/_lib/accounts.js');
 const { redis, KEYS } = await import('../api/_lib/redis.js');
 const applicantAuth = (await import('../api/applicant-auth.js')).default;
 
@@ -56,6 +56,17 @@ test('hashPassword produces distinct salts and hashes', () => {
   assert.notEqual(h1.hash, h2.hash);
   assert.equal(verifyPassword('SuperSecret123', h1.hash, h1.salt), true);
   assert.equal(verifyPassword('WrongPassword', h1.hash, h1.salt), false);
+});
+
+test('hashPasswordAsync produces valid salts and verifies asynchronously', async () => {
+  const h1 = await hashPasswordAsync('SuperSecret123');
+  const h2 = await hashPasswordAsync('SuperSecret123');
+  assert.notEqual(h1.salt, h2.salt);
+  assert.notEqual(h1.hash, h2.hash);
+  assert.equal(await verifyPasswordAsync('SuperSecret123', h1.hash, h1.salt), true);
+  assert.equal(await verifyPasswordAsync('WrongPassword', h1.hash, h1.salt), false);
+  assert.equal(await verifyPasswordAsync('', h1.hash, h1.salt), false);
+  assert.equal(await verifyPasswordAsync('SuperSecret123', 'invalid', h1.salt), false);
 });
 
 test('hashPassword supports reusing salt', () => {
@@ -140,15 +151,38 @@ test('applicant-auth rejects unknown action with 400', async () => {
   assert.equal(res.body.success, false);
 });
 
-test('action "login": returns 400 with PASSWORD_NOT_SET when account has no password set', async () => {
+test('SEC-01: action "login" returns indistinguishable 401 when account has no password set', async () => {
+  await redis.set(KEYS.account('nopassword@example.com'), { email: 'nopassword@example.com', createdAt: new Date().toISOString() });
   const res = await call(applicantAuth, {
     method: 'POST',
     body: { action: 'login', email: 'nopassword@example.com', password: 'AnyPassword123' },
   });
-  assert.equal(res.statusCode, 400);
+  assert.equal(res.statusCode, 401);
   assert.equal(res.body.success, false);
-  assert.equal(res.body.code, 'PASSWORD_NOT_SET');
-  assert.match(res.body.error, /No password set/i);
+  assert.equal(res.body.code, undefined);
+  assert.equal(res.body.error, 'Invalid email or password.');
+});
+
+test('SEC-01: action "login" returns 401 for non-existent absent accounts (no enumeration)', async () => {
+  const res = await call(applicantAuth, {
+    method: 'POST',
+    body: { action: 'login', email: 'absent-account@example.com', password: 'AnyPassword123' },
+  });
+  assert.equal(res.statusCode, 401);
+  assert.equal(res.body.success, false);
+  assert.match(res.body.error, /Invalid email or password/i);
+});
+
+test('SEC-01: action "forgot-password-request" returns 200 without leaking account absence', async () => {
+  const res = await call(applicantAuth, {
+    method: 'POST',
+    body: { action: 'forgot-password-request', email: 'absent-for-reset@example.com' },
+    ip: '198.51.100.99',
+  });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.success, true);
+  const stored = await redis.get(KEYS.otpReset('absent-for-reset@example.com'));
+  assert.equal(stored, null);
 });
 
 test('action "login": returns 401 on wrong credentials', async () => {
@@ -206,9 +240,11 @@ test('action "register": creates account and returns 201 + session on valid OTP'
   assert.equal(account.email, email);
   assert.equal(verifyPassword('SecurePassword123!', account.passwordHash, account.salt), true);
 
-  // Session token should exist in Redis
+  // Session token should exist in Redis with metadata
   const sessionUser = await redis.get(KEYS.applicantSession(res.body.session.token));
-  assert.equal(sessionUser, email);
+  const userEmail = typeof sessionUser === 'object' && sessionUser !== null ? sessionUser.email : sessionUser;
+  assert.equal(userEmail, email);
+  assert.ok(sessionUser.issuedAt || (typeof sessionUser === 'string' && JSON.parse(sessionUser).issuedAt));
 });
 
 test('action "login": returns 200 + session with newly registered credentials', async () => {
@@ -225,7 +261,9 @@ test('action "login": returns 200 + session with newly registered credentials', 
   assert.equal(res.body.session.expiresIn, 86400);
 
   const sessionUser = await redis.get(KEYS.applicantSession(res.body.session.token));
-  assert.equal(sessionUser, email);
+  const userEmail = typeof sessionUser === 'object' && sessionUser !== null ? sessionUser.email : sessionUser;
+  assert.equal(userEmail, email);
+  assert.ok(sessionUser.issuedAt || (typeof sessionUser === 'string' && JSON.parse(sessionUser).issuedAt));
 });
 
 test('action "forgot-password-request": dispatches OTP code and stores in redis', async () => {
@@ -298,7 +336,7 @@ test('action "login": enforces rate limiting after 10 attempts', async () => {
       body: { action: 'login', email, password: 'BadPassword1' },
       ip,
     });
-    assert.equal(res.statusCode, 400); // PASSWORD_NOT_SET
+    assert.equal(res.statusCode, 401); // Invalid email or password (no enumeration)
   }
 
   const blockedRes = await call(applicantAuth, {
@@ -331,7 +369,7 @@ test('action "forgot-password-request": enforces 1 request per minute per email 
   assert.equal(res2.body.success, false);
 });
 
-test('action "login": returns PASSWORD_NOT_SET for legacy account without passwordHash', async () => {
+test('SEC-01: action "login": returns indistinguishable 401 for legacy account without passwordHash', async () => {
   const email = 'legacy@example.com';
   // Manually store account object without passwordHash
   await redis.set(KEYS.account(email), { email, createdAt: new Date().toISOString() });
@@ -341,8 +379,98 @@ test('action "login": returns PASSWORD_NOT_SET for legacy account without passwo
     body: { action: 'login', email, password: 'SomePassword123' },
     ip: '198.51.100.123',
   });
-  assert.equal(res.statusCode, 400);
-  assert.equal(res.body.code, 'PASSWORD_NOT_SET');
+  assert.equal(res.statusCode, 401);
+  assert.equal(res.body.success, false);
+  assert.equal(res.body.code, undefined);
+  assert.equal(res.body.error, 'Invalid email or password.');
 });
 
+test('SEC-02: Password reset invalidates previously issued applicant sessions', async () => {
+  const { getApplicantSession } = await import('../api/_lib/http.js');
+  const email = 'invalidation-test@example.com';
+  await saveAccount(email, 'FirstPassword123');
 
+  // Issue session 1 via login
+  const loginRes = await call(applicantAuth, {
+    method: 'POST',
+    body: { action: 'login', email, password: 'FirstPassword123' },
+    ip: '203.0.113.77',
+  });
+  assert.equal(loginRes.statusCode, 200);
+  const token1 = loginRes.body.session.token;
+
+  // token1 is valid initially
+  const sess1Before = await getApplicantSession({ headers: { authorization: `Bearer ${token1}` } });
+  assert.equal(sess1Before, email);
+
+  // Small delay to ensure timestamp strictly advances
+  await new Promise((r) => setTimeout(r, 20));
+
+  // Password reset occurs
+  await redis.set(`bcci:otp:reset:${email}`, '999888', { ex: 600 });
+  const resetRes = await call(applicantAuth, {
+    method: 'POST',
+    body: { action: 'reset-password', email, code: '999888', newPassword: 'SecondPassword123' },
+    ip: '203.0.113.77',
+  });
+  assert.equal(resetRes.statusCode, 200);
+  const token2 = resetRes.body.session.token;
+
+  // Previously issued session (token1) must now be invalidated
+  const sess1After = await getApplicantSession({ headers: { authorization: `Bearer ${token1}` } });
+  assert.equal(sess1After, null, 'Previous session must be invalidated after password reset');
+
+  // Newly issued session (token2) remains valid
+  const sess2 = await getApplicantSession({ headers: { authorization: `Bearer ${token2}` } });
+  assert.equal(sess2, email, 'New session must remain valid');
+});
+
+test('SEC-02: Session without issuedAt metadata is revoked if account has passwordUpdatedAt', async () => {
+  const { getApplicantSession } = await import('../api/_lib/http.js');
+  const email = 'no-metadata@example.com';
+  await saveAccount(email, 'FirstPassword123');
+
+  // Manually insert session without issuedAt
+  const legacyToken = 'legacy-no-metadata-token';
+  await redis.set(KEYS.applicantSession(legacyToken), { email });
+
+  const check = await getApplicantSession({ headers: { authorization: `Bearer ${legacyToken}` } });
+  assert.equal(check, null, 'Un-metadated session must be rejected when account has passwordUpdatedAt');
+});
+
+test('SEC-02: OTP-verified session is revoked after subsequent password reset', async () => {
+  const { getApplicantSession } = await import('../api/_lib/http.js');
+  const verifyOtpHandler = (await import('../api/verify-otp.js')).default;
+  const email = 'otp-invalidation@example.com';
+  await saveAccount(email, 'FirstPassword123');
+
+  // Issue session via OTP verification
+  await redis.set(`bcci:otp:${email}`, '112233', { ex: 600 });
+  const otpRes = await call(verifyOtpHandler, {
+    method: 'POST',
+    body: { email, code: '112233' },
+  });
+  assert.equal(otpRes.statusCode, 200);
+  const otpToken = otpRes.body.session.token;
+
+  const beforeReset = await getApplicantSession({ headers: { authorization: `Bearer ${otpToken}` } });
+  assert.equal(beforeReset, email);
+
+  await new Promise((r) => setTimeout(r, 20));
+
+  // Reset password
+  await redis.set(`bcci:otp:reset:${email}`, '554433', { ex: 600 });
+  const resetRes = await call(applicantAuth, {
+    method: 'POST',
+    body: { action: 'reset-password', email, code: '554433', newPassword: 'NewPassword999!' },
+    ip: '203.0.113.88',
+  });
+  assert.equal(resetRes.statusCode, 200);
+  const newToken = resetRes.body.session.token;
+
+  const afterReset = await getApplicantSession({ headers: { authorization: `Bearer ${otpToken}` } });
+  assert.equal(afterReset, null, 'OTP session must be revoked after password reset');
+
+  const newValid = await getApplicantSession({ headers: { authorization: `Bearer ${newToken}` } });
+  assert.equal(newValid, email, 'Newly issued session works');
+});

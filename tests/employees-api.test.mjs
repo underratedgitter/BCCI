@@ -123,3 +123,33 @@ test('PATCH /api/employees toggles status without deleting history', async () =>
   assert.ok(found);
   assert.equal(found.status, 'inactive');
 });
+
+test('SEC-10: Concurrent employee creation with identical ID/username handles race condition atomically', async () => {
+  const req1 = mockReq('POST', {
+    body: {
+      name: 'Racer One',
+      employeeId: 'BCCI-RACE-01',
+      username: 'racer.unique',
+      password: 'Password999!',
+    },
+  });
+  const res1 = mockRes();
+
+  const req2 = mockReq('POST', {
+    body: {
+      name: 'Racer Two',
+      employeeId: 'BCCI-RACE-01',
+      username: 'racer.unique',
+      password: 'Password999!',
+    },
+  });
+  const res2 = mockRes();
+
+  await Promise.all([
+    employeesHandler(req1, res1),
+    employeesHandler(req2, res2),
+  ]);
+
+  const statuses = [res1.statusCode, res2.statusCode].sort();
+  assert.deepEqual(statuses, [201, 409], 'Exactly one employee creation must succeed, the second must be rejected with 409');
+});
