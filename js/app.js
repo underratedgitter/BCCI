@@ -1741,16 +1741,20 @@ class App {
   openMobileDrawer() {
     const drawer = document.getElementById('mobileNavDrawer');
     const backdrop = document.getElementById('mobileDrawerBackdrop');
+    const mobileBtn = document.getElementById('mobileMenuBtn');
     if (drawer) drawer.classList.add('open');
     if (backdrop) backdrop.classList.add('show');
+    if (mobileBtn) mobileBtn.setAttribute('aria-expanded', 'true');
     document.body.style.overflow = 'hidden';
   }
 
   closeMobileDrawer() {
     const drawer = document.getElementById('mobileNavDrawer');
     const backdrop = document.getElementById('mobileDrawerBackdrop');
+    const mobileBtn = document.getElementById('mobileMenuBtn');
     if (drawer) drawer.classList.remove('open');
     if (backdrop) backdrop.classList.remove('show');
+    if (mobileBtn) mobileBtn.setAttribute('aria-expanded', 'false');
     document.body.style.overflow = '';
   }
 
@@ -1782,6 +1786,12 @@ class App {
     if (mobileBtn) mobileBtn.addEventListener('click', () => this.openMobileDrawer());
     if (drawerCloseBtn) drawerCloseBtn.addEventListener('click', () => this.closeMobileDrawer());
     if (backdrop) backdrop.addEventListener('click', () => this.closeMobileDrawer());
+
+    window.addEventListener('resize', () => {
+      if (window.innerWidth > 1024) {
+        this.closeMobileDrawer();
+      }
+    });
 
     const drawer = document.getElementById('mobileNavDrawer');
     if (drawer) {

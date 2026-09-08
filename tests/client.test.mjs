@@ -1479,6 +1479,12 @@ ck('styles.css constrains .admin-layout min-width: 0 and max-width: 100%', cssCo
 ck('styles.css defines .admin-content min-width: 0', cssContent.includes('.admin-content {') && cssContent.includes('min-width: 0;'));
 ck('styles.css enforces single column on .admin-metrics-grid at <= 480px', /@media\s*\(max-width:\s*480px\)[\s\S]*?\.admin-metrics-grid\s*\{\s*grid-template-columns:\s*1fr;/m.test(cssContent));
 ck('styles.css enforces word-break on .admin-mobile-card', cssContent.includes('.admin-mobile-card {') && cssContent.includes('word-break: break-word;'));
+ck('styles.css collapses nav-links at max-width: 1024px', /@media\s*\(max-width:\s*1024px\)[\s\S]*?\.nav-links\s*\{\s*display:\s*none\s*!important;/.test(cssContent));
+ck('styles.css activates mobile-menu-btn at max-width: 1024px', /@media\s*\(max-width:\s*1024px\)[\s\S]*?\.mobile-menu-btn\s*\{\s*display:\s*flex\s*!important;/.test(cssContent));
+ck('styles.css provides compact navbar for 1025px - 1200px viewports', cssContent.includes('@media (min-width: 1025px) and (max-width: 1200px)'));
+ck('styles.css ensures mobile drawer is hidden on desktop >= 1025px', /@media\s*\(min-width:\s*1025px\)[\s\S]*?\.mobile-drawer[\s\S]*?display:\s*none\s*!important;/.test(cssContent));
+ck('app.js registers window resize listener to auto-close drawer above 1024px', SRC.includes("window.addEventListener('resize'") && SRC.includes("window.innerWidth > 1024") && SRC.includes("this.closeMobileDrawer()"));
+ck('index.html mobileMenuBtn includes aria-controls and aria-expanded', indexHtml.includes('id="mobileMenuBtn"') && indexHtml.includes('aria-controls="mobileNavDrawer"') && indexHtml.includes('aria-expanded="false"'));
 
 console.log(`\n${'═'.repeat(52)}\n  ${pass} passed, ${fail} failed\n${'═'.repeat(52)}`);
 process.exit(fail?1:0);
