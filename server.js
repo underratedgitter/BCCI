@@ -81,6 +81,11 @@ function decorate(res) {
   return res;
 }
 
+// Route aliases map legacy/consolidated endpoints to their host function
+const ROUTE_ALIASES = {
+  'admin-stats': 'applications',
+};
+
 // Handlers are loaded once and reused, the way a long-lived process should.
 const handlerCache = new Map();
 
@@ -163,16 +168,20 @@ const server = http.createServer(async (req, res) => {
   try {
     // ── API ────────────────────────────────────────────────────────
     if (pathname === '/api' || pathname.startsWith('/api/')) {
-      const name = pathname.slice(5);
+      const rawName = pathname.slice(5);
       // Route names only: no slashes, no dots, no traversal.
-      if (!/^[a-z0-9-]+$/i.test(name)) {
+      if (!/^[a-z0-9-]+$/i.test(rawName)) {
         return res.status(404).json({ error: 'Not found' });
       }
 
+      const name = ROUTE_ALIASES[rawName] || rawName;
       const handler = await loadHandler(name);
       if (!handler) return res.status(404).json({ error: 'Not found' });
 
       req.query = Object.fromEntries(url.searchParams);
+      if (rawName === 'admin-stats') {
+        req.query.stats = 'true';
+      }
       if (req.method !== 'GET' && req.method !== 'HEAD') {
         const raw = await readBody(req);
         if (raw) {

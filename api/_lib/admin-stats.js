@@ -1,14 +1,14 @@
 // api/admin-stats.js
 // Dashboard counters for the admin portal.
 
-import { listApplications, countEnquiries, STATUS } from './_lib/redis.js';
-import { getExpenseSummaryMetrics } from './_lib/expenses.js';
+import { listApplications, countEnquiries, STATUS } from './redis.js';
+import { getExpenseSummaryMetrics } from './expenses.js';
 import {
   applyCors,
   handlePreflight,
   requireAdmin,
   withErrorHandling,
-} from './_lib/http.js';
+} from './http.js';
 
 async function handler(req, res) {
   applyCors(req, res, 'GET, OPTIONS');

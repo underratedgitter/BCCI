@@ -9,7 +9,7 @@ process.env.UPSTASH_REDIS_REST_TOKEN = 'test-token';
 
 const { redis } = await import('../api/_lib/redis.js');
 const expensesHandler = (await import('../api/expenses.js')).default;
-const adminStatsHandler = (await import('../api/admin-stats.js')).default;
+const adminStatsHandler = (await import('../api/_lib/admin-stats.js')).default;
 const { saveEmployee } = await import('../api/_lib/expenses.js');
 
 test.after(() => {

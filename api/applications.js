@@ -27,6 +27,7 @@ import {
 } from './_lib/http.js';
 import { sendEmail, adminRecipients } from './_lib/email.js';
 import { validateFileSignature } from './_lib/validation.js';
+import adminStatsHandler from './_lib/admin-stats.js';
 
 // A receipt is base64 in the JSON body, so the cap has to leave room for it.
 const MAX_BODY_SIZE = 900 * 1024;
@@ -46,6 +47,11 @@ function validUntil(app) {
 }
 
 async function handler(req, res) {
+  // Admin dashboard stats route dispatch (via /api/admin-stats rewrite or ?stats=true)
+  if (req.query?.stats === 'true' || req.query?.stats === '1') {
+    return await adminStatsHandler(req, res);
+  }
+
   applyCors(req, res, 'GET, POST, PATCH, OPTIONS');
   if (handlePreflight(req, res)) return;
 
@@ -604,4 +610,5 @@ async function handler(req, res) {
   return res.status(405).json({ error: 'Method not allowed' });
 }
 
+export { adminStatsHandler };
 export default withErrorHandling('Applications', handler);

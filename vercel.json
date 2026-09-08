@@ -5,6 +5,10 @@
   ],
   "rewrites": [
     {
+      "source": "/api/admin-stats",
+      "destination": "/api/applications?stats=true"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }

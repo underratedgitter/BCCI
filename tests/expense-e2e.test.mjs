@@ -13,7 +13,7 @@ const { redis } = await import('../api/_lib/redis.js');
 const employeesHandler = (await import('../api/employees.js')).default;
 const expensesHandler = (await import('../api/expenses.js')).default;
 const employeeAuthHandler = (await import('../api/employee-auth.js')).default;
-const adminStatsHandler = (await import('../api/admin-stats.js')).default;
+const adminStatsHandler = (await import('../api/_lib/admin-stats.js')).default;
 
 test.after(() => {
   mock.server.close();
