@@ -186,9 +186,9 @@ export class Store {
   getMembershipValidity(app) {
     if (!app || app.status !== 'Approved') return null;
 
-    const approvedDate = app.approvedAt
-      ? new Date(app.approvedAt)
-      : new Date(app.submittedAt || Date.now());
+    // validFrom (set for members imported from the Secretariat register) is the
+    // date their membership year started; otherwise the year runs from approval.
+    const approvedDate = new Date(app.validFrom || app.approvedAt || app.submittedAt || Date.now());
     const validUntil = new Date(approvedDate);
     const yearsToAdd = Number(app.renewalYears) || 1;
     validUntil.setFullYear(validUntil.getFullYear() + yearsToAdd);

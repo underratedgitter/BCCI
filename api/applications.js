@@ -54,9 +54,13 @@ function newApplicationId() {
 
 const INDIAN_DATE = { day: 'numeric', month: 'long', year: 'numeric' };
 
-/** Membership expiry, mirroring the client's getMembershipValidity(). */
+/**
+ * Membership expiry, mirroring the client's getMembershipValidity(). The year runs
+ * from validFrom when set (members imported from the Secretariat register, whose
+ * year starts on the date they paid), otherwise from approval.
+ */
 function validUntil(app) {
-  const from = app.approvedAt ? new Date(app.approvedAt) : new Date(app.submittedAt || Date.now());
+  const from = new Date(app.validFrom || app.approvedAt || app.submittedAt || Date.now());
   const until = new Date(from);
   until.setFullYear(until.getFullYear() + (Number(app.renewalYears) || 1));
   return until;

@@ -30,10 +30,24 @@ const MEMBERSHIP_FEES = {
 
 const MEMBERSHIP_PLANS = Object.keys(MEMBERSHIP_FEES);
 
+/**
+ * Membership plan as shown in the admin portal: the plan's type with the amount the
+ * member actually paid (e.g. "Micro & Small - ₹1,000/-"), since members imported
+ * from the Secretariat register often paid a different amount than the plan's list
+ * price. The stored plan name is unchanged; renewals still price from it.
+ */
+function membershipPlanLabel(app) {
+  if (!app.membershipPlan) return '';
+  const paid = Number(app.paymentAmount);
+  if (!(paid > 0)) return app.membershipPlan;
+  const type = String(app.membershipPlan).replace(/\s*-\s*₹.*$/, '').trim() || app.membershipPlan;
+  return `${type} - ₹${paid.toLocaleString('en-IN')}/-`;
+}
+
 /** Highlighted membership-plan chip for admin lists and the dossier; "—" for legacy records without a plan. */
 function membershipPlanChip(app) {
   if (!app.membershipPlan) return '<span style="color: #94A3B8;">—</span>';
-  return `<span style="display: inline-block; background: #FEF3C7; color: #92400E; border: 1px solid #FCD34D; border-radius: 999px; padding: 0.15rem 0.6rem; font-size: 0.78rem; font-weight: 700; white-space: nowrap;">${escapeHtml(app.membershipPlan)}</span>`;
+  return `<span style="display: inline-block; background: #FEF3C7; color: #92400E; border: 1px solid #FCD34D; border-radius: 999px; padding: 0.15rem 0.6rem; font-size: 0.78rem; font-weight: 700; white-space: nowrap;">${escapeHtml(membershipPlanLabel(app))}</span>`;
 }
 
 function formatMembershipFee(amount) {
@@ -1260,7 +1274,7 @@ class App {
             ${isApproved ? field('Approved Date', formatDate(app.approvedAt || app.submittedAt)) : ''}
             ${isApproved ? field('Valid Until', validity ? validity.validUntilDate : 'Active') : ''}
             ${app.paymentRef ? field('Payment Ref / UTR', app.paymentRef) : ''}
-            ${app.membershipPlan ? field('Membership Plan', app.membershipPlan) : ''}
+            ${app.membershipPlan ? field('Membership Plan', membershipPlanLabel(app)) : ''}
             ${app.paymentMode ? field('Payment Mode', app.paymentMode) : ''}
             ${app.renewalYears ? field('Validity Term', `${app.renewalYears} Year(s)`) : ''}
             ${app.lastRenewedAt ? field('Last Renewed', formatDate(app.lastRenewedAt)) : ''}
@@ -3898,7 +3912,7 @@ class App {
                   ${approvedField}
                   ${reviewerField}
                   ${termField}
-                  ${app.membershipPlan ? field('Membership Plan', app.membershipPlan) : ''}
+                  ${app.membershipPlan ? field('Membership Plan', membershipPlanLabel(app)) : ''}
                   ${app.paymentMode ? field('Payment Mode', app.paymentMode) : ''}
                   ${lastRenewedField}
                   ${rejectedField}
@@ -4033,7 +4047,7 @@ class App {
       a.regNumber || 'N/A', a.regDate || 'N/A', a.regPlace || 'N/A',
       a.address, a.city || 'N/A', a.district, a.state || 'Gujarat', a.pincode,
       a.repName || a.applicantName, a.repDesignation, a.email, a.phone, a.repMobile || 'N/A', a.repEmail || 'N/A',
-      a.membershipPlan || 'N/A', a.paymentMode || 'N/A',
+      membershipPlanLabel(a) || 'N/A', a.paymentMode || 'N/A',
       a.paymentRef || 'N/A', a.status, a.submittedAt, a.approvedAt || 'N/A', a.reviewedBy || 'N/A', a.renewalYears || 1
     ].map(cell));
 
