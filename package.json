@@ -27,7 +27,7 @@
     "test:board": "node tests/board.test.mjs"
   },
   "dependencies": {
-    "@upstash/redis": "^1.39.0",
+    "@upstash/redis": "^1.40.0",
     "nodemailer": "^10.2.1"
   },
   "engines": {
