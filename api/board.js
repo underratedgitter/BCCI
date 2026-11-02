@@ -326,12 +326,13 @@ const admin = {
 
   async meetings(req, res) {
     const [meetings, members] = await Promise.all([listMeetings(), listMembers()]);
-    const withCounts = [];
-    for (const m of meetings) {
+    // One batched read per meeting, all at once rather than one after another.
+    const withCounts = await Promise.all(meetings.map(async (m) => {
       const { roster, marks } = await rosterAndMarks(m, members);
-      const present = [...marks.values()].filter((r) => r.status === 'present' && roster.some((p) => p.id === r.memberId)).length;
-      withCounts.push({ ...(await adminMeeting(m)), rosterCount: roster.length, presentCount: present });
-    }
+      const onRoster = new Set(roster.map((p) => p.id));
+      const present = [...marks.values()].filter((r) => r.status === 'present' && onRoster.has(r.memberId)).length;
+      return { ...(await adminMeeting(m)), rosterCount: roster.length, presentCount: present };
+    }));
     return res.status(200).json({ success: true, meetings: withCounts });
   },
 

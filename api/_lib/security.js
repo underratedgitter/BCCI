@@ -37,6 +37,18 @@ export const SECURITY_HEADERS = {
 };
 
 /**
+ * How long browsers keep a static file. Photos and icons keep fixed names
+ * (replacing nirmal-shah.webp keeps its name), so they get a day, then
+ * refresh in the background; only the vendored libraries, which change
+ * only with a new path, are kept for a year. vercel.json must say the same.
+ */
+export function assetCacheControl(relPath) {
+  if (relPath.startsWith('assets/vendor/')) return 'public, max-age=31536000, immutable';
+  if (relPath.startsWith('assets/')) return 'public, max-age=86400, stale-while-revalidate=604800';
+  return 'public, max-age=604800';
+}
+
+/**
  * @param {boolean} https  Only send HSTS over TLS — sending it on plain HTTP
  *                         during local development locks the browser out of
  *                         http://localhost for two years.

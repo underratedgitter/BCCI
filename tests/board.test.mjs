@@ -607,6 +607,8 @@ sec('The meeting PIN: the permanent QR alone marks no one');
   const legacy = (await call('meeting-save', { token: ADMIN, body: { title: 'Legacy open meeting', date: '2026-09-18', time: '11:00' } })).json?.meeting?.id;
   const stored = await kv.get(KEYS.boardMeeting(legacy));
   await kv.set(KEYS.boardMeeting(legacy), { ...(typeof stored === 'string' ? JSON.parse(stored) : stored), status: 'open', openedAt: new Date().toISOString() });
+  // …and from before the open-meeting pointer: it must be found by the one-time index.
+  await kv.del(KEYS.boardOpenMeeting, KEYS.boardOpenMeetingIndexed);
   r = await call('names', { ip: '192.0.2.204', body: { deviceId: PHONE, pin: '1234' } });
   ck('a meeting opened before PINs existed refuses every mark (pin_locked)', r.status === 423 && r.json?.code === 'pin_locked', JSON.stringify(r.json));
   r = await call('meeting-pin', { token: ADMIN, body: { id: legacy } });
@@ -628,6 +630,54 @@ sec('The meeting PIN: the permanent QR alone marks no one');
     `${closeRes.status} ${pinRes.status} ${JSON.stringify(after)}`);
   r = await call('names', { ip: '192.0.2.206', body: { deviceId: PHONE, pin: pinRes.json?.meeting?.pin || '1234' } });
   ck('…and any PIN it made marks no one at the closed meeting', r.status === 409 && r.json?.code === 'not_open', JSON.stringify(r.json));
+}
+
+// ════════════════════════════════════════════════════════════════════
+sec('One open meeting, even when two are opened at once');
+{
+  const a = (await call('meeting-save', { token: ADMIN, body: { title: 'Race A', date: '2026-09-22', time: '10:00' } })).json?.meeting?.id;
+  const b = (await call('meeting-save', { token: ADMIN, body: { title: 'Race B', date: '2026-09-22', time: '11:00' } })).json?.meeting?.id;
+  const [ra, rb] = await Promise.all([
+    call('meeting-open', { token: ADMIN, body: { id: a } }),
+    call('meeting-open', { token: ADMIN, body: { id: b } }),
+  ]);
+  const opened = [ra, rb].filter((x) => x.status === 200);
+  ck('two meetings opened in the same instant: exactly one opens', opened.length === 1
+    && [ra, rb].some((x) => x.status === 409 && ['another_open', 'busy'].includes(x.json?.code)), `${ra.status}/${ra.json?.code} ${rb.status}/${rb.json?.code}`);
+  const winner = opened[0]?.json?.meeting?.id;
+  const loser = winner === a ? b : a;
+  const loserRec = await kv.get(KEYS.boardMeeting(loser));
+  ck('…the other stays scheduled', (typeof loserRec === 'string' ? JSON.parse(loserRec) : loserRec)?.status === 'scheduled');
+  ck('…and the pointer names the one that opened', String(await kv.get(KEYS.boardOpenMeeting)) === winner);
+  r = await call('names', { ip: '192.0.2.210', body: { deviceId: 'phone-race-' + crypto.randomUUID(), pin: await openPin() } });
+  ck('…which is the meeting the QR resolves to', r.status === 200 && r.json?.meeting?.id === winner, JSON.stringify(r.json?.meeting));
+
+  // An edit of the scheduled meeting racing the close of the open one keeps both.
+  const [edit, close] = await Promise.all([
+    call('meeting-save', { token: ADMIN, body: { id: loser, title: 'Race renamed', date: '2026-09-22', time: '12:00' } }),
+    call('meeting-close', { token: ADMIN, body: { id: winner } }),
+  ]);
+  const winRec = await kv.get(KEYS.boardMeeting(winner));
+  ck('an edit and a close at the same moment both apply', edit.status === 200 && close.status === 200
+    && (typeof winRec === 'string' ? JSON.parse(winRec) : winRec)?.status === 'closed', `${edit.status} ${close.status}`);
+  ck('closing clears the pointer', (await kv.get(KEYS.boardOpenMeeting)) === null);
+  r = await call('names', { ip: '192.0.2.211', body: { deviceId: 'phone-race-' + crypto.randomUUID(), pin: '1234' } });
+  ck('…so the QR marks no one', r.status === 409 && r.json?.code === 'not_open');
+
+  // Deleting an open meeting (nobody marked yet) frees the QR.
+  await call('meeting-open', { token: ADMIN, body: { id: loser } });
+  r = await call('meeting-delete', { token: ADMIN, body: { id: loser } });
+  ck('an open meeting with no marks can be deleted', r.status === 200, JSON.stringify(r.json));
+  ck('…and the pointer and its PIN go with it', (await kv.get(KEYS.boardOpenMeeting)) === null && (await kv.get(KEYS.boardMeetingPin(loser))) === null);
+  r = await call('meeting-open', { token: ADMIN, body: { id: winner } });
+  ck('a closed meeting still cannot be opened (only reopened)', r.status === 409 && r.json?.code === 'closed');
+
+  // A stale pointer (meeting closed outside this code path) does not block opening.
+  const c = (await call('meeting-save', { token: ADMIN, body: { title: 'Race C', date: '2026-09-23', time: '10:00' } })).json?.meeting?.id;
+  await kv.set(KEYS.boardOpenMeeting, winner);
+  r = await call('meeting-open', { token: ADMIN, body: { id: c } });
+  ck('a pointer left at a closed meeting is replaced, not obeyed', r.status === 200 && String(await kv.get(KEYS.boardOpenMeeting)) === c, JSON.stringify(r.json));
+  await call('meeting-close', { token: ADMIN, body: { id: c } });
 }
 
 console.log(`${'═'.repeat(52)}\n  ${pass} passed, ${fail} failed\n${'═'.repeat(52)}`);

@@ -226,6 +226,22 @@ console.log('──────────────────────�
   ck('events search box has an accessible name', /id="eventsSearchInput"[^>]*aria-label="Search events"/.test(HTML));
 }
 
+// Production (vercel.json) and the local server (security.js) must send the
+// same protections and caching: the tests only ever see the local ones.
+{
+  const VERCEL = JSON.parse(fs.readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'));
+  const { SECURITY_HEADERS, assetCacheControl } = await import(new URL('../api/_lib/security.js', import.meta.url));
+  const matching = (p) => VERCEL.headers.filter((rule) => new RegExp(`^${rule.source}$`).test(p));
+  const headerFor = (p, key) => matching(p).flatMap((rule) => rule.headers).filter((h) => h.key === key).map((h) => h.value);
+  const missing = Object.entries(SECURITY_HEADERS).filter(([key, value]) => headerFor('/about', key).at(-1) !== value).map(([key]) => key);
+  ck('vercel.json sends every security header the local server sends', missing.length === 0, missing.join(', '));
+  for (const p of ['assets/nirmal-shah.webp', 'assets/vendor/qrcodejs/qrcode.min.js', 'assets/favicon-32.png']) {
+    const values = headerFor(`/${p}`, 'Cache-Control');
+    ck(`vercel.json caches /${p} exactly as the local server does`, values.length === 1 && values[0] === assetCacheControl(p), JSON.stringify(values));
+  }
+  ck('photos are not cached as immutable (they keep their names when replaced)', !assetCacheControl('assets/nirmal-shah.webp').includes('immutable'));
+}
+
 ck('no cron is scheduled in vercel.json', !JSON.parse(fs.readFileSync(new URL('../vercel.json', import.meta.url),'utf8')).crons);
 ck('health no longer reports a cron job', !fs.readFileSync(new URL('../api/health.js', import.meta.url),'utf8').includes('cron'));
 ck('the reminder email template is gone', !fs.readFileSync(new URL('../api/_lib/email.js', import.meta.url),'utf8').includes('renewal_reminder'));

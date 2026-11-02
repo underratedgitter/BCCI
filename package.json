@@ -24,7 +24,9 @@
     "test:purge": "node tests/purge.test.mjs",
     "purge:data": "node --env-file=.env.local scripts/purge-data.mjs",
     "graph:repair": "node scripts/graphify-repair.mjs && graphify export html",
-    "test:board": "node tests/board.test.mjs"
+    "test:board": "node tests/board.test.mjs",
+    "versions:check": "node scripts/asset-versions.mjs",
+    "versions:update": "node scripts/asset-versions.mjs --update"
   },
   "dependencies": {
     "@upstash/redis": "^1.39.0",

@@ -422,20 +422,42 @@ export class BoardAdmin {
   printQrSticker() {
     // Opened from a full-screen projector, the sheet would sit hidden behind it.
     if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+    // One sheet at a time: a second click brings back the open one, which
+    // would otherwise print as a second page.
+    if (this.stickerOverlay?.isConnected) {
+      this.stickerOverlay.querySelector('button')?.focus();
+      return;
+    }
+    const returnFocus = document.activeElement;
     const qrBox = el('div', { className: 'board-sticker-qr', role: 'img', 'aria-label': 'Attendance QR code' });
     const printBtn = button('Print', 'btn-primary');
     const closeBtn = button('Close');
-    const overlay = el('div', { className: 'board-sticker-overlay' },
+    const overlay = el('div', { className: 'board-sticker-overlay', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Attendance QR sticker' },
       el('div', { className: 'board-sticker-sheet' },
         el('h2', { className: 'board-sticker-title', text: 'BCCI Board Meeting — Attendance' }),
         qrBox,
         el('p', { className: 'board-sticker-how', text: 'Scan with your phone camera, enter the meeting PIN shown in the room, then tap your name. Works only while a meeting is open.' }),
         el('div', { className: 'board-sticker-actions' }, printBtn, closeBtn)));
-    const remove = () => overlay.remove();
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        remove();
+      }
+    };
+    const remove = () => {
+      document.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('afterprint', remove);
+      overlay.remove();
+      if (this.stickerOverlay === overlay) this.stickerOverlay = null;
+      if (returnFocus?.isConnected) returnFocus.focus?.();
+    };
     printBtn.addEventListener('click', () => window.print());
     closeBtn.addEventListener('click', remove);
-    window.addEventListener('afterprint', remove, { once: true });
+    window.addEventListener('afterprint', remove);
+    document.addEventListener('keydown', onKey, true);
     document.body.append(overlay);
+    this.stickerOverlay = overlay;
+    printBtn.focus();
     if (typeof QRCode === 'undefined') {
       qrBox.append(el('p', { className: 'board-projector-banner', text: 'The QR library did not load. Reload the page.' }));
       return;

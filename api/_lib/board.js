@@ -190,12 +190,16 @@ export function validateMeetingFields(body, { str }) {
 
 export async function saveMeeting(fields, { by = 'admin' } = {}) {
   if (fields.id) {
-    const existing = await getMeeting(fields.id);
-    if (!existing) throw new BoardError(404, 'Meeting not found.', 'not_found');
-    if (existing.status === 'closed') throw new BoardError(409, 'A closed meeting cannot be edited. Reopen it first.', 'closed');
-    const updated = { ...existing, ...fields, id: existing.id, updatedAt: nowIso(), updatedBy: by };
-    await withRetry(() => kv.set(KEYS.boardMeeting(existing.id), updated));
-    return updated;
+    // Under the status lock: an edit written from a copy read before an
+    // open or close would otherwise put the old status back.
+    return withMeetingLock(async (lock) => {
+      const existing = await getMeeting(fields.id);
+      if (!existing) throw new BoardError(404, 'Meeting not found.', 'not_found');
+      if (existing.status === 'closed') throw new BoardError(409, 'A closed meeting cannot be edited. Reopen it first.', 'closed');
+      const updated = { ...existing, ...fields, id: existing.id, updatedAt: nowIso(), updatedBy: by };
+      await fencedWrite(MEETING_LOCK, lock, [['set', KEYS.boardMeeting(existing.id), updated]]);
+      return updated;
+    });
   }
   const id = `MTG-${await withRetry(() => kv.incr(KEYS.boardMeetingSeq))}`;
   const meeting = {
@@ -233,72 +237,130 @@ export async function rosterAndMarks(meeting, members) {
   return { roster: members.filter((m) => m.status === 'active' || marks.has(m.id)), marks };
 }
 
-export async function setMeetingStatus(id, action, { by = 'admin' } = {}) {
-  const meeting = await getMeeting(id);
-  if (!meeting) throw new BoardError(404, 'Meeting not found.', 'not_found');
-  const at = nowIso();
-  let updated;
-  if (action === 'open') {
-    if (meeting.status === 'closed') throw new BoardError(409, 'This meeting is closed. Reopen it to take attendance again.', 'closed');
-    // The sticker QR resolves to "the open meeting", so there must be only one.
-    const openOthers = (await listMeetings()).filter((m) => m.id !== id && m.status === 'open');
-    if (openOthers.length) {
-      throw new BoardError(409, `Close attendance for "${openOthers[0].title}" before opening another meeting.`, 'another_open');
-    }
-    // Opening an already open meeting again keeps the PIN people are using.
-    if (meeting.status !== 'open' || !(await getMeetingPin(id))) await setNewPin(id);
-    updated = { ...meeting, status: 'open', openedAt: meeting.openedAt || at, openedBy: meeting.openedBy || by };
-  } else if (action === 'close') {
-    if (meeting.status !== 'open') throw new BoardError(409, 'Only a meeting that is taking attendance can be closed.', 'not_open');
-    // Freeze who belonged, so a later profile change never rewrites history.
-    const { roster } = await rosterAndMarks(meeting, await listMembers());
-    updated = { ...meeting, status: 'closed', roster: roster.map((m) => m.id), closedAt: at, closedBy: by };
-  } else if (action === 'reopen') {
-    if (meeting.status !== 'closed') throw new BoardError(409, 'Only a closed meeting can be reopened.', 'not_closed');
-    // Same one-open rule as opening: the live QR must stay unambiguous.
-    const openOthers = (await listMeetings()).filter((m) => m.id !== id && m.status === 'open');
-    if (openOthers.length) {
-      throw new BoardError(409, `Close attendance for "${openOthers[0].title}" before reopening this meeting.`, 'another_open');
-    }
-    // The roster stays frozen: reopening corrects marks, it does not let a
-    // profile change since the meeting rewrite who belonged.
-    // A fresh PIN: the one from the meeting itself may have been seen outside.
-    await setNewPin(id);
-    updated = { ...meeting, status: 'open', reopenedAt: at, reopenedBy: by };
-  } else {
-    throw new BoardError(400, 'Unknown meeting action.', 'invalid');
+// ── Meeting status and the one open meeting ───────────────────────
+// The permanent QR means "the meeting taking attendance", so at most one
+// meeting may be open. Every change to a meeting's status (open, close,
+// reopen, edit, delete) runs under one lock, and the meeting record and the
+// open-meeting pointer are written together while that lock is held, so two
+// secretaries pressing "Open" on two meetings at once cannot both win.
+
+const MEETING_LOCK = 'board:meetings';
+
+async function withMeetingLock(fn) {
+  const lock = await acquireLock(MEETING_LOCK);
+  if (!lock) throw new BoardError(409, 'Another change to a meeting is in progress. Try again in a moment.', 'busy');
+  try {
+    return await fn(lock);
+  } finally {
+    await releaseLock(MEETING_LOCK, lock);
   }
-  // The PIN is written before the meeting opens (so an open meeting always
-  // has one) and removed after it closes.
-  await withRetry(() => kv.set(KEYS.boardMeeting(id), updated));
-  if (action === 'close') await kv.del(KEYS.boardMeetingPin(id), KEYS.boardPinFails(id)).catch(() => {});
-  return updated;
+}
+
+/**
+ * Meetings opened before the pointer existed: find the open one, once, and
+ * point at it. Call only while holding the meeting lock.
+ */
+async function indexOpenMeetingOnce(lock) {
+  if (await withRetry(() => kv.get(KEYS.boardOpenMeetingIndexed))) return;
+  const open = (await listMeetings())
+    .filter((m) => m.status === 'open')
+    .sort((a, b) => String(b.reopenedAt || b.openedAt || '').localeCompare(String(a.reopenedAt || a.openedAt || '')));
+  const ops = [['set', KEYS.boardOpenMeetingIndexed, '1']];
+  if (open[0]) ops.unshift(['set', KEYS.boardOpenMeeting, open[0].id]);
+  await fencedWrite(MEETING_LOCK, lock, ops);
+}
+
+/** The id the open-meeting pointer holds, or null. */
+async function openMeetingId() {
+  const id = await withRetry(() => kv.get(KEYS.boardOpenMeeting));
+  if (id) return String(id);
+  if (await withRetry(() => kv.get(KEYS.boardOpenMeetingIndexed))) return null;
+  // First scan after this change: index under the lock (once), then read again.
+  await withMeetingLock((lock) => indexOpenMeetingOnce(lock));
+  const after = await withRetry(() => kv.get(KEYS.boardOpenMeeting));
+  return after ? String(after) : null;
+}
+
+/** Throws another_open when a meeting other than `id` is taking attendance. Lock held. */
+async function refuseIfAnotherOpen(id, lock, verb) {
+  await indexOpenMeetingOnce(lock);
+  const openId = await withRetry(() => kv.get(KEYS.boardOpenMeeting));
+  if (!openId || String(openId) === id) return;
+  const other = await getMeeting(String(openId));
+  // A pointer left at a meeting that is no longer open is simply replaced.
+  if (other?.status === 'open') {
+    throw new BoardError(409, `Close attendance for "${other.title}" before ${verb} this meeting.`, 'another_open');
+  }
+}
+
+export async function setMeetingStatus(id, action, { by = 'admin' } = {}) {
+  if (!['open', 'close', 'reopen'].includes(action)) throw new BoardError(400, 'Unknown meeting action.', 'invalid');
+  return withMeetingLock(async (lock) => {
+    // Read inside the lock, so the status acted on is the current one.
+    const meeting = await getMeeting(id);
+    if (!meeting) throw new BoardError(404, 'Meeting not found.', 'not_found');
+    const at = nowIso();
+    let updated;
+    if (action === 'open') {
+      if (meeting.status === 'closed') throw new BoardError(409, 'This meeting is closed. Reopen it to take attendance again.', 'closed');
+      await refuseIfAnotherOpen(id, lock, 'opening');
+      // Opening an already open meeting again keeps the PIN people are using.
+      if (meeting.status !== 'open' || !(await getMeetingPin(id))) await setNewPin(id);
+      updated = { ...meeting, status: 'open', openedAt: meeting.openedAt || at, openedBy: meeting.openedBy || by };
+    } else if (action === 'close') {
+      if (meeting.status !== 'open') throw new BoardError(409, 'Only a meeting that is taking attendance can be closed.', 'not_open');
+      // Freeze who belonged, so a later profile change never rewrites history.
+      const { roster } = await rosterAndMarks(meeting, await listMembers());
+      updated = { ...meeting, status: 'closed', roster: roster.map((m) => m.id), closedAt: at, closedBy: by };
+    } else {
+      if (meeting.status !== 'closed') throw new BoardError(409, 'Only a closed meeting can be reopened.', 'not_closed');
+      await refuseIfAnotherOpen(id, lock, 'reopening');
+      // The roster stays frozen: reopening corrects marks, it does not let a
+      // profile change since the meeting rewrite who belonged.
+      // A fresh PIN: the one from the meeting itself may have been seen outside.
+      await setNewPin(id);
+      updated = { ...meeting, status: 'open', reopenedAt: at, reopenedBy: by };
+    }
+    // The PIN is written before a meeting opens (an open meeting always has
+    // one); the record and the pointer change together.
+    const ops = [['set', KEYS.boardMeeting(id), updated]];
+    if (updated.status === 'open') ops.push(['set', KEYS.boardOpenMeeting, id]);
+    else if (String(await withRetry(() => kv.get(KEYS.boardOpenMeeting))) === id) ops.push(['del', KEYS.boardOpenMeeting]);
+    await fencedWrite(MEETING_LOCK, lock, ops);
+    if (action === 'close') await kv.del(KEYS.boardMeetingPin(id), KEYS.boardPinFails(id)).catch(() => {});
+    return updated;
+  });
 }
 
 /** Removes a meeting created by mistake; refused once anyone has been marked. */
 export async function deleteMeeting(id, { by = 'admin' } = {}) {
-  const meeting = await getMeeting(id);
-  if (!meeting) throw new BoardError(404, 'Meeting not found.', 'not_found');
-  const members = await listMembers();
-  const marks = await attendanceFor(id, members.map((m) => m.id));
-  if (marks.size) throw new BoardError(409, 'Attendance has been recorded for this meeting, so it cannot be deleted.', 'has_attendance');
-  await withRetry(() => kv.set(KEYS.boardMeeting(id), { ...meeting, deleted: true, deletedAt: nowIso(), deletedBy: by }));
+  await withMeetingLock(async (lock) => {
+    const meeting = await getMeeting(id);
+    if (!meeting) throw new BoardError(404, 'Meeting not found.', 'not_found');
+    const members = await listMembers();
+    const marks = await attendanceFor(id, members.map((m) => m.id));
+    if (marks.size) throw new BoardError(409, 'Attendance has been recorded for this meeting, so it cannot be deleted.', 'has_attendance');
+    const ops = [['set', KEYS.boardMeeting(id), { ...meeting, deleted: true, deletedAt: nowIso(), deletedBy: by }]];
+    if (String(await withRetry(() => kv.get(KEYS.boardOpenMeeting))) === id) ops.push(['del', KEYS.boardOpenMeeting]);
+    await fencedWrite(MEETING_LOCK, lock, ops);
+  });
+  await kv.del(KEYS.boardMeetingPin(id), KEYS.boardPinFails(id)).catch(() => {});
 }
 
 // ── The live (sticker) QR target ───────────────────────────────────
 
 /**
  * The meeting the permanent QR (/board?attend=live) points at right now:
- * the open meeting. There is at most one because opening is refused while
- * another is open; the openedAt tie-break only covers pre-change data.
+ * the open meeting, found through the pointer in two reads rather than by
+ * reading every meeting ever held.
  */
 export async function resolveOpenMeeting() {
-  const open = (await listMeetings()).filter((m) => m.status === 'open');
-  if (!open.length) {
+  const id = await openMeetingId();
+  const meeting = id ? await getMeeting(id) : null;
+  if (!meeting || meeting.status !== 'open') {
     throw new BoardError(409, 'Attendance is not open right now. The secretary opens attendance before each meeting.', 'not_open');
   }
-  open.sort((a, b) => String(b.openedAt || '').localeCompare(String(a.openedAt || '')));
-  return open[0];
+  return meeting;
 }
 
 // ── The meeting PIN ────────────────────────────────────────────────

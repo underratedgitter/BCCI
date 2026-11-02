@@ -22,6 +22,7 @@ const SUITES = [
   { name: 'events-redis', file: 'tests/events-redis.test.mjs' },
   { name: 'events-api', file: 'tests/events-api.test.mjs' },
   { name: 'board', file: 'tests/board.test.mjs' },
+  { name: 'asset-versions', file: 'scripts/asset-versions.mjs' },
 ];
 
 /** "168 passed", or "" when the suite reports no tally we recognise. */
