@@ -471,6 +471,7 @@ class Projector {
     this.onPrintSticker = onPrintSticker;
     this.onExit = onExit;
     this.qrPin = null;
+    this.closed = false;
     this.timer = null;
     this.wakeLock = null;
     this.stopped = false;
@@ -533,6 +534,7 @@ class Projector {
     try {
       data = await this.api('live', { query: `&id=${encodeURIComponent(this.meetingId)}` });
     } catch (err) {
+      if (this.stopped || this.closed) return;
       if (err.status === 409 || err.status === 404) {
         this.showClosed(err.message);
         return;
@@ -544,9 +546,11 @@ class Projector {
       }
       this.banner.hidden = false;
       this.banner.textContent = 'Connection lost. Retrying… the present list may be stale.';
-      this.timer = setTimeout(() => this.poll(), 3000);
+      this.schedulePoll();
       return;
     }
+    // Closed or exited while this poll was in flight: leave the closed screen alone.
+    if (this.stopped || this.closed) return;
     // Too many wrong PINs locked it: nobody can mark in until there is a new one.
     this.banner.hidden = !data.pinLocked;
     if (data.pinLocked) this.banner.textContent = 'Too many wrong PINs were tried, so the PIN is locked. Tap "New PIN" to let members in again.';
@@ -562,7 +566,16 @@ class Projector {
       this.drawQr(`${location.origin}/board?attend=live${pin ? `&pin=${pin}` : ''}`);
     }
     this.renderPresent(data.present, data.counts);
-    this.timer = setTimeout(() => this.poll(), 3000);
+    this.schedulePoll();
+  }
+
+  /**
+   * The next refresh in three seconds. Clearing first keeps a single loop
+   * even when two polls overlap (New PIN polls at once while one is in flight).
+   */
+  schedulePoll() {
+    clearTimeout(this.timer);
+    if (!this.stopped && !this.closed) this.timer = setTimeout(() => this.poll(), 3000);
   }
 
   drawQr(payload) {
@@ -601,7 +614,8 @@ class Projector {
       this.banner.hidden = false;
       this.banner.textContent = err.message;
     } finally {
-      this.pinBtn.disabled = false;
+      // Attendance may have closed meanwhile; then there is no PIN to change.
+      this.pinBtn.disabled = !!this.closed;
     }
   }
 
@@ -621,6 +635,7 @@ class Projector {
   showClosed(message) {
     clearTimeout(this.timer);
     this.timer = null;
+    this.closed = true;
     this.qrPin = null;
     this.pinValue.textContent = '····';
     this.pinBtn.disabled = true;

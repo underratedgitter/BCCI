@@ -60,7 +60,7 @@ const waitMail = async (n, ms = 3000) => {
 /** The open meeting's PIN, as the projector shows it (null when none is open). */
 async function openPin() {
   try {
-    return (await lib.resolveOpenMeeting()).pin;
+    return await lib.getMeetingPin((await lib.resolveOpenMeeting()).id);
   } catch {
     return null;
   }
@@ -595,7 +595,8 @@ sec('The meeting PIN: the permanent QR alone marks no one');
   }
 
   r = await call('meeting-close', { token: ADMIN, body: { id: mtg } });
-  ck('closing clears the PIN', r.status === 200 && r.json?.meeting?.pin === null && (await kv.get(KEYS.boardMeeting(mtg)))?.pin === null);
+  ck('closing clears the PIN', r.status === 200 && r.json?.meeting?.pin === null && (await kv.get(KEYS.boardMeetingPin(mtg))) === null);
+  ck('…and the meeting record never stored it', (await kv.get(KEYS.boardMeeting(mtg)))?.pin === undefined);
   r = await call('meeting-pin', { token: ADMIN, body: { id: mtg } });
   ck('a closed meeting has no PIN to change', r.status === 409 && r.json?.code === 'not_open');
   r = await call('meeting-reopen', { token: ADMIN, body: { id: mtg } });
@@ -605,8 +606,7 @@ sec('The meeting PIN: the permanent QR alone marks no one');
   // A meeting left open from before PINs existed has none: fail closed.
   const legacy = (await call('meeting-save', { token: ADMIN, body: { title: 'Legacy open meeting', date: '2026-09-18', time: '11:00' } })).json?.meeting?.id;
   const stored = await kv.get(KEYS.boardMeeting(legacy));
-  const { pin: _unused, ...noPin } = typeof stored === 'string' ? JSON.parse(stored) : stored;
-  await kv.set(KEYS.boardMeeting(legacy), { ...noPin, status: 'open', openedAt: new Date().toISOString() });
+  await kv.set(KEYS.boardMeeting(legacy), { ...(typeof stored === 'string' ? JSON.parse(stored) : stored), status: 'open', openedAt: new Date().toISOString() });
   r = await call('names', { ip: '192.0.2.204', body: { deviceId: PHONE, pin: '1234' } });
   ck('a meeting opened before PINs existed refuses every mark (pin_locked)', r.status === 423 && r.json?.code === 'pin_locked', JSON.stringify(r.json));
   r = await call('meeting-pin', { token: ADMIN, body: { id: legacy } });
@@ -614,6 +614,20 @@ sec('The meeting PIN: the permanent QR alone marks no one');
   r = await call('names', { ip: '192.0.2.205', body: { deviceId: PHONE, pin: legacyPin } });
   ck('…until the secretary makes it a PIN', r.status === 200, JSON.stringify(r.json));
   await call('meeting-close', { token: ADMIN, body: { id: legacy } });
+
+  // "New PIN" and "Close attendance" pressed at the same moment: the close
+  // must win, never be undone by the PIN change.
+  const raced = (await call('meeting-save', { token: ADMIN, body: { title: 'Race meeting', date: '2026-09-20', time: '11:00' } })).json?.meeting?.id;
+  await call('meeting-open', { token: ADMIN, body: { id: raced } });
+  const [closeRes, pinRes] = await Promise.all([
+    call('meeting-close', { token: ADMIN, body: { id: raced } }),
+    call('meeting-pin', { token: ADMIN, body: { id: raced } }),
+  ]);
+  const after = await kv.get(KEYS.boardMeeting(raced));
+  ck('a New PIN racing a close never reopens the meeting', closeRes.status === 200 && (typeof after === 'string' ? JSON.parse(after) : after)?.status === 'closed',
+    `${closeRes.status} ${pinRes.status} ${JSON.stringify(after)}`);
+  r = await call('names', { ip: '192.0.2.206', body: { deviceId: PHONE, pin: pinRes.json?.meeting?.pin || '1234' } });
+  ck('…and any PIN it made marks no one at the closed meeting', r.status === 409 && r.json?.code === 'not_open', JSON.stringify(r.json));
 }
 
 console.log(`${'═'.repeat(52)}\n  ${pass} passed, ${fail} failed\n${'═'.repeat(52)}`);

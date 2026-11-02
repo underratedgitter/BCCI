@@ -63,6 +63,7 @@ import {
   isPinLocked,
   verifyMeetingPin,
   rotateMeetingPin,
+  getMeetingPin,
 } from './_lib/board.js';
 import { buildRegister } from './_lib/board-register.js';
 
@@ -329,7 +330,7 @@ const admin = {
     for (const m of meetings) {
       const { roster, marks } = await rosterAndMarks(m, members);
       const present = [...marks.values()].filter((r) => r.status === 'present' && roster.some((p) => p.id === r.memberId)).length;
-      withCounts.push({ ...adminMeeting(m), rosterCount: roster.length, presentCount: present });
+      withCounts.push({ ...(await adminMeeting(m)), rosterCount: roster.length, presentCount: present });
     }
     return res.status(200).json({ success: true, meetings: withCounts });
   },
@@ -342,19 +343,18 @@ const admin = {
   },
 
   async 'meeting-open'(req, res, { adminEmail }) {
-    return res.status(200).json({ success: true, meeting: adminMeeting(await setMeetingStatus(str(req.body?.id, 20), 'open', { by: adminEmail })) });
+    return res.status(200).json({ success: true, meeting: await adminMeeting(await setMeetingStatus(str(req.body?.id, 20), 'open', { by: adminEmail })) });
   },
   async 'meeting-close'(req, res, { adminEmail }) {
-    return res.status(200).json({ success: true, meeting: adminMeeting(await setMeetingStatus(str(req.body?.id, 20), 'close', { by: adminEmail })) });
+    return res.status(200).json({ success: true, meeting: await adminMeeting(await setMeetingStatus(str(req.body?.id, 20), 'close', { by: adminEmail })) });
   },
   async 'meeting-reopen'(req, res, { adminEmail }) {
-    return res.status(200).json({ success: true, meeting: adminMeeting(await setMeetingStatus(str(req.body?.id, 20), 'reopen', { by: adminEmail })) });
+    return res.status(200).json({ success: true, meeting: await adminMeeting(await setMeetingStatus(str(req.body?.id, 20), 'reopen', { by: adminEmail })) });
   },
   /** "New PIN": for a PIN that leaked or locked after too many wrong guesses. */
   async 'meeting-pin'(req, res, { adminEmail }) {
-    const meeting = await rotateMeetingPin(str(req.body?.id, 20), { by: adminEmail });
-    console.log(`[Board] ${adminEmail} made a new PIN for ${meeting.id}`);
-    return res.status(200).json({ success: true, meeting: adminMeeting(meeting) });
+    const { meeting, pin } = await rotateMeetingPin(str(req.body?.id, 20), { by: adminEmail });
+    return res.status(200).json({ success: true, meeting: await adminMeeting(meeting, pin) });
   },
   async 'meeting-delete'(req, res, { adminEmail }) {
     await deleteMeeting(str(req.body?.id, 20), { by: adminEmail });
@@ -375,7 +375,8 @@ const admin = {
       .filter((r) => r.status === 'present')
       .sort((a, b) => String(b.at).localeCompare(String(a.at)))
       .map(({ memberId, name, designation, at, method }) => ({ memberId, name, designation, at, method }));
-    return res.status(200).json({ success: true, meeting: adminMeeting(meeting), pinLocked: await isPinLocked(meeting), present, counts });
+    const pin = await getMeetingPin(meeting.id);
+    return res.status(200).json({ success: true, meeting: await adminMeeting(meeting, pin), pinLocked: await isPinLocked(meeting, pin), present, counts });
   },
 
   async mark(req, res, { adminEmail }) {

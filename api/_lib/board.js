@@ -246,13 +246,13 @@ export async function setMeetingStatus(id, action, { by = 'admin' } = {}) {
       throw new BoardError(409, `Close attendance for "${openOthers[0].title}" before opening another meeting.`, 'another_open');
     }
     // Opening an already open meeting again keeps the PIN people are using.
-    const pin = meeting.status === 'open' && meeting.pin ? meeting.pin : newPin();
-    updated = { ...meeting, status: 'open', pin, openedAt: meeting.openedAt || at, openedBy: meeting.openedBy || by };
+    if (meeting.status !== 'open' || !(await getMeetingPin(id))) await setNewPin(id);
+    updated = { ...meeting, status: 'open', openedAt: meeting.openedAt || at, openedBy: meeting.openedBy || by };
   } else if (action === 'close') {
     if (meeting.status !== 'open') throw new BoardError(409, 'Only a meeting that is taking attendance can be closed.', 'not_open');
     // Freeze who belonged, so a later profile change never rewrites history.
     const { roster } = await rosterAndMarks(meeting, await listMembers());
-    updated = { ...meeting, status: 'closed', roster: roster.map((m) => m.id), pin: null, closedAt: at, closedBy: by };
+    updated = { ...meeting, status: 'closed', roster: roster.map((m) => m.id), closedAt: at, closedBy: by };
   } else if (action === 'reopen') {
     if (meeting.status !== 'closed') throw new BoardError(409, 'Only a closed meeting can be reopened.', 'not_closed');
     // Same one-open rule as opening: the live QR must stay unambiguous.
@@ -263,13 +263,15 @@ export async function setMeetingStatus(id, action, { by = 'admin' } = {}) {
     // The roster stays frozen: reopening corrects marks, it does not let a
     // profile change since the meeting rewrite who belonged.
     // A fresh PIN: the one from the meeting itself may have been seen outside.
-    updated = { ...meeting, status: 'open', pin: newPin(), reopenedAt: at, reopenedBy: by };
+    await setNewPin(id);
+    updated = { ...meeting, status: 'open', reopenedAt: at, reopenedBy: by };
   } else {
     throw new BoardError(400, 'Unknown meeting action.', 'invalid');
   }
+  // The PIN is written before the meeting opens (so an open meeting always
+  // has one) and removed after it closes.
   await withRetry(() => kv.set(KEYS.boardMeeting(id), updated));
-  // A new or cleared PIN starts with no wrong guesses against it.
-  if (updated.pin !== meeting.pin) await kv.del(KEYS.boardPinFails(id)).catch(() => {});
+  if (action === 'close') await kv.del(KEYS.boardMeetingPin(id), KEYS.boardPinFails(id)).catch(() => {});
   return updated;
 }
 
@@ -312,13 +314,27 @@ const newPin = () => String(crypto.randomInt(0, 10 ** PIN_LENGTH)).padStart(PIN_
 /** True for something shaped like a PIN; anything else is not counted as a guess. */
 export const isPinShaped = (pin) => PIN_FORMAT.test(String(pin ?? ''));
 
+/** A meeting's current PIN, or null (not open, or opened before PINs existed). */
+export async function getMeetingPin(meetingId) {
+  const pin = await withRetry(() => kv.get(KEYS.boardMeetingPin(meetingId)));
+  return pin == null ? null : String(pin).padStart(PIN_LENGTH, '0');
+}
+
+/** Stores a fresh PIN for a meeting, with no wrong guesses against it. */
+async function setNewPin(meetingId) {
+  const pin = newPin();
+  await withRetry(() => kv.set(KEYS.boardMeetingPin(meetingId), pin));
+  await kv.del(KEYS.boardPinFails(meetingId)).catch(() => {});
+  return pin;
+}
+
 async function pinFailures(meetingId) {
   return Number(await withRetry(() => kv.get(KEYS.boardPinFails(meetingId)))) || 0;
 }
 
 /** True once a meeting has no usable PIN: too many wrong guesses, or opened before PINs existed. */
-export async function isPinLocked(meeting) {
-  return !meeting.pin || (await pinFailures(meeting.id)) >= PIN_MAX_FAILS;
+export async function isPinLocked(meeting, pin) {
+  return !pin || (await pinFailures(meeting.id)) >= PIN_MAX_FAILS;
 }
 
 const pinLockedError = () => new BoardError(423, 'The meeting PIN is locked. Ask the secretary to show a new PIN.', 'pin_locked');
@@ -329,12 +345,13 @@ const pinLockedError = () => new BoardError(423, 'The meeting PIN is locked. Ask
  * counting, so a tap on the sticker before typing costs nothing.
  */
 export async function verifyMeetingPin(meeting, pin) {
-  if (await isPinLocked(meeting)) throw pinLockedError();
+  const current = await getMeetingPin(meeting.id);
+  if (await isPinLocked(meeting, current)) throw pinLockedError();
   const given = String(pin ?? '').trim();
   if (!isPinShaped(given)) {
     throw new BoardError(400, 'Enter the 4-digit meeting PIN shown in the meeting room.', 'pin_required');
   }
-  if (crypto.timingSafeEqual(Buffer.from(given), Buffer.from(String(meeting.pin)))) return;
+  if (crypto.timingSafeEqual(Buffer.from(given), Buffer.from(current))) return;
   const key = KEYS.boardPinFails(meeting.id);
   // One attempt only: INCR is not idempotent.
   const fails = await withRetry(() => kv.incr(key), 1);
@@ -346,15 +363,19 @@ export async function verifyMeetingPin(meeting, pin) {
   throw new BoardError(403, 'That PIN is not right. Check the PIN shown in the meeting room.', 'pin_wrong');
 }
 
-/** The secretary's "New PIN": replaces the PIN of an open meeting and clears its wrong guesses. */
+/**
+ * The secretary's "New PIN": replaces the PIN of an open meeting and clears
+ * its wrong guesses. Only the PIN key is written, never the meeting record,
+ * so a close at the same moment cannot be undone by it; a PIN left behind by
+ * that race is harmless, since every check first needs the meeting open.
+ */
 export async function rotateMeetingPin(id, { by = 'admin' } = {}) {
   const meeting = await getMeeting(id);
   if (!meeting) throw new BoardError(404, 'Meeting not found.', 'not_found');
   if (meeting.status !== 'open') throw new BoardError(409, 'Only a meeting that is taking attendance has a PIN.', 'not_open');
-  const updated = { ...meeting, pin: newPin(), pinChangedAt: nowIso(), pinChangedBy: by };
-  await withRetry(() => kv.set(KEYS.boardMeeting(id), updated));
-  await kv.del(KEYS.boardPinFails(id)).catch(() => {});
-  return updated;
+  const pin = await setNewPin(id);
+  console.log(`[Board] ${by} made a new PIN for ${id}`);
+  return { meeting, pin };
 }
 
 // ── Attendance ─────────────────────────────────────────────────────
@@ -400,8 +421,9 @@ export async function markBySelf(meeting, member, { userAgent = '' } = {}) {
 
 // ── Mark by name (no sign-in) ──────────────────────────────────────
 // Scan the live QR, enter the meeting PIN, tap your name. A 5-minute
-// single-use pass, issued only for the right PIN, covers picking the name. Each name can be marked once per
-// meeting, and each phone can mark only one name.
+// single-use pass, issued only for the right PIN, covers picking the name.
+// Each name can be marked once per meeting, and each phone can mark only
+// one name.
 
 const NAME_PASS_TTL_SECONDS = 5 * 60;
 const DEVICE_MARK_TTL_SECONDS = 3 * 24 * 3600;
@@ -565,8 +587,8 @@ export async function meetingDetail(meetingId) {
       history: rec?.history || [],
     };
   });
-  // Admin only (meeting view, projector, register): includes the PIN.
-  return { meeting: adminMeeting(meeting), rows, counts: countRows(rows) };
+  // Admin only (meeting view, projector): includes the PIN.
+  return { meeting: await adminMeeting(meeting), rows, counts: countRows(rows) };
 }
 
 export function countRows(rows) {
@@ -575,16 +597,16 @@ export function countRows(rows) {
   return counts;
 }
 
-/** A meeting without its QR secret, for anything sent to a browser. */
-/** A meeting as members see it: never its PIN (or a legacy QR secret). */
+/** A meeting as members see it: without a legacy QR secret. The PIN lives in its own key. */
 export function publicMeeting(m) {
-  const { secret, pin, ...rest } = m;
+  const { secret, ...rest } = m;
   return rest;
 }
 
-/** A meeting as the secretary sees it: with the PIN to show in the room. */
-export function adminMeeting(m) {
-  return { ...publicMeeting(m), pin: m.status === 'open' ? m.pin || null : null };
+/** A meeting as the secretary sees it: with the PIN to show in the room (null unless open). */
+export async function adminMeeting(m, pin) {
+  const current = m.status !== 'open' ? null : pin !== undefined ? pin : await getMeetingPin(m.id);
+  return { ...publicMeeting(m), pin: current };
 }
 
 /** A board member's own meetings and statuses, for their portal. */
