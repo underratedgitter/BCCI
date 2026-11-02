@@ -3,8 +3,9 @@
 //
 // No sign-in needed to mark attendance: scanning the attendance QR (the
 // printed sticker or the projector) with the phone's camera opens
-// /board?attend=live, which lists the board; the member taps their name.
-// Each phone gets one response per meeting.
+// /board?attend=live; the member enters the meeting PIN shown in the room
+// (the projector's QR carries it, so only sticker scans type it), then taps
+// their name. Each phone gets one response per meeting.
 //
 // Signing in (email → 6-digit code) is optional: a signed-in member's scan
 // marks them straight away, and they can see their attendance history.
@@ -13,11 +14,20 @@ import { el, dayLabel, timeLabel } from './dom.js?v=1.0.1';
 import { QrScanner } from './qr-scanner.js?v=1.0.0';
 
 const ATTEND_IN_TEXT = /[?&]attend=live(?![A-Za-z0-9_-])/;
+const PIN_IN_TEXT = /[?&]pin=(\d{4})(?!\d)/;
 
-/** The permanent attendance QR's URL marker (/board?attend=live), or null. */
+/**
+ * The attendance QR's URL (/board?attend=live), or null. The projector's
+ * version also carries the meeting PIN (&pin=1234); the sticker's does not.
+ */
 export function parseAttendQr(text) {
-  return ATTEND_IN_TEXT.test(String(text || '')) ? { live: true } : null;
+  const value = String(text || '');
+  if (!ATTEND_IN_TEXT.test(value)) return null;
+  return { live: true, pin: PIN_IN_TEXT.exec(value)?.[1] || '' };
 }
+
+/** Server answers that mean "ask for the PIN (again)". */
+const PIN_RETRY = new Set(['pin_required', 'pin_wrong']);
 
 const DEVICE_KEY = 'bcci_board_device';
 
@@ -58,11 +68,11 @@ export class BoardPortal {
     this.busy = false;
   }
 
-  /** @param {{ attend?: { live: boolean } | null }} opts */
+  /** @param {{ attend?: { live: boolean, pin: string } | null }} opts */
   async mount({ attend = null } = {}) {
     this.pendingAttend = attend;
     if (this.store.getBoardSession()) await this.showSignedIn();
-    else if (attend) await this.showNameList();
+    else if (attend) await this.showNameList(attend.pin);
     else this.showSignIn();
   }
 
@@ -73,29 +83,68 @@ export class BoardPortal {
 
   // ── Mark by name (no sign-in) ──────────────────────────────────
 
-  /** After a scan: the board's names, and one tap to mark yours present. */
-  async showNameList() {
+  /**
+   * After a scan: the meeting PIN (unless the QR carried it), then the
+   * board's names, and one tap to mark yours present.
+   */
+  async showNameList(pin = '', notice = '') {
     this.destroy();
     const card = el('div', { className: 'board-card board-names' },
-      el('h2', { className: 'board-title', text: 'Mark your attendance' }),
-      el('p', { className: 'board-lead', text: 'Loading the meeting…' }));
+      el('h2', { className: 'board-title', text: 'Mark your attendance' }));
     this.root.replaceChildren(card);
 
     const device = deviceId();
     if (!device) {
-      card.replaceChildren(card.firstChild, el('p', { className: 'board-result board-result--error', text: 'This browser is blocking site storage (private mode?). Open the link in your normal browser, or sign in instead.' }), this.signInLink());
+      card.append(el('p', { className: 'board-result board-result--error', text: 'This browser is blocking site storage (private mode?). Open the link in your normal browser, or sign in instead.' }), this.signInLink());
       return;
     }
+    if (!pin) {
+      card.append(this.pinForm((value) => this.showNameList(value), notice), this.signInLink());
+      card.querySelector('input')?.focus();
+      return;
+    }
+    card.append(el('p', { className: 'board-lead', text: 'Loading the meeting…' }));
 
     let data;
     try {
-      data = await this.store.apiCall('/api/board?action=names', { method: 'POST', body: { deviceId: device } });
+      data = await this.store.apiCall('/api/board?action=names', { method: 'POST', body: { deviceId: device, pin } });
     } catch (err) {
-      const text = err.data?.code === 'not_open' ? 'Attendance is not open right now. Wait for the secretary to open the meeting, then scan again.' : (err.message || 'The meeting could not be loaded.');
+      const reason = err.data?.code;
+      if (PIN_RETRY.has(reason)) {
+        await this.showNameList('', err.message);
+        return;
+      }
+      const text = reason === 'not_open' ? 'Attendance is not open right now. Wait for the secretary to open the meeting, then scan again.' : (err.message || 'The meeting could not be loaded.');
       card.replaceChildren(card.firstChild, el('p', { className: 'board-result board-result--error', role: 'alert', text }), this.signInLink());
       return;
     }
     this.renderNameList(card, data, device);
+  }
+
+  /**
+   * The meeting PIN field. The PIN is shown only in the meeting room, so it
+   * is what proves this phone is there; the QR itself never changes.
+   */
+  pinForm(onPin, notice = '') {
+    const message = el('p', { className: 'board-message', role: 'status', 'aria-live': 'polite' });
+    const input = el('input', { type: 'text', id: 'boardPin', className: 'form-control board-code-input', autocomplete: 'off', inputmode: 'numeric', maxlength: '4', pattern: '\\d{4}', required: true, placeholder: '••••' });
+    const submit = el('button', { type: 'submit', className: 'btn-primary board-wide-btn', text: 'Continue' });
+    const form = el('form', { className: 'board-form board-pin-form', novalidate: true },
+      el('p', { className: 'board-lead', text: 'Enter the 4-digit meeting PIN shown in the meeting room (on the projector, or ask the secretary).' }),
+      el('label', { for: 'boardPin', className: 'form-label', text: 'Meeting PIN' }), input, submit, message);
+    if (notice) this.say(message, 'error', notice);
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const value = input.value.replace(/\s/g, '');
+      if (!/^\d{4}$/.test(value)) {
+        this.say(message, 'error', 'The meeting PIN is 4 digits.');
+        input.focus();
+        return;
+      }
+      submit.disabled = true;
+      onPin(value);
+    });
+    return form;
   }
 
   /**
@@ -259,8 +308,9 @@ export class BoardPortal {
     this.render();
 
     if (this.pendingAttend) {
+      const pending = this.pendingAttend;
       this.pendingAttend = null;
-      await this.attend();
+      await this.attend(pending);
     }
   }
 
@@ -286,6 +336,7 @@ export class BoardPortal {
 
     // ── Scan ──
     this.resultBox = el('div', { className: 'board-result', role: 'status', 'aria-live': 'assertive', hidden: true });
+    this.pinBox = el('div', { className: 'board-pin-box', hidden: true });
     this.video = el('video', { className: 'board-video', playsinline: true, muted: true, hidden: true, 'aria-label': 'Camera view for scanning the meeting QR code' });
     this.scanBtn = el('button', { type: 'button', className: 'btn-primary board-scan-btn' }, el('i', { className: 'fas fa-qrcode', 'aria-hidden': 'true' }), ' Scan meeting QR');
     this.cancelBtn = el('button', { type: 'button', className: 'btn-secondary', text: 'Cancel', hidden: true });
@@ -304,6 +355,7 @@ export class BoardPortal {
       this.scanBtn,
       this.video,
       this.cancelBtn,
+      this.pinBox,
       this.resultBox,
     );
 
@@ -379,12 +431,31 @@ export class BoardPortal {
     await this.attend(target);
   }
 
-  async attend() {
+  /** Asks for the meeting PIN in the scan card, then marks attendance with it. */
+  askPin(notice = '') {
+    if (!this.pinBox) return;
+    this.pinBox.hidden = false;
+    this.pinBox.replaceChildren(this.pinForm((pin) => {
+      this.pinBox.hidden = true;
+      this.pinBox.replaceChildren();
+      this.attend({ live: true, pin });
+    }, notice));
+    this.pinBox.querySelector('input')?.focus();
+  }
+
+  async attend({ pin = '' } = {}) {
     if (this.busy) return;
+    if (!pin) {
+      // The sticker's QR has no PIN in it.
+      this.stopScan();
+      this.showResult(null);
+      this.askPin();
+      return;
+    }
     this.busy = true;
     try {
       const result = await this.store.apiCall('/api/board?action=attend', {
-        method: 'POST', body: {}, auth: 'board', retries: 1,
+        method: 'POST', body: { pin }, auth: 'board', retries: 1,
       });
       this.stopScan();
       const when = timeLabel(result.at);
@@ -397,11 +468,16 @@ export class BoardPortal {
     } catch (err) {
       if (err.status === 401) {
         this.stopScan();
-        this.pendingAttend = { live: true };
+        this.pendingAttend = { live: true, pin };
         this.showSignIn();
         return;
       }
       this.stopScan();
+      if (PIN_RETRY.has(err.data?.code)) {
+        this.showResult(null);
+        this.askPin(err.message);
+        return;
+      }
       this.showResult('error', err.message || 'Your attendance could not be recorded.');
     } finally {
       this.busy = false;

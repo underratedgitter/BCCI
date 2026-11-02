@@ -8,7 +8,11 @@
 // Superadmin (the existing admin session):
 //   GET  members, meetings, meeting, live, register
 //   POST member-save, member-status, member-welcome, meeting-save,
-//        meeting-open, meeting-close, meeting-reopen, meeting-delete, mark
+//        meeting-open, meeting-close, meeting-reopen, meeting-pin,
+//        meeting-delete, mark
+//
+// `attend` and `names` need the open meeting's PIN, which is only shown in
+// the meeting room: the attendance QR itself is permanent and public.
 //
 // A board session lives under its own key prefix, so it can never be used
 // as an admin session or an applicant session, and the reverse.
@@ -21,6 +25,7 @@ import {
   bearerToken,
   getAdminSession,
   rateLimit,
+  refundRateLimit,
   tooManyRequests,
   clientIp,
   safeEqual,
@@ -52,7 +57,12 @@ import {
   meetingDetail,
   memberHistory,
   publicMeeting,
+  adminMeeting,
   rosterAndMarks,
+  isPinShaped,
+  isPinLocked,
+  verifyMeetingPin,
+  rotateMeetingPin,
 } from './_lib/board.js';
 import { buildRegister } from './_lib/board-register.js';
 
@@ -199,10 +209,45 @@ async function me(req, res, { member }) {
   return res.status(200).json({ success: true, member: profileView(member), ...history });
 }
 
+// Wrong PINs one network address may try in ten minutes. Only wrong ones
+// count, because a whole room can share the venue Wi-Fi's address.
+const PIN_IP_MAX_FAILS = 10;
+const PIN_IP_WINDOW_SECONDS = 600;
+
+/**
+ * Checks the meeting PIN in the request, limiting wrong guesses per network
+ * address on top of the meeting's own cap. Returns false once it has sent a
+ * 429.
+ */
+async function requirePin(req, res, meeting) {
+  const pin = str(req.body?.pin, 10);
+  // A missing PIN is not a guess: let the PIN check refuse it uncounted.
+  if (!isPinShaped(pin)) {
+    await verifyMeetingPin(meeting, pin);
+    return true;
+  }
+  const key = `board:pin:ip:${clientIp(req)}`;
+  const limit = await rateLimit(key, { max: PIN_IP_MAX_FAILS, windowSec: PIN_IP_WINDOW_SECONDS });
+  if (!limit.ok) {
+    tooManyRequests(res, limit.retryAfter, 'Too many wrong PINs from this network. Wait a few minutes, or ask the secretary to mark you.');
+    return false;
+  }
+  try {
+    await verifyMeetingPin(meeting, pin);
+  } catch (err) {
+    // Only a wrong guess keeps its count; a locked PIN is not this caller's guess.
+    if (err?.code !== 'pin_wrong') await refundRateLimit(key);
+    throw err;
+  }
+  await refundRateLimit(key);
+  return true;
+}
+
 async function attend(req, res, { member }) {
   const limit = await rateLimit(`board:attend:${member.id}`, { max: 20, windowSec: 60 });
   if (!limit.ok) return tooManyRequests(res, limit.retryAfter, 'Too many scans. Wait a moment and scan again.');
   const meeting = await resolveOpenMeeting();
+  if (!(await requirePin(req, res, meeting))) return undefined;
   const { record, alreadyMarked } = await markBySelf(meeting, member, { userAgent: req.headers['user-agent'] });
   if (!alreadyMarked) console.log(`[Board] ${member.id} present at ${meeting.id}`);
   return res.status(200).json({
@@ -223,7 +268,9 @@ async function signOut(req, res, { token }) {
 async function nameList(req, res) {
   const limit = await rateLimit(`board:names:ip:${clientIp(req)}`, { max: 60, windowSec: 60 });
   if (!limit.ok) return tooManyRequests(res, limit.retryAfter, 'Too many scans. Wait a moment and scan again.');
-  const result = await openNameMarking(str(req.body?.deviceId, 64));
+  const meeting = await resolveOpenMeeting();
+  if (!(await requirePin(req, res, meeting))) return undefined;
+  const result = await openNameMarking(meeting, str(req.body?.deviceId, 64));
   return res.status(200).json({ success: true, ...result });
 }
 
@@ -282,7 +329,7 @@ const admin = {
     for (const m of meetings) {
       const { roster, marks } = await rosterAndMarks(m, members);
       const present = [...marks.values()].filter((r) => r.status === 'present' && roster.some((p) => p.id === r.memberId)).length;
-      withCounts.push({ ...publicMeeting(m), rosterCount: roster.length, presentCount: present });
+      withCounts.push({ ...adminMeeting(m), rosterCount: roster.length, presentCount: present });
     }
     return res.status(200).json({ success: true, meetings: withCounts });
   },
@@ -295,13 +342,19 @@ const admin = {
   },
 
   async 'meeting-open'(req, res, { adminEmail }) {
-    return res.status(200).json({ success: true, meeting: publicMeeting(await setMeetingStatus(str(req.body?.id, 20), 'open', { by: adminEmail })) });
+    return res.status(200).json({ success: true, meeting: adminMeeting(await setMeetingStatus(str(req.body?.id, 20), 'open', { by: adminEmail })) });
   },
   async 'meeting-close'(req, res, { adminEmail }) {
-    return res.status(200).json({ success: true, meeting: publicMeeting(await setMeetingStatus(str(req.body?.id, 20), 'close', { by: adminEmail })) });
+    return res.status(200).json({ success: true, meeting: adminMeeting(await setMeetingStatus(str(req.body?.id, 20), 'close', { by: adminEmail })) });
   },
   async 'meeting-reopen'(req, res, { adminEmail }) {
-    return res.status(200).json({ success: true, meeting: publicMeeting(await setMeetingStatus(str(req.body?.id, 20), 'reopen', { by: adminEmail })) });
+    return res.status(200).json({ success: true, meeting: adminMeeting(await setMeetingStatus(str(req.body?.id, 20), 'reopen', { by: adminEmail })) });
+  },
+  /** "New PIN": for a PIN that leaked or locked after too many wrong guesses. */
+  async 'meeting-pin'(req, res, { adminEmail }) {
+    const meeting = await rotateMeetingPin(str(req.body?.id, 20), { by: adminEmail });
+    console.log(`[Board] ${adminEmail} made a new PIN for ${meeting.id}`);
+    return res.status(200).json({ success: true, meeting: adminMeeting(meeting) });
   },
   async 'meeting-delete'(req, res, { adminEmail }) {
     await deleteMeeting(str(req.body?.id, 20), { by: adminEmail });
@@ -312,7 +365,7 @@ const admin = {
     return res.status(200).json({ success: true, ...(await meetingDetail(str(req.query?.id, 20))) });
   },
 
-  /** What the projector shows: the live QR is static, and who is in so far. */
+  /** What the projector shows: the PIN (and whether it locked), and who is in so far. */
   async live(req, res) {
     const meeting = await getMeeting(str(req.query?.id, 20));
     if (!meeting) throw new BoardError(404, 'Meeting not found.', 'not_found');
@@ -322,7 +375,7 @@ const admin = {
       .filter((r) => r.status === 'present')
       .sort((a, b) => String(b.at).localeCompare(String(a.at)))
       .map(({ memberId, name, designation, at, method }) => ({ memberId, name, designation, at, method }));
-    return res.status(200).json({ success: true, meeting: publicMeeting(meeting), present, counts });
+    return res.status(200).json({ success: true, meeting: adminMeeting(meeting), pinLocked: await isPinLocked(meeting), present, counts });
   },
 
   async mark(req, res, { adminEmail }) {
