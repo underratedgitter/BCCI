@@ -12,15 +12,15 @@
 //   - each attendance mark is its own key, written with SET NX, so fifteen
 //     members scanning in the same second cannot overwrite one another.
 //
-// A meeting's QR code is an HMAC of the meeting's secret and the current
-// 20-second window. It only works inside that window (and the one before),
-// so a photo forwarded to someone outside the room stops working quickly.
+// Attendance uses one permanent QR code (/board?attend=live) — printed on a
+// sticker or shown on the projector. It is "live" only while a meeting is
+// open: opening a meeting activates it, closing stops it immediately, and
+// only one meeting can be open at a time so the QR is never ambiguous.
 
 import crypto from 'node:crypto';
 import { kv, KEYS, withRetry } from './kv.js';
 import { acquireLock, releaseLock, fencedWrite } from './records.js';
 
-export const QR_WINDOW_MS = 20_000;
 const MEMBER_STATUS = ['active', 'inactive'];
 export const ATTENDANCE_STATUS = ['present', 'leave', 'absent'];
 
@@ -196,7 +196,6 @@ export async function saveMeeting(fields, { by = 'admin' } = {}) {
     ...fields,
     id,
     status: 'scheduled',
-    secret: crypto.randomBytes(32).toString('hex'),
     roster: null,
     createdAt: nowIso(),
     createdBy: by,
@@ -235,6 +234,11 @@ export async function setMeetingStatus(id, action, { by = 'admin' } = {}) {
   let updated;
   if (action === 'open') {
     if (meeting.status === 'closed') throw new BoardError(409, 'This meeting is closed. Reopen it to take attendance again.', 'closed');
+    // The sticker QR resolves to "the open meeting", so there must be only one.
+    const openOthers = (await listMeetings()).filter((m) => m.id !== id && m.status === 'open');
+    if (openOthers.length) {
+      throw new BoardError(409, `Close attendance for "${openOthers[0].title}" before opening another meeting.`, 'another_open');
+    }
     updated = { ...meeting, status: 'open', openedAt: meeting.openedAt || at, openedBy: meeting.openedBy || by };
   } else if (action === 'close') {
     if (meeting.status !== 'open') throw new BoardError(409, 'Only a meeting that is taking attendance can be closed.', 'not_open');
@@ -243,6 +247,11 @@ export async function setMeetingStatus(id, action, { by = 'admin' } = {}) {
     updated = { ...meeting, status: 'closed', roster: roster.map((m) => m.id), closedAt: at, closedBy: by };
   } else if (action === 'reopen') {
     if (meeting.status !== 'closed') throw new BoardError(409, 'Only a closed meeting can be reopened.', 'not_closed');
+    // Same one-open rule as opening: the live QR must stay unambiguous.
+    const openOthers = (await listMeetings()).filter((m) => m.id !== id && m.status === 'open');
+    if (openOthers.length) {
+      throw new BoardError(409, `Close attendance for "${openOthers[0].title}" before reopening this meeting.`, 'another_open');
+    }
     // The roster stays frozen: reopening corrects marks, it does not let a
     // profile change since the meeting rewrite who belonged.
     updated = { ...meeting, status: 'open', reopenedAt: at, reopenedBy: by };
@@ -263,31 +272,28 @@ export async function deleteMeeting(id, { by = 'admin' } = {}) {
   await withRetry(() => kv.set(KEYS.boardMeeting(id), { ...meeting, deleted: true, deletedAt: nowIso(), deletedBy: by }));
 }
 
-// ── The rotating QR code ───────────────────────────────────────────
+// ── The live (sticker) QR target ───────────────────────────────────
 
-function codeFor(meeting, window) {
-  return crypto.createHmac('sha256', meeting.secret).update(`${meeting.id}:${window}`).digest('base64url').slice(0, 12);
-}
-
-/** The code the projector shows now, and how long until it changes. */
-export function currentCode(meeting, now = Date.now()) {
-  const window = Math.floor(now / QR_WINDOW_MS);
-  return { code: codeFor(meeting, window), refreshInMs: (window + 1) * QR_WINDOW_MS - now };
-}
-
-/** True for the code shown now or in the window just before. */
-export function isCodeValid(meeting, code, now = Date.now()) {
-  if (typeof code !== 'string' || !/^[A-Za-z0-9_-]{12}$/.test(code)) return false;
-  const window = Math.floor(now / QR_WINDOW_MS);
-  return [window, window - 1].some((w) => crypto.timingSafeEqual(Buffer.from(codeFor(meeting, w)), Buffer.from(code)));
+/**
+ * The meeting the permanent QR (/board?attend=live) points at right now:
+ * the open meeting. There is at most one because opening is refused while
+ * another is open; the openedAt tie-break only covers pre-change data.
+ */
+export async function resolveOpenMeeting() {
+  const open = (await listMeetings()).filter((m) => m.status === 'open');
+  if (!open.length) {
+    throw new BoardError(409, 'Attendance is not open right now. The secretary opens attendance before each meeting.', 'not_open');
+  }
+  open.sort((a, b) => String(b.openedAt || '').localeCompare(String(a.openedAt || '')));
+  return open[0];
 }
 
 // ── Attendance ─────────────────────────────────────────────────────
 
-/** A board member marking themselves present by scanning the projector. */
-export async function markBySelf(meetingId, member, code, { userAgent = '' } = {}) {
-  const meeting = await getMeeting(meetingId);
-  if (!meeting) throw new BoardError(404, 'This QR code is not for a BCCI board meeting.', 'not_found');
+/** A board member marking themselves present by scanning the live QR. */
+export async function markBySelf(meeting, member, { userAgent = '' } = {}) {
+  // The route resolves the open meeting; this re-check covers the moment
+  // between resolving and writing.
   if (meeting.status !== 'open') {
     throw new BoardError(409, meeting.status === 'closed' ? 'Attendance for this meeting has closed.' : 'Attendance for this meeting has not opened yet.', 'not_open');
   }
@@ -295,9 +301,6 @@ export async function markBySelf(meetingId, member, code, { userAgent = '' } = {
   // A reopened meeting keeps the roster it closed with.
   if (Array.isArray(meeting.roster) && !meeting.roster.includes(member.id)) {
     throw new BoardError(403, 'You are not on the board for this meeting.', 'not_on_roster');
-  }
-  if (!isCodeValid(meeting, code)) {
-    throw new BoardError(410, 'This QR code has expired. Scan the code on the screen again.', 'expired');
   }
 
   const key = KEYS.boardAttendance(meeting.id, member.id);
@@ -328,10 +331,9 @@ export async function markBySelf(meetingId, member, code, { userAgent = '' } = {
 }
 
 // ── Mark by name (no sign-in) ──────────────────────────────────────
-// Scan the projector QR, tap your name. The rotating code proves the phone
-// saw the screen; after that a 5-minute single-use pass covers picking the
-// name, which takes longer than the code's 40-second life. Each name can be
-// marked once per meeting, and each phone can mark only one name.
+// Scan the live QR, tap your name. A 5-minute single-use pass covers
+// picking the name after the scan. Each name can be marked once per
+// meeting, and each phone can mark only one name.
 
 const NAME_PASS_TTL_SECONDS = 5 * 60;
 const DEVICE_MARK_TTL_SECONDS = 3 * 24 * 3600;
@@ -360,12 +362,9 @@ async function openMeetingFor(meetingId) {
  * Only names are returned (no email or phone). When this phone has already
  * marked someone at this meeting, says who, and issues no pass.
  */
-export async function openNameMarking(meetingId, code, deviceId) {
+export async function openNameMarking(deviceId) {
   requireDeviceId(deviceId);
-  const meeting = await openMeetingFor(meetingId);
-  if (!isCodeValid(meeting, code)) {
-    throw new BoardError(410, 'This QR code has expired. Scan the code on the screen again.', 'expired');
-  }
+  const meeting = await resolveOpenMeeting();
   const { roster, marks } = await rosterAndMarks(meeting, await listMembers());
   const members = roster
     .filter((m) => m.status === 'active')

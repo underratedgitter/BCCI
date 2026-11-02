@@ -1,9 +1,10 @@
 // js/board-portal.js
 // The board member's side of meeting attendance, at /board.
 //
-// No sign-in needed to mark attendance: scanning the projector QR with the
-// phone's camera opens /board?attend=…, which lists the board; the member
-// taps their name. Each phone gets one response per meeting.
+// No sign-in needed to mark attendance: scanning the attendance QR (the
+// printed sticker or the projector) with the phone's camera opens
+// /board?attend=live, which lists the board; the member taps their name.
+// Each phone gets one response per meeting.
 //
 // Signing in (email → 6-digit code) is optional: a signed-in member's scan
 // marks them straight away, and they can see their attendance history.
@@ -11,12 +12,11 @@
 import { el, dayLabel, timeLabel } from './dom.js?v=1.0.1';
 import { QrScanner } from './qr-scanner.js?v=1.0.0';
 
-const ATTEND_IN_TEXT = /[?&]attend=(MTG-\d{1,6})\.([A-Za-z0-9_-]{12})(?![A-Za-z0-9_-])/;
+const ATTEND_IN_TEXT = /[?&]attend=live(?![A-Za-z0-9_-])/;
 
-/** The meeting and code inside a projector QR (its URL), or null. */
+/** The permanent attendance QR's URL marker (/board?attend=live), or null. */
 export function parseAttendQr(text) {
-  const m = ATTEND_IN_TEXT.exec(String(text || ''));
-  return m ? { meetingId: m[1], code: m[2] } : null;
+  return ATTEND_IN_TEXT.test(String(text || '')) ? { live: true } : null;
 }
 
 const DEVICE_KEY = 'bcci_board_device';
@@ -58,11 +58,11 @@ export class BoardPortal {
     this.busy = false;
   }
 
-  /** @param {{ attend?: {meetingId: string, code: string} | null }} opts */
+  /** @param {{ attend?: { live: boolean } | null }} opts */
   async mount({ attend = null } = {}) {
     this.pendingAttend = attend;
     if (this.store.getBoardSession()) await this.showSignedIn();
-    else if (attend) await this.showNameList(attend);
+    else if (attend) await this.showNameList();
     else this.showSignIn();
   }
 
@@ -74,7 +74,7 @@ export class BoardPortal {
   // ── Mark by name (no sign-in) ──────────────────────────────────
 
   /** After a scan: the board's names, and one tap to mark yours present. */
-  async showNameList({ meetingId, code }) {
+  async showNameList() {
     this.destroy();
     const card = el('div', { className: 'board-card board-names' },
       el('h2', { className: 'board-title', text: 'Mark your attendance' }),
@@ -89,9 +89,9 @@ export class BoardPortal {
 
     let data;
     try {
-      data = await this.store.apiCall('/api/board?action=names', { method: 'POST', body: { meetingId, code, deviceId: device } });
+      data = await this.store.apiCall('/api/board?action=names', { method: 'POST', body: { deviceId: device } });
     } catch (err) {
-      const text = err.data?.code === 'expired' ? 'This code has changed. Scan the QR on the screen again.' : (err.message || 'The meeting could not be loaded.');
+      const text = err.data?.code === 'not_open' ? 'Attendance is not open right now. Wait for the secretary to open the meeting, then scan again.' : (err.message || 'The meeting could not be loaded.');
       card.replaceChildren(card.firstChild, el('p', { className: 'board-result board-result--error', role: 'alert', text }), this.signInLink());
       return;
     }
@@ -99,8 +99,8 @@ export class BoardPortal {
   }
 
   /**
-   * The list from one scan. Going back to it reuses `data`: the projector
-   * code is dead within 40 seconds, but the pass lasts five minutes.
+   * The list from one scan. Going back to it reuses `data`: the pass lasts
+   * five minutes even if attendance closes or reopens meanwhile.
    */
   renderNameList(card, data, device, notice = '') {
     const message = el('p', { className: 'board-message', role: 'status', 'aria-live': 'polite' });
@@ -150,7 +150,7 @@ export class BoardPortal {
           return;
         }
         card.replaceChildren(card.firstChild, heading,
-          el('p', { className: 'board-result board-result--error', role: 'alert', text: reason === 'expired' ? 'This page has expired. Scan the QR on the screen again.' : err.message }));
+          el('p', { className: 'board-result board-result--error', role: 'alert', text: reason === 'expired' ? 'This page has expired. Scan the attendance QR again.' : err.message }));
       }
     });
   }
@@ -170,7 +170,7 @@ export class BoardPortal {
       el('h2', { className: 'board-title', text: 'BCCI Board Portal' }),
       el('p', { className: 'board-lead', text: this.pendingAttend
         ? 'Sign in to mark your attendance for this meeting.'
-        : 'To mark attendance, scan the QR on the meeting screen with your phone camera; no sign-in needed. Sign in here to see your attendance history.' }),
+        : 'To mark attendance, scan the attendance QR with your phone camera; no sign-in needed. Sign in here to see your attendance history.' }),
     );
 
     if (step === 'email') {
@@ -259,9 +259,8 @@ export class BoardPortal {
     this.render();
 
     if (this.pendingAttend) {
-      const pending = this.pendingAttend;
       this.pendingAttend = null;
-      await this.attend(pending);
+      await this.attend();
     }
   }
 
@@ -297,7 +296,7 @@ export class BoardPortal {
     const openNote = open.map((i) => el('p', { className: i.status === 'present' ? 'board-open board-open--done' : 'board-open' },
       i.status === 'present'
         ? `${i.meeting.title}: you are marked present (${timeLabel(i.at)}).`
-        : `Attendance is open for ${i.meeting.title}. Scan the QR code on the screen.`));
+        : `Attendance is open for ${i.meeting.title}. Scan the attendance QR to be marked present.`));
 
     const scan = el('div', { className: 'board-card board-scan' },
       el('h3', { className: 'board-section-title', text: 'Mark your attendance' }),
@@ -356,10 +355,10 @@ export class BoardPortal {
     this.scanner.reset();
     try {
       await this.scanner.start();
-      this.showResult('idle', 'Point your camera at the QR code on the screen.');
+      this.showResult('idle', 'Point your camera at the attendance QR.');
     } catch (err) {
       this.stopScan();
-      this.showResult('error', `${err.message} You can also scan the screen with your phone's camera app.`);
+      this.showResult('error', `${err.message} You can also scan the attendance QR with your phone's camera app.`);
     }
   }
 
@@ -374,18 +373,18 @@ export class BoardPortal {
   async onScanned(text) {
     const target = parseAttendQr(text);
     if (!target) {
-      this.showResult('error', 'That is not a BCCI board meeting QR code. Scan the code on the meeting screen.');
+      this.showResult('error', 'That is not the BCCI attendance QR. Scan the QR on the sticker or the projector screen.');
       return;
     }
     await this.attend(target);
   }
 
-  async attend({ meetingId, code }) {
+  async attend() {
     if (this.busy) return;
     this.busy = true;
     try {
       const result = await this.store.apiCall('/api/board?action=attend', {
-        method: 'POST', body: { meetingId, code }, auth: 'board', retries: 1,
+        method: 'POST', body: {}, auth: 'board', retries: 1,
       });
       this.stopScan();
       const when = timeLabel(result.at);
@@ -396,21 +395,14 @@ export class BoardPortal {
       }
       await this.refreshData();
     } catch (err) {
-      const reason = err.data?.code;
       if (err.status === 401) {
         this.stopScan();
-        this.pendingAttend = { meetingId, code };
+        this.pendingAttend = { live: true };
         this.showSignIn();
         return;
       }
-      if (reason === 'expired') {
-        // The projector moved on to a new code; keep the camera running.
-        this.scanner?.reset();
-        this.showResult('warn', 'That code just changed. Hold your phone up to the screen again.');
-      } else {
-        this.stopScan();
-        this.showResult('error', err.message || 'Your attendance could not be recorded.');
-      }
+      this.stopScan();
+      this.showResult('error', err.message || 'Your attendance could not be recorded.');
     } finally {
       this.busy = false;
     }

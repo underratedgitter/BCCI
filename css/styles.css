@@ -3350,8 +3350,6 @@ body.modal-open {
 }
 .board-projector-qr img, .board-projector-qr canvas { width: 100% !important; height: auto !important; image-rendering: pixelated; }
 .board-projector-closed { color: #0F2C59; font-size: 1.6rem; font-weight: 800; line-height: 1.3; text-align: center; padding: 1rem; }
-.board-projector-bar-track { width: min(64vh, 46vw); height: 8px; background: rgba(255,255,255,0.2); border-radius: 4px; overflow: hidden; }
-.board-projector-bar { height: 100%; width: 100%; background: #FFD700; }
 .board-projector-how { margin: 0; color: #E2E8F0; font-size: clamp(0.95rem, 1.6vw, 1.25rem); text-align: center; max-width: min(64vh, 46vw); }
 .board-projector-count { font-size: clamp(1.2rem, 2.4vw, 2rem); font-weight: 700; margin-bottom: 1rem; }
 .board-projector-number { font-size: clamp(2.4rem, 6vw, 5rem); color: #FFD700; font-weight: 800; }
@@ -3365,7 +3363,30 @@ body.modal-open {
 .board-projector-list li time { grid-row: 1 / span 2; grid-column: 2; color: #FFD700; font-variant-numeric: tabular-nums; }
 @media (max-width: 760px) {
   .board-projector-body { grid-template-columns: 1fr; }
-  .board-projector-qr, .board-projector-bar-track, .board-projector-how { width: min(86vw, 60vh); max-width: none; }
+  .board-projector-qr, .board-projector-how { width: min(86vw, 60vh); max-width: none; }
+}
+
+/* ── Attendance QR sticker (print) ───────────────────────────────── */
+.board-sticker-overlay {
+  position: fixed; inset: 0; z-index: 6000; display: grid; place-items: center;
+  background: rgba(15, 20, 35, 0.7); padding: 1rem; overflow: auto;
+}
+.board-sticker-sheet {
+  background: #FFFFFF; color: #0F2C59; border-radius: 16px; padding: clamp(16px, 3vw, 40px);
+  max-width: 480px; width: 100%; text-align: center; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+.board-sticker-title { font-size: 1.5rem; font-weight: 800; margin: 0 0 1rem; color: #0F2C59; }
+.board-sticker-qr { display: grid; place-items: center; }
+.board-sticker-qr img, .board-sticker-qr canvas { width: 100% !important; height: auto !important; max-width: 320px; image-rendering: pixelated; }
+.board-sticker-how { margin: 0.75rem 0 0; color: #334155; font-size: 0.95rem; }
+.board-sticker-actions { display: flex; justify-content: center; gap: 0.5rem; margin-top: 1.25rem; }
+
+@media print {
+  /* When the sticker sheet is open, print only it. */
+  body:has(.board-sticker-overlay) > *:not(.board-sticker-overlay) { display: none !important; }
+  .board-sticker-overlay { position: static; background: none; display: block; padding: 0; overflow: visible; }
+  .board-sticker-sheet { box-shadow: none; border-radius: 0; max-width: none; padding: 0; }
+  .board-sticker-actions { display: none !important; }
 }
 
 /* Board admin and attendee tables have no card layout, so on small screens

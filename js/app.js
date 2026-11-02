@@ -1949,9 +1949,10 @@ class App {
   }
 
   /**
-   * /board: a board member's sign-in, QR attendance and history. A QR opened
-   * with the phone's own camera arrives as /board?attend=…; it is marked once
-   * and dropped from the address bar so a refresh cannot resubmit it.
+   * /board: a board member's sign-in, QR attendance and history. The
+   * permanent attendance QR (sticker or projector) opens /board?attend=live;
+   * it is marked once and dropped from the address bar so a refresh cannot
+   * resubmit it.
    */
   async renderBoardPortal() {
     const root = document.getElementById('boardPortalRoot');
@@ -1959,7 +1960,7 @@ class App {
     let BoardPortal;
     let parseAttendQr;
     try {
-      ({ BoardPortal, parseAttendQr } = await import('./board-portal.js?v=1.1.2'));
+      ({ BoardPortal, parseAttendQr } = await import('./board-portal.js?v=1.1.3'));
     } catch (err) {
       root.textContent = 'The Board Portal could not load. Check your connection and reload the page.';
       console.error('[Board] portal failed to load:', err);
@@ -1985,7 +1986,7 @@ class App {
       return;
     }
     try {
-      const { BoardAdmin } = await import('./board-admin.js?v=1.1.3');
+      const { BoardAdmin } = await import('./board-admin.js?v=1.1.4');
       this._boardAdmin = new BoardAdmin({
         root,
         store: this.store,

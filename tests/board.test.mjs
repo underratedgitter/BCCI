@@ -231,7 +231,7 @@ r = await call('me', { method: 'GET', token: crypto.randomBytes(32).toString('he
 ck('a refused session gets no lifetime header', r.status === 401 && r.headers['x-session-expires-in'] === undefined);
 
 // ════════════════════════════════════════════════════════════════════
-sec('Meetings and the projector QR');
+sec('Meetings and the live QR');
 
 r = await call('meeting-save', { token: ADMIN, body: { title: 'Board meeting', date: '2026-08-15', time: '25:00' } });
 ck('an impossible start time is refused', r.status === 400);
@@ -243,14 +243,14 @@ ck('29 Feb in a leap year is accepted by the validator', !lib.validateMeetingFie
 const m1 = await call('meeting-save', { token: ADMIN, body: { title: 'Board meeting', date: '2026-08-15', time: '10:00', venue: 'BCCI Hall' } });
 const m2 = await call('meeting-save', { token: ADMIN, body: { title: 'AGM preparation', date: '2026-08-30', time: '17:30' } });
 ck('superadmin schedules meetings', m1.status === 201 && m1.json?.meeting?.id === 'MTG-1' && m2.json?.meeting?.id === 'MTG-2');
-ck('the QR secret never leaves the server', m1.json?.meeting?.secret === undefined);
+ck('no secret ever leaves the server', m1.json?.meeting?.secret === undefined && m2.json?.meeting?.secret === undefined);
 
 const { token: bharatToken } = await signIn('bharat.shah@example.com');
 const { token: chiragToken } = await signIn('chirag@example.com');
 const { token: dinaToken } = await signIn('bharat@example.com');
 ck('other members sign in', [bharatToken, chiragToken, dinaToken].every((t) => typeof t === 'string'));
 
-r = await call('attend', { token: ashaToken, body: { meetingId: 'MTG-1', code: 'AAAAAAAAAAAA' } });
+r = await call('attend', { token: ashaToken, body: {} });
 ck('attendance before the meeting opens is refused', r.status === 409 && r.json?.code === 'not_open');
 r = await call('live', { method: 'GET', token: ADMIN, query: { id: 'MTG-1' } });
 ck('the projector has nothing to show before opening', r.status === 409);
@@ -258,27 +258,20 @@ ck('the projector has nothing to show before opening', r.status === 409);
 r = await call('meeting-open', { token: ADMIN, body: { id: 'MTG-1' } });
 ck('superadmin opens attendance', r.status === 200 && r.json?.meeting?.status === 'open');
 let live = await call('live', { method: 'GET', token: ADMIN, query: { id: 'MTG-1' } });
-ck('the projector gets a 12-character code and when it changes', /^[A-Za-z0-9_-]{12}$/.test(live.json?.code || '') && live.json?.refreshInMs > 0 && live.json?.refreshInMs <= 20000);
+ck('the projector no longer returns a rotating code', live.json?.code === undefined && live.json?.refreshInMs === undefined, JSON.stringify(live.json));
 ck('the projector sees the roster count', live.json?.counts?.roster === 4 && live.json?.counts?.present === 0, JSON.stringify(live.json?.counts));
 
-r = await call('attend', { token: ashaToken, body: { meetingId: 'MTG-1', code: live.json.code } });
-ck('scanning the projector code marks the member present', r.status === 200 && r.json?.alreadyMarked === false && !!r.json?.at, JSON.stringify(r.json));
-r = await call('attend', { token: ashaToken, body: { meetingId: 'MTG-1', code: live.json.code } });
+r = await call('attend', { token: ashaToken, body: {} });
+ck('scanning the live QR marks the member present', r.status === 200 && r.json?.alreadyMarked === false && !!r.json?.at, JSON.stringify(r.json));
+r = await call('attend', { token: ashaToken, body: {} });
 ck('scanning twice says already marked, not twice', r.status === 200 && r.json?.alreadyMarked === true);
-r = await call('attend', { body: { meetingId: 'MTG-1', code: live.json.code } });
+r = await call('attend', { body: {} });
 ck('scanning while signed out is refused', r.status === 401 && r.json?.code === 'signed_out');
-r = await call('attend', { token: bharatToken, body: { meetingId: 'MTG-1', code: 'AAAAAAAAAAAA' } });
-ck('a made-up code is refused', r.status === 410 && r.json?.code === 'expired');
+r = await call('names', { body: { meetingId: 'MTG-9', code: 'STALE', deviceId: 'legacy-' + crypto.randomUUID() } });
+ck('a legacy meeting/code in the body is ignored; the open meeting wins', r.status === 200 && r.json?.meeting?.id === 'MTG-1', JSON.stringify(r.json));
 
-const meeting1 = await lib.getMeeting('MTG-1');
-const previous = lib.currentCode(meeting1, Date.now() - lib.QR_WINDOW_MS).code;
-const stale = lib.currentCode(meeting1, Date.now() - 2 * lib.QR_WINDOW_MS).code;
-ck('the code from the previous 20 seconds still works', lib.isCodeValid(meeting1, previous));
-ck('a code older than that has expired', !lib.isCodeValid(meeting1, stale));
-r = await call('attend', { token: bharatToken, body: { meetingId: 'MTG-1', code: stale } });
-ck('…so a forwarded photo stops working', r.status === 410);
-r = await call('attend', { token: bharatToken, body: { meetingId: 'MTG-2', code: live.json.code } });
-ck("one meeting's code cannot mark another meeting", r.status === 409 || r.status === 410);
+r = await call('meeting-open', { token: ADMIN, body: { id: 'MTG-2' } });
+ck('opening a second meeting while one is open is refused', r.status === 409 && r.json?.code === 'another_open', JSON.stringify(r.json));
 
 live = await call('live', { method: 'GET', token: ADMIN, query: { id: 'MTG-1' } });
 ck('the projector shows who is in, with designation', live.json?.counts?.present === 1 && live.json?.present?.[0]?.name === 'Asha Patel' && live.json?.present?.[0]?.designation === 'President');
@@ -315,8 +308,8 @@ ck('a deactivated member cannot be marked at an open meeting', r.status === 409 
 
 r = await call('meeting-close', { token: ADMIN, body: { id: 'MTG-1' } });
 ck('superadmin closes the meeting', r.status === 200 && r.json?.meeting?.status === 'closed' && r.json?.meeting?.roster?.join() === 'BM-1,BM-2,BM-4', JSON.stringify(r.json?.meeting?.roster));
-r = await call('attend', { token: dinaToken, body: { meetingId: 'MTG-1', code: live.json.code } });
-ck('scanning after closing is refused', r.status === 409 && /closed/.test(r.json?.error));
+r = await call('attend', { token: dinaToken, body: {} });
+ck('scanning after closing is refused', r.status === 409 && r.json?.code === 'not_open');
 r = await call('mark', { token: ADMIN, body: { meetingId: 'MTG-1', memberId: 'BM-4', status: 'present', reason: 'Late correction' } });
 ck('the secretary cannot rewrite a closed register', r.status === 409 && r.json?.code === 'not_open', JSON.stringify(r.json));
 r = await call('mark', { token: ADMIN, body: { meetingId: 'MTG-2', memberId: 'BM-1', status: 'leave', reason: 'Travelling, informed in advance' } });
@@ -341,9 +334,9 @@ for (let i = 0; i < 6; i++) {
 }
 live = await call('live', { method: 'GET', token: ADMIN, query: { id: 'MTG-2' } });
 const burst = await Promise.all([bharatToken, dinaToken, ...extra].map((t, i) =>
-  call('attend', { token: t, ip: `203.0.113.${50 + i}`, body: { meetingId: 'MTG-2', code: live.json.code } })));
+  call('attend', { token: t, ip: `203.0.113.${50 + i}`, body: {} })));
 ck('eight members scanning in the same instant are all recorded', burst.every((x) => x.status === 200 && x.json?.alreadyMarked === false), burst.map((x) => x.status).join());
-const repeat = await Promise.all(Array.from({ length: 8 }, () => call('attend', { token: bharatToken, body: { meetingId: 'MTG-2', code: live.json.code } })));
+const repeat = await Promise.all(Array.from({ length: 8 }, () => call('attend', { token: bharatToken, body: {} })));
 ck('one member double-tapping eight times is recorded once', repeat.every((x) => x.status === 200 && x.json?.alreadyMarked === true));
 live = await call('live', { method: 'GET', token: ADMIN, query: { id: 'MTG-2' } });
 ck('the projector counts all eight', live.json?.counts?.present === 8, JSON.stringify(live.json?.counts));
@@ -402,23 +395,20 @@ sec('Mark by name: scan, tap your name, one response per phone');
   await call('member-status', { token: ADMIN, body: { id: gita.id, status: 'inactive' } });
   const saved = await call('meeting-save', { token: ADMIN, body: { title: 'Name-tap meeting', date: '2026-09-10', time: '11:00' } });
   const mtg = saved.json?.meeting?.id;
-  r = await call('names', { body: { meetingId: mtg, code: 'AAAAAAAAAAAA', deviceId: PHONE_A } });
+  r = await call('names', { body: { deviceId: PHONE_A } });
   ck('names before the meeting opens → 409 not_open', r.status === 409 && r.json?.code === 'not_open', JSON.stringify(r.json));
   await call('meeting-open', { token: ADMIN, body: { id: mtg } });
-  const code = (await call('live', { method: 'GET', token: ADMIN, query: { id: mtg } })).json?.code;
 
-  r = await call('names', { body: { meetingId: mtg, code, deviceId: 'short' } });
+  r = await call('names', { body: { deviceId: 'short' } });
   ck('a request without a usable phone id is refused', r.status === 400 && r.json?.code === 'no_device');
-  r = await call('names', { body: { meetingId: mtg, code: 'AAAAAAAAAAAA', deviceId: PHONE_A } });
-  ck('a wrong or old projector code is refused', r.status === 410 && r.json?.code === 'expired');
 
-  r = await call('names', { body: { meetingId: mtg, code, deviceId: PHONE_A } });
+  r = await call('names', { body: { deviceId: PHONE_A } });
   const names = (r.json?.members || []).map((m) => m.name);
-  ck('a valid scan lists the active board, alphabetically, with a pass', r.status === 200 && typeof r.json?.pass === 'string'
+  ck('a scan lists the active board, alphabetically, with a pass', r.status === 200 && typeof r.json?.pass === 'string'
     && names.includes('Esha Name') && names.includes('Farid Name') && !names.includes('Gita Former') && names.join() === [...names].sort((a, b) => a.localeCompare(b)).join(), JSON.stringify(names));
   ck('the list carries names only, no contact details', JSON.stringify(r.json?.members || []).match(/@|98250/) === null);
   const passA1 = r.json?.pass;
-  const passA2 = (await call('names', { body: { meetingId: mtg, code, deviceId: PHONE_A } })).json?.pass;
+  const passA2 = (await call('names', { body: { deviceId: PHONE_A } })).json?.pass;
 
   r = await call('mark-name', { body: { pass: passA1, memberId: esha.id, deviceId: PHONE_B } });
   ck('a pass only works on the phone that scanned', r.status === 410 && r.json?.code === 'expired');
@@ -431,11 +421,11 @@ sec('Mark by name: scan, tap your name, one response per phone');
   ck('a used pass cannot be used again', r.status === 410);
   r = await call('mark-name', { body: { pass: passA2, memberId: farid.id, deviceId: PHONE_A } });
   ck('one phone, one response: a second name from the same phone is refused', r.status === 409 && r.json?.code === 'device_used' && /Esha Name/.test(r.json?.error || ''), JSON.stringify(r.json));
-  r = await call('names', { body: { meetingId: mtg, code, deviceId: PHONE_A } });
+  r = await call('names', { body: { deviceId: PHONE_A } });
   ck('scanning again on that phone says who it marked, with no pass', r.status === 200 && r.json?.pass === null && r.json?.markedByThisPhone === 'Esha Name');
   ck('and shows that name as marked', r.json?.members?.find((m) => m.name === 'Esha Name')?.marked === true);
 
-  const passB = (await call('names', { body: { meetingId: mtg, code, deviceId: PHONE_B } })).json?.pass;
+  const passB = (await call('names', { body: { deviceId: PHONE_B } })).json?.pass;
   r = await call('mark-name', { body: { pass: passB, memberId: esha.id, deviceId: PHONE_B } });
   ck('one response per name: a name already marked is refused', r.status === 409 && r.json?.code === 'already_marked');
   r = await call('mark-name', { body: { pass: passB, memberId: farid.id, deviceId: PHONE_B } });
@@ -443,7 +433,7 @@ sec('Mark by name: scan, tap your name, one response per phone');
 
   // A secretary's leave mark is never overwritten by a tap.
   await call('mark', { token: ADMIN, body: { meetingId: mtg, memberId: 'BM-2', status: 'leave', reason: 'Informed in advance' } });
-  const passC = (await call('names', { body: { meetingId: mtg, code, deviceId: PHONE_C } })).json?.pass;
+  const passC = (await call('names', { body: { deviceId: PHONE_C } })).json?.pass;
   r = await call('mark-name', { body: { pass: passC, memberId: 'BM-2', deviceId: PHONE_C } });
   const bm2 = await kv.get(KEYS.boardAttendance(mtg, 'BM-2'));
   ck('a name the secretary marked on leave cannot be tapped present', r.status === 409 && (typeof bm2 === 'string' ? JSON.parse(bm2) : bm2)?.status === 'leave');
@@ -451,8 +441,8 @@ sec('Mark by name: scan, tap your name, one response per phone');
   ck('an inactive profile cannot be tapped', r.status === 404 && r.json?.code === 'not_on_roster');
 
   // Two passes taken before either is used: still only one response.
-  const passD1 = (await call('names', { body: { meetingId: mtg, code, deviceId: PHONE_D } })).json?.pass;
-  const passD2 = (await call('names', { body: { meetingId: mtg, code, deviceId: PHONE_D } })).json?.pass;
+  const passD1 = (await call('names', { body: { deviceId: PHONE_D } })).json?.pass;
+  const passD2 = (await call('names', { body: { deviceId: PHONE_D } })).json?.pass;
   const [d1, d2] = await Promise.all([
     call('mark-name', { body: { pass: passD1, memberId: 'BM-1', deviceId: PHONE_D } }),
     call('mark-name', { body: { pass: passD2, memberId: 'BM-4', deviceId: PHONE_D } }),
@@ -460,7 +450,7 @@ sec('Mark by name: scan, tap your name, one response per phone');
   ck('two taps at once from one phone: exactly one is accepted', [d1.status, d2.status].filter((x) => x === 200).length === 1 && [d1.status, d2.status].includes(409), `${d1.status} ${d2.status}`);
 
   await call('meeting-close', { token: ADMIN, body: { id: mtg } });
-  r = await call('names', { body: { meetingId: mtg, code, deviceId: PHONE_C } });
+  r = await call('names', { body: { deviceId: PHONE_C } });
   ck('after closing, the name list is refused', r.status === 409 && r.json?.code === 'not_open');
   r = await call('meeting', { method: 'GET', token: ADMIN, query: { id: mtg } });
   ck('the secretary sees the name-tap marks', r.json?.rows?.filter((x) => x.method === 'name').length === 3, JSON.stringify(r.json?.rows?.map((x) => [x.memberId, x.status, x.method])));
@@ -473,8 +463,7 @@ sec('Mark by name: a failed write leaves the phone free to try again');
   const hana = (await call('member-save', { token: ADMIN, body: { name: 'Hana Retry', designation: 'Director', email: 'hana.retry@example.com', mobile: '9825012364' } })).json?.member;
   const mtg = (await call('meeting-save', { token: ADMIN, body: { title: 'Outage meeting', date: '2026-09-12', time: '11:00' } })).json?.meeting?.id;
   await call('meeting-open', { token: ADMIN, body: { id: mtg } });
-  const code = (await call('live', { method: 'GET', token: ADMIN, query: { id: mtg } })).json?.code;
-  const passKey = (await call('names', { body: { meetingId: mtg, code, deviceId: PHONE } })).json?.pass;
+  const passKey = (await call('names', { body: { deviceId: PHONE } })).json?.pass;
 
   const markKey = KEYS.boardAttendance(mtg, hana.id);
   redis.failKeys.add(markKey);
@@ -488,10 +477,11 @@ sec('Mark by name: a failed write leaves the phone free to try again');
   redis.failKeys.delete(markKey);
   ck('a storage failure on the mark is an error, not a success', failed);
 
-  r = await call('names', { body: { meetingId: mtg, code, deviceId: PHONE } });
+  r = await call('names', { body: { deviceId: PHONE } });
   ck('…and the phone is not left claiming a name it never marked', r.status === 200 && r.json?.markedByThisPhone === null && typeof r.json?.pass === 'string', JSON.stringify(r.json));
   r = await call('mark-name', { body: { pass: r.json?.pass, memberId: hana.id, deviceId: PHONE } });
   ck('…so the same phone can mark the name once storage is back', r.status === 200 && r.json?.member?.name === 'Hana Retry', JSON.stringify(r.json));
+  await call('meeting-close', { token: ADMIN, body: { id: mtg } });
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -511,8 +501,7 @@ sec('Reopening a meeting keeps the roster it closed with');
   ck('someone absent and since deactivated stays on the reopened register', before.includes(ivan.id) && reopened.includes(ivan.id), JSON.stringify(reopened));
   ck('someone added after the meeting is not added to it', !reopened.includes(jaya.id));
   const { token: jayaToken } = await signIn(jaya.email);
-  const reopenCode = (await call('live', { method: 'GET', token: ADMIN, query: { id: mtg } })).json?.code;
-  r = await call('attend', { token: jayaToken, body: { meetingId: mtg, code: reopenCode } });
+  r = await call('attend', { token: jayaToken, body: {} });
   ck('…and cannot scan into it while it is reopened', r.status === 403 && r.json?.code === 'not_on_roster', JSON.stringify(r.json));
   ck('…so no mark is written for them', !(await kv.get(KEYS.boardAttendance(mtg, jaya.id))));
   r = await call('mark', { token: ADMIN, body: { meetingId: mtg, memberId: ivan.id, status: 'leave', reason: 'Correcting the record' } });

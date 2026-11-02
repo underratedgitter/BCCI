@@ -1,7 +1,7 @@
 // js/board-admin.js
 // The superadmin's "Board & Meetings" tab: board member profiles, meetings,
 // each meeting's attendance (with overrides), the Excel register, and the
-// full-screen projector view that shows the rotating attendance QR.
+// full-screen projector view that shows the attendance QR.
 //
 // Names and designations are typed by people, so everything is rendered
 // through el() / textContent, never innerHTML.
@@ -59,11 +59,14 @@ export class BoardAdmin {
     const download = button('Download attendance register (Excel)', 'btn-primary');
     download.prepend(el('i', { className: 'fas fa-file-excel', 'aria-hidden': 'true' }), ' ');
     download.addEventListener('click', () => this.downloadRegister(download));
+    const sticker = button('Print attendance QR sticker', 'btn-primary');
+    sticker.prepend(el('i', { className: 'fas fa-qrcode', 'aria-hidden': 'true' }), ' ');
+    sticker.addEventListener('click', () => this.printQrSticker());
 
     this.root.replaceChildren(el('div', { className: 'board-admin' },
       el('div', { className: 'board-admin-head' },
         el('h3', { className: 'board-admin-title' }, el('i', { className: 'fas fa-user-tie', 'aria-hidden': 'true' }), ' Board & Meetings'),
-        el('p', { className: 'board-admin-lead', text: 'Create a profile for each board member. At a meeting, open attendance to show a QR code on the projector; members scan it with their phone camera and tap their name to be marked present. Each phone can mark one name.' })),
+        el('p', { className: 'board-admin-lead', text: 'Create a profile for each board member. At a meeting, open attendance: members scan the attendance QR — the printed sticker or the one on the projector — with their phone camera and tap their name to be marked present. Each phone can mark one name.' })),
       el('div', { className: 'board-admin-forms' },
         el('section', { className: 'board-admin-card' },
           el('h4', { className: 'board-admin-card-title', text: 'Add a board member' }),
@@ -73,7 +76,8 @@ export class BoardAdmin {
           this.meetingForm(null, () => this.refresh()))),
       el('section', { className: 'board-admin-section' },
         el('div', { className: 'board-admin-section-head' },
-          el('h4', { className: 'board-admin-card-title', text: 'Meetings' }), download),
+          el('h4', { className: 'board-admin-card-title', text: 'Meetings' }),
+          el('div', { className: 'board-actions' }, sticker, download)),
         this.meetingsBox),
       el('section', { className: 'board-admin-section' },
         el('h4', { className: 'board-admin-card-title', text: 'Board members' }),
@@ -400,12 +404,42 @@ export class BoardAdmin {
     this.projector = new Projector({
       api: (a, o) => this.api(a, o),
       meetingId,
+      onPrintSticker: () => this.printQrSticker(),
       onExit: () => {
         this.projector = null;
         this.refresh();
       },
     });
     this.projector.start();
+  }
+
+  /**
+   * The permanent attendance QR, print-ready: stick it on a wall or a stand
+   * so members can scan in even when the projector is not available. It only
+   * works while a meeting is open.
+   */
+  printQrSticker() {
+    const qrBox = el('div', { className: 'board-sticker-qr', role: 'img', 'aria-label': 'Attendance QR code' });
+    const printBtn = button('Print', 'btn-primary');
+    const closeBtn = button('Close');
+    const overlay = el('div', { className: 'board-sticker-overlay' },
+      el('div', { className: 'board-sticker-sheet' },
+        el('h2', { className: 'board-sticker-title', text: 'BCCI Board Meeting — Attendance' }),
+        qrBox,
+        el('p', { className: 'board-sticker-how', text: 'Scan with your phone camera, then tap your name. Works only while a meeting is open.' }),
+        el('div', { className: 'board-sticker-actions' }, printBtn, closeBtn)));
+    const remove = () => overlay.remove();
+    printBtn.addEventListener('click', () => window.print());
+    closeBtn.addEventListener('click', remove);
+    window.addEventListener('afterprint', remove, { once: true });
+    document.body.append(overlay);
+    if (typeof QRCode === 'undefined') {
+      qrBox.append(el('p', { className: 'board-projector-banner', text: 'The QR library did not load. Reload the page.' }));
+      return;
+    }
+    new QRCode(qrBox, { text: `${location.origin}/board?attend=live`, width: 512, height: 512, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+    qrBox.removeAttribute('title');
+    qrBox.querySelectorAll('img, canvas').forEach((n) => n.setAttribute('aria-hidden', 'true'));
   }
 
   async runAction(btn, fn, successMessage) {
@@ -422,16 +456,18 @@ export class BoardAdmin {
 }
 
 /**
- * The full-screen view for the meeting room's projector: the rotating QR,
- * and names appearing as members scan in. Polls the server every few
- * seconds; keeps the screen awake while it is up.
+ * The full-screen view for the meeting room's projector: the attendance QR
+ * (the same permanent one as the sticker), and names appearing as members
+ * scan in. Polls the server every few seconds; keeps the screen awake while
+ * it is up.
  */
 class Projector {
-  constructor({ api, meetingId, onExit }) {
+  constructor({ api, meetingId, onPrintSticker, onExit }) {
     this.api = api;
     this.meetingId = meetingId;
+    this.onPrintSticker = onPrintSticker;
     this.onExit = onExit;
-    this.code = null;
+    this.qrDrawn = false;
     this.timer = null;
     this.wakeLock = null;
     this.stopped = false;
@@ -442,7 +478,6 @@ class Projector {
 
   start() {
     this.qrBox = el('div', { className: 'board-projector-qr', role: 'img', 'aria-label': 'Attendance QR code' });
-    this.bar = el('div', { className: 'board-projector-bar' });
     this.title = el('h2', { className: 'board-projector-title', text: 'Loading…' });
     this.meta = el('p', { className: 'board-projector-meta' });
     this.count = el('div', { className: 'board-projector-count', 'aria-live': 'polite' });
@@ -451,6 +486,8 @@ class Projector {
 
     const fullscreen = button('Full screen');
     fullscreen.addEventListener('click', () => this.overlay.requestFullscreen?.().catch(() => {}));
+    const sticker = button('Print sticker');
+    sticker.addEventListener('click', () => this.onPrintSticker());
     this.closeBtn = button('Close attendance', 'btn-action-reject');
     this.closeBtn.addEventListener('click', () => this.closeAttendance());
     const exit = button('Exit');
@@ -459,12 +496,11 @@ class Projector {
     this.overlay = el('div', { className: 'board-projector', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Meeting attendance QR' },
       el('div', { className: 'board-projector-top' },
         el('div', {}, this.title, this.meta),
-        el('div', { className: 'board-projector-controls' }, fullscreen, this.closeBtn, exit)),
+        el('div', { className: 'board-projector-controls' }, fullscreen, sticker, this.closeBtn, exit)),
       this.banner,
       el('div', { className: 'board-projector-body' },
         el('div', { className: 'board-projector-left' },
           this.qrBox,
-          el('div', { className: 'board-projector-bar-track' }, this.bar),
           el('p', { className: 'board-projector-how', text: 'Scan with your phone camera, then tap your name.' })),
         el('div', { className: 'board-projector-right' }, this.count, this.list)));
 
@@ -499,7 +535,7 @@ class Projector {
         return;
       }
       this.banner.hidden = false;
-      this.banner.textContent = 'Connection lost. Retrying… The code on screen stops working within 40 seconds.';
+      this.banner.textContent = 'Connection lost. Retrying… the present list may be stale.';
       this.timer = setTimeout(() => this.poll(), 3000);
       return;
     }
@@ -508,15 +544,15 @@ class Projector {
     const m = data.meeting;
     this.title.textContent = m.title;
     this.meta.textContent = [dayLabel(m.date), m.time, m.venue].filter(Boolean).join(' · ');
-    if (data.code !== this.code) {
-      this.code = data.code;
-      this.drawQr(`${location.origin}/board?attend=${m.id}.${data.code}`, data.refreshInMs);
+    if (!this.qrDrawn) {
+      this.qrDrawn = true;
+      this.drawQr(`${location.origin}/board?attend=live`);
     }
     this.renderPresent(data.present, data.counts);
-    this.timer = setTimeout(() => this.poll(), Math.min(3000, data.refreshInMs + 150));
+    this.timer = setTimeout(() => this.poll(), 3000);
   }
 
-  drawQr(payload, refreshInMs) {
+  drawQr(payload) {
     this.qrBox.replaceChildren();
     if (typeof QRCode === 'undefined') {
       this.qrBox.append(el('p', { className: 'board-projector-banner', text: 'The QR library did not load. Reload the page.' }));
@@ -525,12 +561,6 @@ class Projector {
     new QRCode(this.qrBox, { text: payload, width: 512, height: 512, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
     this.qrBox.removeAttribute('title');
     this.qrBox.querySelectorAll('img, canvas').forEach((n) => n.setAttribute('aria-hidden', 'true'));
-    // The bar empties as the code's 20 seconds run out.
-    this.bar.style.transition = 'none';
-    this.bar.style.width = '100%';
-    void this.bar.offsetWidth;
-    this.bar.style.transition = `width ${refreshInMs}ms linear`;
-    this.bar.style.width = '0%';
   }
 
   renderPresent(present, counts) {
@@ -562,10 +592,8 @@ class Projector {
   showClosed(message) {
     clearTimeout(this.timer);
     this.timer = null;
-    this.code = null;
+    this.qrDrawn = false;
     this.qrBox.replaceChildren(el('p', { className: 'board-projector-closed', text: message || 'Attendance is closed.' }));
-    this.bar.style.transition = 'none';
-    this.bar.style.width = '0%';
     this.closeBtn.disabled = true;
   }
 

@@ -3,7 +3,7 @@
 //
 // Board members (their own session, from an emailed sign-in code):
 //   POST request-code, verify-code, attend, sign-out      GET me
-// Anyone who scanned the projector QR (no session):
+// Anyone who scanned the attendance QR (no session):
 //   POST names, mark-name
 // Superadmin (the existing admin session):
 //   GET  members, meetings, meeting, live, register
@@ -44,7 +44,7 @@ import {
   validateMeetingFields,
   setMeetingStatus,
   deleteMeeting,
-  currentCode,
+  resolveOpenMeeting,
   markBySelf,
   openNameMarking,
   markByName,
@@ -202,9 +202,8 @@ async function me(req, res, { member }) {
 async function attend(req, res, { member }) {
   const limit = await rateLimit(`board:attend:${member.id}`, { max: 20, windowSec: 60 });
   if (!limit.ok) return tooManyRequests(res, limit.retryAfter, 'Too many scans. Wait a moment and scan again.');
-  const meetingId = str(req.body?.meetingId, 20);
-  const code = str(req.body?.code, 20);
-  const { meeting, record, alreadyMarked } = await markBySelf(meetingId, member, code, { userAgent: req.headers['user-agent'] });
+  const meeting = await resolveOpenMeeting();
+  const { record, alreadyMarked } = await markBySelf(meeting, member, { userAgent: req.headers['user-agent'] });
   if (!alreadyMarked) console.log(`[Board] ${member.id} present at ${meeting.id}`);
   return res.status(200).json({
     success: true,
@@ -224,7 +223,7 @@ async function signOut(req, res, { token }) {
 async function nameList(req, res) {
   const limit = await rateLimit(`board:names:ip:${clientIp(req)}`, { max: 60, windowSec: 60 });
   if (!limit.ok) return tooManyRequests(res, limit.retryAfter, 'Too many scans. Wait a moment and scan again.');
-  const result = await openNameMarking(str(req.body?.meetingId, 20), str(req.body?.code, 20), str(req.body?.deviceId, 64));
+  const result = await openNameMarking(str(req.body?.deviceId, 64));
   return res.status(200).json({ success: true, ...result });
 }
 
@@ -313,7 +312,7 @@ const admin = {
     return res.status(200).json({ success: true, ...(await meetingDetail(str(req.query?.id, 20))) });
   },
 
-  /** What the projector shows: the current code and who is in so far. */
+  /** What the projector shows: the live QR is static, and who is in so far. */
   async live(req, res) {
     const meeting = await getMeeting(str(req.query?.id, 20));
     if (!meeting) throw new BoardError(404, 'Meeting not found.', 'not_found');
@@ -323,7 +322,7 @@ const admin = {
       .filter((r) => r.status === 'present')
       .sort((a, b) => String(b.at).localeCompare(String(a.at)))
       .map(({ memberId, name, designation, at, method }) => ({ memberId, name, designation, at, method }));
-    return res.status(200).json({ success: true, meeting: publicMeeting(meeting), ...currentCode(meeting), present, counts });
+    return res.status(200).json({ success: true, meeting: publicMeeting(meeting), present, counts });
   },
 
   async mark(req, res, { adminEmail }) {
