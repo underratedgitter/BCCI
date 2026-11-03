@@ -3,9 +3,8 @@
 //
 // No sign-in needed to mark attendance: scanning the attendance QR (the
 // printed sticker or the projector) with the phone's camera opens
-// /board?attend=live; the member enters the meeting PIN shown in the room
-// (the projector's QR carries it, so only sticker scans type it), then taps
-// their name. Each phone gets one response per meeting.
+// /board?attend=live; the member enters the meeting PIN shown in the room,
+// then taps their name. Each phone gets one response per meeting.
 //
 // Signing in (email → 6-digit code) is optional: a signed-in member's scan
 // marks them straight away, and they can see their attendance history.
@@ -17,8 +16,8 @@ const ATTEND_IN_TEXT = /[?&]attend=live(?![A-Za-z0-9_-])/;
 const PIN_IN_TEXT = /[?&]pin=(\d{4})(?!\d)/;
 
 /**
- * The attendance QR's URL (/board?attend=live), or null. The projector's
- * version also carries the meeting PIN (&pin=1234); the sticker's does not.
+ * The attendance QR's URL (/board?attend=live), or null. Older projector
+ * links may still carry the PIN (&pin=1234); new ones do not.
  */
 export function parseAttendQr(text) {
   const value = String(text || '');

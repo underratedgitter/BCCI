@@ -114,6 +114,7 @@ Sessions are opaque tokens held in the server-side store, not signed blobs the b
 | `bcci:enq:<id>`, `bcci:enq_index` | enquiries, newest 1000 kept |
 | `admin:<token>`, `applicant:<token>` | sessions, TTL-expired |
 | `bcci:otp:<email>` | pending code, 10-minute TTL |
+| `bcci:board:*` | board profiles, meetings, attendance, PINs and passes (see [`DEPLOYMENT.md`](DEPLOYMENT.md)) |
 
 Records are stored one per key rather than as a single JSON document, so two applicants submitting at the same moment cannot overwrite each other. An older single-blob layout migrates automatically on first read; the original is left untouched as a backup.
 
@@ -132,11 +133,12 @@ npm run purge:data -- --confirm # actually delete
 npm test
 ```
 
-Eleven suites of assertions, plus the asset-version check,, with no network access and no live database:
+Eleven test suites plus the asset-version check, with no network access and no live database:
 
 | Suite | Covers |
 |---|---|
 | `e2e` | the real server against a mock Upstash and a **real SMTP server** — OTP, application, approval, renewal, 30 concurrent submissions |
+| `email-outbox` | decision emails retry after a failed send and are never sent twice |
 | `api` | authentication, ownership, rate limits, the approval flow |
 | `data` | legacy migration, concurrent writes |
 | `client` | XSS escaping, form drafts, sign-in, accessibility |
@@ -146,7 +148,7 @@ Eleven suites of assertions, plus the asset-version check,, with no network acce
 | `events-redis` | attendee storage and capacity under Redis |
 | `events-api` | event CRUD, registration, check-in, payment confirmation |
 | `board` | board portal sign-in, meeting PIN, one open meeting, attendance, register export |
-| `asset-versions` | that every changed `/js` or `/css` file got a new `?v=` |
+| `asset-versions` | that changed JS, CSS and versioned portraits got a new `?v=` |
 
 ### Changing a JS or CSS file
 
@@ -158,6 +160,20 @@ URL that loads them. After changing a file:
 2. run `npm run versions:update` to record the new versions.
 
 `npm test` fails if a file changed but its version did not.
+
+The published leadership roster lives in `js/leadership.js`. Portrait URLs
+include `?v=`: bump it when replacing a photo, then run `npm run versions:update`.
+Admin → Board & Meetings warns when a published leader is missing or inactive
+in the portal roster. Portal accounts still require a verified email and mobile;
+the public list never creates sign-in accounts automatically.
+
+Both printed and projector attendance QR codes open `/board?attend=live` without
+the meeting PIN. Members enter the PIN displayed separately in the room.
+
+For a focused Chrome smoke test, start `npm run dev:sandbox`, then run
+`npm run test:leadership-browser`. Set `SITE_URL` for a different local port
+and `CHROME_PATH` if Chrome is installed elsewhere. This tests profiles,
+modal title escaping, roster warnings, the projector QR, and responsive layouts.
 
 ---
 
@@ -182,6 +198,6 @@ api/            serverless handlers, one file per route
 js/             app.js (UI and routing), store.js (API client)
 css/            styles.css, membership-card.css
 scripts/        dev-sandbox, mail:test, purge:data, run-tests
-tests/          ten suites, plus mock Redis and mock SMTP
+tests/          eleven suites, plus mock Redis and mock SMTP
 server.js       local server: the same handlers plus the static site
 ```

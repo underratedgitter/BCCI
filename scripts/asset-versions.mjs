@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const RECORD = path.join(ROOT, 'tests', 'asset-versions.json');
-const REF = /([A-Za-z0-9_./-]+\.(?:js|css))\?v=([A-Za-z0-9._-]+)/g;
+const REF = /([A-Za-z0-9_./-]+\.(?:js|css|webp|jpe?g|png|svg))\?v=([A-Za-z0-9._-]+)/g;
 
 /** Every file that can reference a versioned file. */
 function sources() {
@@ -40,7 +40,9 @@ function resolve(from, ref) {
 
 /** Hash without line-ending noise, so a Windows checkout agrees with Linux. */
 function hashOf(file) {
-  const text = fs.readFileSync(path.join(ROOT, file), 'utf8').replace(/\r\n/g, '\n');
+  const text = /\.(js|css)$/.test(file)
+    ? fs.readFileSync(path.join(ROOT, file), 'utf8').replace(/\r\n/g, '\n')
+    : fs.readFileSync(path.join(ROOT, file));
   return crypto.createHash('sha256').update(text).digest('hex');
 }
 

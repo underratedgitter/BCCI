@@ -680,6 +680,29 @@ sec('One open meeting, even when two are opened at once');
   await call('meeting-close', { token: ADMIN, body: { id: c } });
 }
 
+sec('Published roster reconciliation (admin only)');
+{
+  r = await call('members', { method: 'GET', token: ADMIN });
+  ck('admin sees the 15 published names without inventing portal accounts', r.status === 200 && r.json?.websiteRoster?.length === 15);
+  ck('Mahesh is flagged when no portal profile exists', r.json.websiteRoster.some((w) => w.name === 'DR. MAHESH R. VASHI' && w.portalId === null));
+  ck('Jigar stays unpublished', !r.json.websiteRoster.some((w) => /jigar/i.test(w.name)));
+  const { member } = await lib.saveMember({ name: 'Mahesh R Vashi', designation: 'CSR & Skill Development', email: 'mahesh-test@example.com', mobile: '9825012345', company: '' });
+  r = await call('members', { method: 'GET', token: ADMIN });
+  let match = r.json.websiteRoster.find((w) => w.name === 'DR. MAHESH R. VASHI');
+  ck('titles, dots, case and spacing do not cause a false missing-profile warning', match?.portalId === member.id && match?.portalStatus === 'active');
+  ck('reconciliation contains no email or mobile', !('email' in match) && !('mobile' in match));
+  await lib.setMemberStatus(member.id, 'inactive');
+  r = await call('members', { method: 'GET', token: ADMIN });
+  match = r.json.websiteRoster.find((w) => w.name === 'DR. MAHESH R. VASHI');
+  ck('inactive portal profiles are distinguished from missing profiles', match?.portalId === member.id && match?.portalStatus === 'inactive');
+  const urjit = await lib.saveMember({ name: 'Urjit Patel', designation: 'Event Management & Exhibitions', email: 'urjit-test@example.com', mobile: '9825012345', company: '' });
+  r = await call('members', { method: 'GET', token: ADMIN });
+  ck('Urjit’s expanded public name still matches his existing short portal name',
+    r.json.websiteRoster.some((w) => w.name === 'MR. URJIT BHUPENDRABHAI PATEL' && w.portalId === urjit.member.id));
+  r = await call('members', { method: 'GET' });
+  ck('reconciliation remains admin-only', r.status === 401 && !r.json?.websiteRoster);
+}
+
 console.log(`${'═'.repeat(52)}\n  ${pass} passed, ${fail} failed\n${'═'.repeat(52)}`);
 smtp.server.close();
 redis.server.close();

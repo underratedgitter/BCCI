@@ -1031,7 +1031,7 @@ body.admin-area footer .footer-grid > div:has(.footer-links a) h4 {
 .team-readmore-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
 .leader-profile { text-align: left; }
-.leader-profile-img { display: block; width: 160px; height: 180px; object-fit: cover; object-position: top center; margin: 0 auto var(--space-md); border: 2px solid var(--gray-200); }
+.leader-profile-img { display: block; width: auto; max-width: min(160px, 100%); height: auto; max-height: 180px; object-fit: contain; margin: 0 auto var(--space-md); border: 2px solid var(--gray-200); }
 .leader-profile-role { font-family: var(--font-mono); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--gray-500); text-align: center; margin-bottom: var(--space-md); }
 .leader-profile-bio p { font-size: 0.92rem; line-height: 1.7; color: var(--gray-700); margin: 0 0 0.85rem; }
 .leader-profile .team-linkedin-btn { margin-top: 0.25rem; }
@@ -1241,6 +1241,7 @@ body.admin-area footer .footer-grid > div:has(.footer-links a) h4 {
 }
 
 .qrcode-card {
+  min-width: 0;
   background: var(--white);
   border: var(--rule);
   padding: var(--space-2xl);
@@ -1248,6 +1249,7 @@ body.admin-area footer .footer-grid > div:has(.footer-links a) h4 {
 }
 
 .qrcode-badge {
+  max-width: 100%;
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
@@ -1290,7 +1292,7 @@ body.admin-area footer .footer-grid > div:has(.footer-links a) h4 {
 .qrcode-img-frame:hover .qrcode-img-hover { opacity: 1; }
 
 .qrcode-actions { display: flex; gap: 0.75rem; flex-direction: column; }
-.qrcode-details-pane { display: flex; flex-direction: column; gap: var(--space-xl); }
+.qrcode-details-pane { display: flex; flex-direction: column; gap: var(--space-xl); min-width: 0; overflow-wrap: anywhere; }
 
 .payment-info-box {
   background: var(--white);
@@ -2098,6 +2100,8 @@ footer h4 {
    RESPONSIVE
    ========================================================================== */
 @media (max-width: 1024px) {
+  /* Payment panels need readable space before the phone breakpoint. */
+  .qrcode-hero-container { grid-template-columns: minmax(0, 1fr); gap: var(--space-xl); }
   /* ── Navigation ────────────────────────────────────────────── */
   .top-bar { display: none !important; }
   .nav-links { display: none !important; }
@@ -2965,7 +2969,7 @@ body.modal-open {
 /* ── Public Events & Conclaves Page ─────────────────────────────── */
 .events-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(330px, 100%), 1fr));
   gap: 1.5rem;
 }
 
@@ -3318,6 +3322,13 @@ body.modal-open {
 .board-admin-section-head { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
 .board-admin-section-head .board-admin-card-title { margin: 0; }
 .board-admin-count { color: #475569; font-weight: 600; margin: 0 0 0.75rem; }
+.board-roster-warning {
+  margin: 0 0 1rem; padding: 0.9rem 1rem; border: 1px solid #FDE68A; border-radius: var(--radius-md);
+  background: #FFFBEB; color: #92400E; font-size: 0.88rem;
+}
+.board-roster-warning strong { display: block; margin-bottom: 0.35rem; color: #78350F; }
+.board-roster-warning p { margin: 0.35rem 0; }
+.board-roster-warning ul { margin: 0.35rem 0 0; padding-left: 1.2rem; }
 .board-table { min-width: 760px; }
 /* Tables scroll sideways in their container rather than splitting emails
    and names mid-word, which the site-wide data-table rule allows. */

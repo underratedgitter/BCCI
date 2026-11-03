@@ -1,23 +1,83 @@
 {
+  "assets/KAmal.webp": {
+    "version": "2",
+    "sha256": "c87672bd865aa9a4488c5ab77f2519816ac3c396ffdad47bf7c03b2f4dca9750"
+  },
+  "assets/President_photo.webp": {
+    "version": "2",
+    "sha256": "15bb9b3de1cb122b103beec58bf43c168a17a121cb3fe0b177652ebaed54ccda"
+  },
+  "assets/anish.webp": {
+    "version": "2",
+    "sha256": "dcfc7be58d4c4be77004c89140a389917c3d4c1d2ea81654a40c31d3d1754745"
+  },
+  "assets/bharat-shah.webp": {
+    "version": "2",
+    "sha256": "107968d7c852bc9a504786d3103b7165ed38096e4987215c2eef865ee9f580bc"
+  },
+  "assets/bhavik-barot.webp": {
+    "version": "2",
+    "sha256": "8989a62307abffbd1670d61550ece20adddc3f213586ef4d5c998ef2553bcbd4"
+  },
+  "assets/cd-shelat.webp": {
+    "version": "2",
+    "sha256": "9ce7837f069095ad619b7e7cbfcb445aa9fe04a0855e745aa2f58a573ab857d8"
+  },
+  "assets/mahesh-vashi.webp": {
+    "version": "2",
+    "sha256": "4792fbc47c9204d66a8f30ece701cb5a2eebd569051bc77d42426d0364155891"
+  },
+  "assets/nirmal-shah.webp": {
+    "version": "2",
+    "sha256": "2b8e04efd6f2218cef2b30ae16c48c324434e920dbab0d6d29fc4214e92c7791"
+  },
+  "assets/nirmalsinh-yadav.webp": {
+    "version": "2",
+    "sha256": "05e709238eeb84898f5a38da965ac2a08c9fbf648293f532e17476ca3bec288a"
+  },
+  "assets/rajesh-dudhat.webp": {
+    "version": "2",
+    "sha256": "48ad54760593b14fbcd442652cf2dde33006cb2b2c2e71badb63445d2f6fa3cc"
+  },
+  "assets/rajesh-makwana.webp": {
+    "version": "2",
+    "sha256": "3af30fbb7434fe423def50c45452253c7d5a19bc6e5201b246aefcf0ae72c958"
+  },
+  "assets/trupti-almola.webp": {
+    "version": "2",
+    "sha256": "da1ded4bacfd8cd1a148a84d995d0755d69e654733c6509737cf70e740fb4516"
+  },
+  "assets/tushar.webp": {
+    "version": "2",
+    "sha256": "70784ea1e2ed0dce49be39aa4a5eeda8d449adeca783572d6690edd21a7a1a45"
+  },
+  "assets/tushar_j_shah.jpeg": {
+    "version": "2",
+    "sha256": "47e3e1b34ac887c7e604e756b64df68d96294d93c91ca555df19e2b58d28fe9e"
+  },
+  "assets/urjit-patel.webp": {
+    "version": "1",
+    "sha256": "c0a87ff33688258d7ac133ff4ec4ca0e70654c9024b6491e58f73de36c8b68d8"
+  },
   "css/membership-card.css": {
     "version": "3.2.0",
     "sha256": "af1d664603d7291980d3f8e2097b569247bd9169b103d60c874fde19178736c9"
   },
   "css/styles.css": {
-    "version": "3.2.18",
-    "sha256": "1879b9bc3f8895d5225c50d59fb2899a6bc603d9038eef0bca8221cd64d2fa69"
+    "version": "3.2.21",
+    "sha256": "e838e4644d54fc9a0ae93810ccf2ec660e478a104ed17266a07a0665d3de28dd"
   },
   "js/app.js": {
-    "version": "5.0.33",
-    "sha256": "25f73c8310e94a0c7cc7f067206ea69a71baf16f0b3092bd098c14cc5711c75f"
+    "version": "5.0.36",
+    "sha256": "1e4f2c8c1dc988063818d4fd655c8557fb866a947a463bbe6fdc0fe68c035642"
   },
   "js/board-admin.js": {
-    "version": "1.1.5",
-    "sha256": "c0474675867292ca3955ed91f687119d9bf998d3dfe372c1447d3ca62e74a3c5"
+    "version": "1.1.6",
+    "sha256": "3611efb51e36e0cdca004319e824544fa39e8677576c76ae19c5a3f4ef36a544"
   },
   "js/board-portal.js": {
-    "version": "1.1.4",
-    "sha256": "82d4aeed07158169ea189fd460ff19a641aa5862df59f779ac31d835546c72e1"
+    "version": "1.1.5",
+    "sha256": "b7816a0a837bd15cab55247b854b5644812db1fafc7c921a98e7893462a92a92"
   },
   "js/checkin.js": {
     "version": "1.1.1",
@@ -27,12 +87,16 @@
     "version": "1.0.1",
     "sha256": "80d0abbd1937996c74e5ab460a28c7987d65e21fbddcfae2afcf030305edcb94"
   },
+  "js/leadership.js": {
+    "version": "1.0.1",
+    "sha256": "c75cad831aea4fd5b7545564029db7ab7b19b5b4840c7bbebb6e7deb6c7654a2"
+  },
   "js/qr-scanner.js": {
     "version": "1.0.0",
     "sha256": "f6fa3375a3566b257c90419689e4769a0c2c4a3ce7378caf6d821e247443f569"
   },
   "js/store.js": {
-    "version": "4.0.21",
-    "sha256": "53fa49754e76dfa954d51093b56bd132fd370c1a1fcf2bbeb196e8eb1539f0ca"
+    "version": "4.0.23",
+    "sha256": "11c0d3b74377416518c1a9ce1a52c3bbd77789742831ddc670d51bb71aefd725"
   }
 }

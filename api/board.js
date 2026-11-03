@@ -66,6 +66,7 @@ import {
   getMeetingPin,
 } from './_lib/board.js';
 import { buildRegister } from './_lib/board-register.js';
+import { LEADERSHIP } from '../js/leadership.js';
 
 const OTP_TTL_SECONDS = 600;
 const OTP_MAX_TRIES = 5;
@@ -79,6 +80,9 @@ const LEGACY_SESSION_TTL_SECONDS = 180 * 24 * 3600;
 const profileView = (m) => ({
   id: m.id, name: m.name, designation: m.designation, email: m.email, mobile: m.mobile, company: m.company || '',
 });
+
+/** Names differ only by case, punctuation and spacing; compare that way. */
+const nameKey = (name) => String(name || '').toLowerCase().replace(/^(?:(?:mr|mrs|ms|dr|adv)\.?\s+)+/, '').replace(/[^a-z0-9]+/g, '');
 
 /**
  * Renews a live session once less than half its idle window is left, clamped
@@ -300,7 +304,15 @@ async function sendWelcome(member) {
 
 const admin = {
   async members(req, res) {
-    return res.status(200).json({ success: true, members: await listMembers() });
+    const members = await listMembers();
+    const portal = new Map(members.map((m) => [nameKey(m.name), m]));
+    // The About page roster is static, so show the secretary where it has
+    // drifted from the portal: those people cannot sign in or be marked.
+    const websiteRoster = LEADERSHIP.map(({ name, role, portalNames = [] }) => {
+      const match = [name, ...portalNames].map((n) => portal.get(nameKey(n))).find(Boolean);
+      return { name, role, portalId: match?.id || null, portalStatus: match?.status || null };
+    });
+    return res.status(200).json({ success: true, members, websiteRoster });
   },
 
   async 'member-save'(req, res, { adminEmail }) {

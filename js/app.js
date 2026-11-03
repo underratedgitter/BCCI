@@ -4,7 +4,7 @@
    All store operations are async — Vercel API + Redis backend.
    ========================================================================== */
 
-import { Store } from './store.js?v=4.0.21';
+import { Store } from './store.js?v=4.0.23';
 
 // ── Membership tiers ───────────────────────────────────────────
 // Built-in plans: label → fee in INR. The form starts with these and swaps in
@@ -1080,7 +1080,7 @@ class App {
   showDigitalMemberCardModal(app) {
     const validity = this.store.getMembershipValidity(app);
     this.showModal({
-      title: `<i class="fas fa-id-card" style="color: var(--accent-gold-dark);"></i> Official BCCI Digital Membership Pass`,
+      titleHtml: `<i class="fas fa-id-card" style="color: var(--accent-gold-dark);"></i> Official BCCI Digital Membership Pass`,
       content: `
         <div style="padding: 0.5rem 0;">
           <div class="bcci-membership-card-wrapper" style="margin-bottom: 1.5rem;">
@@ -1322,7 +1322,7 @@ class App {
     `;
 
     this.showModal({
-      title: `<i class="fas fa-id-card-alt" style="color: var(--accent-gold-dark); margin-right: 0.5rem;"></i> BCCI Official Member Details`,
+      titleHtml: `<i class="fas fa-id-card-alt" style="color: var(--accent-gold-dark); margin-right: 0.5rem;"></i> BCCI Official Member Details`,
       content
     });
 
@@ -1353,7 +1353,7 @@ class App {
     const validity = this.store.getMembershipValidity(app);
     const renewalFee = this.renewalFeeFor(app);
     this.showModal({
-      title: `<i class="fas fa-sync-alt" style="color: var(--primary);"></i> Annual Membership Renewal (1-Year Extension)`,
+      titleHtml: `<i class="fas fa-sync-alt" style="color: var(--primary);"></i> Annual Membership Renewal (1-Year Extension)`,
       content: `
         <div style="padding: 0.5rem 0;">
           <div style="background: #EFF6FF; border: 1px solid #BFDBFE; padding: 1rem; border-radius: 8px; margin-bottom: 1.25rem; font-size: 0.9rem; color: #1E3E62;">
@@ -1950,9 +1950,9 @@ class App {
 
   /**
    * /board: a board member's sign-in, QR attendance and history. The
-   * permanent attendance QR (sticker or projector) opens /board?attend=live
-   * (the projector's adds &pin=…); both are read once and dropped from the
-   * address bar so a refresh cannot resubmit them.
+   * permanent attendance QR (sticker or projector) opens /board?attend=live;
+   * the member then types the PIN shown on the projector. The query is read
+   * once and dropped from the address bar so a refresh cannot resubmit it.
    */
   async renderBoardPortal() {
     const root = document.getElementById('boardPortalRoot');
@@ -1960,7 +1960,7 @@ class App {
     let BoardPortal;
     let parseAttendQr;
     try {
-      ({ BoardPortal, parseAttendQr } = await import('./board-portal.js?v=1.1.4'));
+      ({ BoardPortal, parseAttendQr } = await import('./board-portal.js?v=1.1.5'));
     } catch (err) {
       root.textContent = 'The Board Portal could not load. Check your connection and reload the page.';
       console.error('[Board] portal failed to load:', err);
@@ -1987,7 +1987,7 @@ class App {
       return;
     }
     try {
-      const { BoardAdmin } = await import('./board-admin.js?v=1.1.5');
+      const { BoardAdmin } = await import('./board-admin.js?v=1.1.6');
       this._boardAdmin = new BoardAdmin({
         root,
         store: this.store,
@@ -2048,7 +2048,7 @@ class App {
   /** A leader's full profile, opened from "Read more" on their card. */
   showLeaderProfile(m) {
     this.showModal({
-      title: escapeHtml(m.name),
+      title: m.name,
       content: `
         <div class="leader-profile">
           ${m.image ? `<img src="${escapeAttr(m.image)}" alt="${escapeAttr(m.name)}" class="leader-profile-img" />` : ''}
@@ -2362,7 +2362,7 @@ class App {
             Scan a BCCI digital membership card QR code or enter a BCCI Membership ID below to check its standing in the official chamber registry.
           </p>
           <form id="verifySearchForm" style="display: flex; gap: 0.5rem; max-width: 440px; margin: 0 auto;">
-            <input type="text" id="verifySearchInput" class="form-input" placeholder="e.g. BCCI-2026-..." required style="flex: 1;" aria-label="Membership ID to verify">
+            <input type="text" id="verifySearchInput" class="form-input" placeholder="e.g. BCCI-2026-..." required style="flex: 1; min-width: 0;" aria-label="Membership ID to verify">
             <button type="submit" class="btn-primary" style="white-space: nowrap;"><i class="fas fa-search"></i> Verify</button>
           </form>
         </div>
@@ -3412,7 +3412,7 @@ class App {
 
           const applicantEmailDisplay = newApp.email ? `<strong>${escapeHtml(newApp.email)}</strong>` : 'your registered email';
           this.showModal({
-            title: '<i class="fas fa-check-circle" style="color: #10B981;"></i> Application Submitted',
+            titleHtml: '<i class="fas fa-check-circle" style="color: #10B981;"></i> Application Submitted',
             content: `
               <div style="text-align: center; padding: 0.5rem 0;">
                 <div style="width: 72px; height: 72px; background: rgba(16, 185, 129, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem;">
@@ -3836,7 +3836,7 @@ class App {
       this.showToast(`Application ${id} approved. Confirmation email sent to ${updated.email}.`, 'success');
 
       this.showModal({
-        title: `<i class="fas fa-envelope-open-text" style="color: #10B981;"></i> Membership approved`,
+        titleHtml: `<i class="fas fa-envelope-open-text" style="color: #10B981;"></i> Membership approved`,
         content: `
           <div style="font-size: 0.9rem; line-height: 1.6;">
             <div style="background: #ECFDF5; border: 1px solid #A7F3D0; padding: 1rem; border-radius: 8px; margin-bottom: 1.25rem; color: #065F46;">
@@ -3870,7 +3870,7 @@ class App {
     if (!app) return;
 
     this.showModal({
-      title: `<i class="fas fa-times-circle" style="color: #EF4444;"></i> Reject application: ${escapeHtml(app.company)}`,
+      titleHtml: `<i class="fas fa-times-circle" style="color: #EF4444;"></i> Reject application: ${escapeHtml(app.company)}`,
       content: `
         <div style="padding: 0.5rem 0;">
           <div style="background: #FEF2F2; border: 1px solid #FECACA; padding: 1rem; border-radius: 8px; margin-bottom: 1.25rem; font-size: 0.9rem; color: #991B1B;">
@@ -4042,7 +4042,7 @@ class App {
           ['Registration Certificate', app.regCertProof],
           ['Representative Attachment', app.repAttachment],
         ].map(([label, doc]) => this._docLinkHtml(label, doc)).join('');
-        const modalTitle = `Application Full Dossier — ${escapeHtml(app.id)}`;
+        const modalTitle = `Application Full Dossier — ${app.id}`;
         const companyName = escapeHtml(app.company);
         const appId = escapeHtml(app.id);
         const submittedDate = escapeHtml(formatDate(app.submittedAt));
@@ -4434,7 +4434,7 @@ class App {
     }
 
     this.showModal({
-      title: `<i class="fas fa-qrcode" style="color:var(--primary);"></i> Check-in: ${escapeHtml(event.title)}`,
+      titleHtml: `<i class="fas fa-qrcode" style="color:var(--primary);"></i> Check-in: ${escapeHtml(event.title)}`,
       wide: true,
       content: '<div id="checkinDeskRoot"></div>',
     });
@@ -4464,7 +4464,7 @@ class App {
           if (!event) return;
           const attendees = event.attendees || [];
           this.showModal({
-            title: `<i class="fas fa-users" style="color:var(--primary);"></i> Registered Attendees: ${escapeHtml(event.title)}`,
+            titleHtml: `<i class="fas fa-users" style="color:var(--primary);"></i> Registered Attendees: ${escapeHtml(event.title)}`,
             wide: true,
             content: `
               <div style="font-size:0.9rem;">
@@ -5092,7 +5092,7 @@ class App {
     `;
 
     this.showModal({
-      title: `<i class="fas fa-calendar-check" style="color: var(--accent-gold); margin-right: 0.5rem;"></i> Register for Event`,
+      titleHtml: `<i class="fas fa-calendar-check" style="color: var(--accent-gold); margin-right: 0.5rem;"></i> Register for Event`,
       content,
     });
 
@@ -5187,7 +5187,7 @@ class App {
 
     if (isPending) {
       this.showModal({
-        title: `<i class="fas fa-clock" style="color: #F59E0B;"></i> Registration Received — Payment Verification Pending`,
+        titleHtml: `<i class="fas fa-clock" style="color: #F59E0B;"></i> Registration Received — Payment Verification Pending`,
         content: `
           <div style="font-size: 0.9rem; line-height: 1.6; padding: 0.5rem 0;">
             <div style="background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 8px; padding: 1rem; margin-bottom: 1.25rem; color: #92400E;">
@@ -5219,7 +5219,7 @@ class App {
       : `<span style="color: #059669; font-weight: 700;">COMPLIMENTARY PASS</span>`;
 
     this.showModal({
-      title: `<i class="fas fa-ticket-alt" style="color: var(--accent-gold);"></i> Official BCCI Event Admission Pass`,
+      titleHtml: `<i class="fas fa-ticket-alt" style="color: var(--accent-gold);"></i> Official BCCI Event Admission Pass`,
       content: `
         <div class="universal-ticket-modal-content" style="padding: 0.5rem 0;">
           <div style="background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px; padding: 0.85rem 1rem; margin-bottom: 1.25rem; font-size: 0.88rem; color: #1E3E62; display: flex; align-items: center; gap: 10px;">
@@ -5340,7 +5340,7 @@ class App {
       return;
     }
     this.showModal({
-      title: '<i class="fas fa-ticket-alt" style="color: var(--accent-gold);"></i> Your Entry Pass',
+      titleHtml: '<i class="fas fa-ticket-alt" style="color: var(--accent-gold);"></i> Your Entry Pass',
       content: `
         <div class="ticket-entry-qr ticket-entry-qr--page">
           <div id="ticketEntryQR" class="ticket-entry-qr-code"></div>
@@ -5375,10 +5375,11 @@ class App {
     }
   }
 
-  showModal({ title, content, wide = false }) {
+  showModal({ title = '', titleHtml, content, wide = false }) {
     const backdrop = document.getElementById('modalBackdrop');
     const container = document.getElementById('modalContainer');
     if (!backdrop || !container) return;
+    const heading = titleHtml ?? escapeHtml(title);
     this.runModalCleanup();
     // Wide dialogs hold tables (e.g. event attendees) that do not fit 560px.
     container.classList.toggle('modal-box--wide', Boolean(wide));
@@ -5396,7 +5397,7 @@ class App {
 
     container.innerHTML = `
       <button class="modal-close" id="modalCloseIcon" aria-label="Close dialog">&times;</button>
-      <h3 class="modal-title">${title}</h3>
+      <h3 class="modal-title">${heading}</h3>
       <div>${content}</div>
     `;
     backdrop.classList.add('show');
@@ -5702,7 +5703,7 @@ class App {
         const alt = imgTarget.getAttribute('alt') || 'BCCI photo';
         if (!safeSrc(src)) return;
         this.showModal({
-          title: escapeHtml(alt),
+          title: alt,
           content: `<div style="text-align: center;"><img src="${escapeAttr(src)}" alt="${escapeAttr(alt)}" class="lightbox-img-view" /><div style="margin-top: 1rem; color: #94A3B8; font-size: 0.85rem;"><i class="fas fa-search-plus"></i> High resolution view</div></div>`
         });
       } else if (btnTarget) {
@@ -5710,7 +5711,7 @@ class App {
         const title = btnTarget.getAttribute('data-img-title') || 'BCCI event photo';
         if (!safeSrc(src)) return;
         this.showModal({
-          title: escapeHtml(title),
+          title,
           content: `<div style="text-align: center;"><img src="${escapeAttr(src)}" alt="${escapeAttr(title)}" class="lightbox-img-view" /><div style="margin-top: 1rem; color: #94A3B8; font-size: 0.85rem;"><i class="fas fa-camera"></i> Official BCCI media archive</div></div>`
         });
       }
@@ -5727,4 +5728,3 @@ if (typeof document !== 'undefined' && document.addEventListener) {
 }
 
 export { App };
-

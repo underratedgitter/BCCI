@@ -1689,8 +1689,8 @@ console.log('──────────────────────�
 
   let modalTitle = '';
   let modalContent = '';
-  app.showModal = ({ title, content }) => {
-    modalTitle = title;
+  app.showModal = ({ title, titleHtml, content }) => {
+    modalTitle = titleHtml ?? title;
     modalContent = content;
   };
 
@@ -1811,6 +1811,9 @@ ck('styles.css provides compact navbar for 1025px - 1200px viewports', cssConten
 ck('styles.css ensures mobile drawer is hidden on desktop >= 1025px', /@media\s*\(min-width:\s*1025px\)[\s\S]*?\.mobile-drawer[\s\S]*?display:\s*none\s*!important;/.test(cssContent));
 ck('app.js registers window resize listener to auto-close drawer above 1024px', SRC.includes("window.addEventListener('resize'") && SRC.includes("window.innerWidth > 1024") && SRC.includes("this.closeMobileDrawer()"));
 ck('index.html mobileMenuBtn includes aria-controls and aria-expanded', indexHtml.includes('id="mobileMenuBtn"') && indexHtml.includes('aria-controls="mobileNavDrawer"') && indexHtml.includes('aria-expanded="false"'));
+ck('event cards can shrink below their usual 330px minimum', CSS.includes('minmax(min(330px, 100%), 1fr)'));
+ck('payment panels collapse at tablet widths', /@media \(max-width: 1024px\)\s*\{[\s\S]{0,180}\.qrcode-hero-container \{ grid-template-columns: minmax\(0, 1fr\)/.test(CSS));
+ck('verification input can shrink beside the submit button', /id="verifySearchInput"[^>]*min-width: 0/.test(SRC));
 
 console.log('\nAUTH-01  Applicant sign-out revokes the server session before clearing the local token');
 console.log('───────────────────────────────────────────────────────────────────────');
@@ -1819,7 +1822,48 @@ ck('sign-out awaits store.clearApplicantSession() (DELETE carries the token)', s
 ck('sign-out no longer wipes the local token first', !signOutBlock.includes('forgetApplicantSession()'));
 ck('sign-out calls clearApplicantSession exactly once', signOutBlock.split('clearApplicantSession()').length === 2);
 
+console.log('\nModal title safety and published leadership');
+{
+  const savedDocument = globalThis.document;
+  const savedTimeout = globalThis.setTimeout;
+  const box = { innerHTML: '', classList: { toggle() {} }, addEventListener() {}, removeEventListener() {} };
+  const backdrop = { classList: { contains: () => false, add() {} } };
+  globalThis.document = {
+    ...savedDocument,
+    getElementById: (id) => id === 'modalContainer' ? box : id === 'modalBackdrop' ? backdrop : null,
+    body: { classList: { add() {} } },
+  };
+  globalThis.setTimeout = () => 0;
+  try {
+    const app = Object.create(App.prototype);
+    app.runModalCleanup = () => {};
+    app.showModal({ title: '<img src=x onerror=alert(1)> Shah & Sons', content: '<p>Safe body</p>' });
+    ck('modal titles escape markup by default', box.innerHTML.includes('&lt;img') && !box.innerHTML.includes('<img'));
+    app.showModal({ title: 'Shah & Sons', content: '' });
+    ck('plain modal titles are escaped exactly once', box.innerHTML.includes('Shah &amp; Sons') && !box.innerHTML.includes('&amp;amp;'));
+    app.showModal({ titleHtml: '<i class="fas fa-check"></i> Approved', content: '' });
+    ck('explicit trusted icon titles keep their markup', box.innerHTML.includes('<i class="fas fa-check"></i> Approved'));
+  } finally {
+    globalThis.document = savedDocument;
+    globalThis.setTimeout = savedTimeout;
+  }
+  const { LEADERSHIP } = await import('../js/leadership.js');
+  const leaders = new Store().getLeadership();
+  ck('About uses the shared published roster', leaders.length === LEADERSHIP.length && leaders.every((m, i) => m.name === LEADERSHIP[i].name));
+  ck('published roster has 15 unique names and excludes Jigar', leaders.length === 15 && new Set(leaders.map((m) => m.name)).size === 15 && !leaders.some((m) => /jigar/i.test(m.name)));
+  const urjit = leaders.find((m) => m.name === 'MR. URJIT BHUPENDRABHAI PATEL');
+  ck('Urjit has his supplied full name, portrait and profile without changing his board role',
+    urjit?.role === 'Event Management & Exhibitions' && urjit?.image === '/assets/urjit-patel.webp?v=1' &&
+    urjit?.bio?.length === 2 && urjit.bio.join(' ').includes('SLD Infrastructure Private Limited') &&
+    urjit.bio.join(' ').includes('Rotary Youth Center'));
+  for (const leader of leaders.filter((m) => m.image)) {
+    const url = new URL(leader.image, 'https://bccibharuch.in');
+    ck(`${leader.name} has an existing versioned portrait`, !!url.searchParams.get('v') && fs.existsSync(new URL(`..${url.pathname}`, import.meta.url)));
+  }
+  const admin = fs.readFileSync(new URL('../js/board-admin.js', import.meta.url), 'utf8');
+  ck('projector QR has no PIN in its payload', admin.includes('this.drawQr(`${location.origin}/board?attend=live`)') && !admin.includes('&pin='));
+  ck('admin displays missing and inactive website profiles', admin.includes('rosterWarning()') && admin.includes("w.portalStatus !== 'active'"));
+}
+
 console.log(`\n${'═'.repeat(52)}\n  ${pass} passed, ${fail} failed\n${'═'.repeat(52)}`);
 process.exit(fail?1:0);
-
-

@@ -95,6 +95,12 @@ Everything (records, accounts, OTP codes, sessions, rate limits, the email log) 
 | `bcci:enq:<id>`, `bcci:enq_index` | Enquiries (newest 1000 kept) |
 | `admin:<token>`, `applicant:<token>` | Sessions, TTL-expired |
 | `bcci:otp:<email>` | Pending OTP, 10-minute TTL |
+| `bcci:board:member:<id>`, `bcci:board:member_email:<email>` | Board profiles and their email index |
+| `bcci:board:meeting:<id>`, `bcci:board:open_meeting` | Board meetings and the one currently taking attendance |
+| `bcci:board:att:<meeting>:<member>` | Attendance marks |
+| `bcci:board:pin:<meeting>`, `bcci:board:pin_fails:<meeting>` | The open meeting's PIN and its wrong-guess count |
+| `bcci:board:name_pass:<token>`, `bcci:board:device:<meeting>:<hash>` | Short-lived mark-by-name pass and one-mark-per-phone record |
+| `board:<token>` | Board portal sessions, TTL-expired |
 | `bcci:email_log` | Last 300 send attempts |
 | `bcci:applications`, `bcci:enquiries` | **Legacy blobs**, kept as a backup after migration |
 

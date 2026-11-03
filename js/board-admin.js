@@ -26,7 +26,6 @@ const ATTEND_CHIP = {
 };
 
 const chip = ([className, text]) => el('span', { className, text });
-const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const button = (text, className = 'btn-secondary', attrs = {}) => el('button', { type: 'button', className: `${className} board-btn`, text, ...attrs });
 
 function field(id, label, input, hint) {
@@ -45,6 +44,7 @@ export class BoardAdmin {
     this.store = store;
     this.ui = ui;
     this.members = [];
+    this.websiteRoster = [];
     this.meetings = [];
     this.projector = null;
   }
@@ -66,7 +66,7 @@ export class BoardAdmin {
     this.root.replaceChildren(el('div', { className: 'board-admin' },
       el('div', { className: 'board-admin-head' },
         el('h3', { className: 'board-admin-title' }, el('i', { className: 'fas fa-user-tie', 'aria-hidden': 'true' }), ' Board & Meetings'),
-        el('p', { className: 'board-admin-lead', text: 'Create a profile for each board member. At a meeting, open attendance: members scan the attendance QR — the printed sticker or the one on the projector — with their phone camera, enter the meeting PIN shown in the room, and tap their name. The projector QR carries the PIN, so only sticker scans type it. Each phone can mark one name.' })),
+        el('p', { className: 'board-admin-lead', text: 'Create a profile for each board member. At a meeting, open attendance: members scan the attendance QR — the printed sticker or the one on the projector — with their phone camera, enter the meeting PIN shown in the room, and tap their name. Each phone can mark one name.' })),
       el('div', { className: 'board-admin-forms' },
         el('section', { className: 'board-admin-card' },
           el('h4', { className: 'board-admin-card-title', text: 'Add a board member' }),
@@ -90,6 +90,7 @@ export class BoardAdmin {
     try {
       const [m, mt] = await Promise.all([this.api('members'), this.api('meetings')]);
       this.members = m.members || [];
+      this.websiteRoster = m.websiteRoster || [];
       this.meetings = mt.meetings || [];
     } catch (err) {
       this.ui.toast(err.message || 'Could not load the board.', 'error');
@@ -148,10 +149,32 @@ export class BoardAdmin {
     return form;
   }
 
+  /** Where the published About roster and the portal's sign-in roster differ. */
+  rosterWarning() {
+    const missing = this.websiteRoster.filter((w) => !w.portalId);
+    const inactive = this.websiteRoster.filter((w) => w.portalId && w.portalStatus !== 'active');
+    if (!missing.length && !inactive.length) return null;
+    const parts = [el('strong', { text: 'Website roster and portal roster differ' })];
+    if (missing.length) {
+      parts.push(
+        el('p', { text: 'These people are published on the About page but have no portal profile, so they cannot sign in or be marked present. Add them with the form above, using their email and mobile.' }),
+        el('ul', {}, ...missing.map((w) => el('li', { text: `${w.name} — ${w.role}` }))));
+    }
+    if (inactive.length) {
+      parts.push(
+        el('p', { text: 'These are published on the About page but their portal profile is inactive.' }),
+        el('ul', {}, ...inactive.map((w) => el('li', { text: `${w.name} — ${w.role}` }))));
+    }
+    return el('div', { className: 'board-roster-warning', role: 'status' }, ...parts);
+  }
+
   renderMembers() {
     const active = this.members.filter((m) => m.status === 'active').length;
+    const warning = this.rosterWarning();
     if (!this.members.length) {
-      this.membersBox.replaceChildren(el('p', { className: 'board-empty', text: 'No board members yet. Add the first profile above.' }));
+      this.membersBox.replaceChildren(
+        ...(warning ? [warning] : []),
+        el('p', { className: 'board-empty', text: 'No board members yet. Add the first profile above.' }));
       return;
     }
     const rows = this.members.map((m) => {
@@ -182,6 +205,7 @@ export class BoardAdmin {
         el('td', {}, actions));
     });
     this.membersBox.replaceChildren(
+      ...(warning ? [warning] : []),
       el('p', { className: 'board-admin-count', text: `${active} active board member${active === 1 ? '' : 's'}` }),
       el('div', { className: 'table-responsive board-scroll' },
         el('table', { className: 'data-table board-table' },
@@ -190,7 +214,7 @@ export class BoardAdmin {
   }
 
   openMemberEditor(member) {
-    this.ui.showModal({ title: `Edit ${esc(member.name)}`, content: '<div id="boardModalRoot"></div>' });
+    this.ui.showModal({ title: `Edit ${member.name}`, content: '<div id="boardModalRoot"></div>' });
     document.getElementById('boardModalRoot')?.append(this.memberForm(member, async () => {
       this.ui.closeModal();
       await this.refresh();
@@ -256,7 +280,7 @@ export class BoardAdmin {
         });
         const edit = button('Edit');
         edit.addEventListener('click', () => {
-          this.ui.showModal({ title: `Edit ${esc(m.title)}`, content: '<div id="boardModalRoot"></div>' });
+          this.ui.showModal({ title: `Edit ${m.title}`, content: '<div id="boardModalRoot"></div>' });
           document.getElementById('boardModalRoot')?.append(this.meetingForm(m, async () => {
             this.ui.closeModal();
             await this.refresh();
@@ -314,7 +338,7 @@ export class BoardAdmin {
       return;
     }
     const { meeting, rows, counts } = detail;
-    this.ui.showModal({ title: `Attendance: ${esc(meeting.title)}`, content: '<div id="boardModalRoot"></div>', wide: true });
+    this.ui.showModal({ title: `Attendance: ${meeting.title}`, content: '<div id="boardModalRoot"></div>', wide: true });
     const root = document.getElementById('boardModalRoot');
     if (!root) return;
 
@@ -492,7 +516,7 @@ class Projector {
     this.meetingId = meetingId;
     this.onPrintSticker = onPrintSticker;
     this.onExit = onExit;
-    this.qrPin = null;
+    this.qrDrawn = false;
     this.closed = false;
     this.timer = null;
     this.wakeLock = null;
@@ -532,7 +556,7 @@ class Projector {
         el('div', { className: 'board-projector-left' },
           this.qrBox,
           this.pinLine,
-          el('p', { className: 'board-projector-how', text: 'Scan with your phone camera, then tap your name. Scanning the sticker? Enter the PIN above.' })),
+          el('p', { className: 'board-projector-how', text: 'Scan with your phone camera, enter the PIN above, then tap your name.' })),
         el('div', { className: 'board-projector-right' }, this.count, this.list)));
 
     document.body.append(this.overlay);
@@ -581,11 +605,11 @@ class Projector {
     this.title.textContent = m.title;
     this.meta.textContent = [dayLabel(m.date), m.time, m.venue].filter(Boolean).join(' · ');
     const pin = m.pin || '';
-    if (pin !== this.qrPin) {
-      this.qrPin = pin;
-      this.pinValue.textContent = pin || '····';
-      // The projector's QR carries the PIN, so its scanners need not type it.
-      this.drawQr(`${location.origin}/board?attend=live${pin ? `&pin=${pin}` : ''}`);
+    this.pinValue.textContent = pin || '····';
+    if (!this.qrDrawn) {
+      this.qrDrawn = true;
+      // The QR never carries the PIN: everyone types the one shown above.
+      this.drawQr(`${location.origin}/board?attend=live`);
     }
     this.renderPresent(data.present, data.counts);
     this.schedulePoll();
@@ -658,7 +682,7 @@ class Projector {
     clearTimeout(this.timer);
     this.timer = null;
     this.closed = true;
-    this.qrPin = null;
+    this.qrDrawn = false;
     this.pinValue.textContent = '····';
     this.pinBtn.disabled = true;
     this.qrBox.replaceChildren(el('p', { className: 'board-projector-closed', text: message || 'Attendance is closed.' }));
