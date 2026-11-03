@@ -19,7 +19,7 @@ import { createReadStream } from 'node:fs';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { applySecurityHeaders, reportConfig } from './api/_lib/security.js';
+import { applySecurityHeaders, reportConfig, assetCacheControl } from './api/_lib/security.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 3000);
@@ -123,7 +123,7 @@ async function loadHandler(name) {
 
 // ── Static files ───────────────────────────────────────────────────
 
-async function serveStatic(res, relPath, { baseDir = ROOT, immutable = false } = {}) {
+async function serveStatic(res, relPath, { baseDir = ROOT, cacheControl = 'public, max-age=604800' } = {}) {
   // Reject traversal markers outright
   const parts = relPath.split(/[/\\]+/).filter(Boolean);
   if (parts.some((p) => p === '..' || p === '.')) return false;
@@ -145,10 +145,7 @@ async function serveStatic(res, relPath, { baseDir = ROOT, immutable = false } =
   const ext = path.extname(full).toLowerCase();
   res.setHeader('Content-Type', MIME[ext] || 'application/octet-stream');
   res.setHeader('Content-Length', stat.size);
-  res.setHeader(
-    'Cache-Control',
-    immutable ? 'public, max-age=31536000, immutable' : 'public, max-age=604800'
-  );
+  res.setHeader('Cache-Control', cacheControl);
   createReadStream(full).pipe(res);
   return true;
 }
@@ -257,7 +254,7 @@ const server = http.createServer(async (req, res) => {
       const dir = segments[0];
       const rel = segments.slice(1).join('/');
       if (!rel) return res.status(404).json({ error: 'Not found' });
-      if (await serveStatic(res, rel, { baseDir: path.join(ROOT, dir), immutable: dir === 'assets' })) return;
+      if (await serveStatic(res, rel, { baseDir: path.join(ROOT, dir), cacheControl: assetCacheControl(`${dir}/${rel}`) })) return;
       return res.status(404).json({ error: 'Not found' });
     }
     if (segments.length === 1 && ROOT_FILES.has(segments[0])) {

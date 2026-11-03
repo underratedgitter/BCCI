@@ -132,7 +132,7 @@ npm run purge:data -- --confirm # actually delete
 npm test
 ```
 
-953 assertions across ten suites, with no network access and no live database:
+Eleven suites of assertions, plus the asset-version check,, with no network access and no live database:
 
 | Suite | Covers |
 |---|---|
@@ -145,7 +145,19 @@ npm test
 | `applicant-auth` | password login, OTP registration, forgot/reset flows |
 | `events-redis` | attendee storage and capacity under Redis |
 | `events-api` | event CRUD, registration, check-in, payment confirmation |
-| `board` | board portal sign-in, attendance, register export |
+| `board` | board portal sign-in, meeting PIN, one open meeting, attendance, register export |
+| `asset-versions` | that every changed `/js` or `/css` file got a new `?v=` |
+
+### Changing a JS or CSS file
+
+Browsers keep `/js` and `/css` files for a week, keyed by the `?v=` in the
+URL that loads them. After changing a file:
+
+1. bump its `?v=` everywhere it is loaded (`index.html`, or the `import` in
+   another module — and then that module's own `?v=` too, since it changed);
+2. run `npm run versions:update` to record the new versions.
+
+`npm test` fails if a file changed but its version did not.
 
 ---
 

@@ -34,7 +34,15 @@ export const KEYS = {
   boardMemberByEmail: (email) => `bcci:board:member_email:${String(email).trim().toLowerCase()}`,
   boardMeetingSeq: 'bcci:board:seq:meeting',
   boardMeeting: (id) => `bcci:board:meeting:${id}`,
+  // The id of the one meeting taking attendance (what the permanent QR means),
+  // and a marker that meetings opened before this pointer existed were indexed.
+  boardOpenMeeting: 'bcci:board:open_meeting',
+  boardOpenMeetingIndexed: 'bcci:board:open_meeting_indexed',
   boardAttendance: (meetingId, memberId) => `bcci:board:att:${meetingId}:${memberId}`,
+  // An open meeting's attendance PIN, kept apart from the meeting record so
+  // changing it can never overwrite a concurrent open/close; and its wrong guesses.
+  boardMeetingPin: (meetingId) => `bcci:board:pin:${meetingId}`,
+  boardPinFails: (meetingId) => `bcci:board:pin_fails:${meetingId}`,
   boardSession: (token) => `board:${token}`,
   // Mark-by-name: a short pass issued when the projector QR is scanned, and
   // which name each phone (a hashed device id) has marked at a meeting.

@@ -1,0 +1,38 @@
+{
+  "css/membership-card.css": {
+    "version": "3.2.0",
+    "sha256": "af1d664603d7291980d3f8e2097b569247bd9169b103d60c874fde19178736c9"
+  },
+  "css/styles.css": {
+    "version": "3.2.18",
+    "sha256": "1879b9bc3f8895d5225c50d59fb2899a6bc603d9038eef0bca8221cd64d2fa69"
+  },
+  "js/app.js": {
+    "version": "5.0.33",
+    "sha256": "25f73c8310e94a0c7cc7f067206ea69a71baf16f0b3092bd098c14cc5711c75f"
+  },
+  "js/board-admin.js": {
+    "version": "1.1.5",
+    "sha256": "c0474675867292ca3955ed91f687119d9bf998d3dfe372c1447d3ca62e74a3c5"
+  },
+  "js/board-portal.js": {
+    "version": "1.1.4",
+    "sha256": "82d4aeed07158169ea189fd460ff19a641aa5862df59f779ac31d835546c72e1"
+  },
+  "js/checkin.js": {
+    "version": "1.1.1",
+    "sha256": "f25a918bc1fbcb60020226413a150f5c36c9f3e9778c29c8dae61def51ba3e58"
+  },
+  "js/dom.js": {
+    "version": "1.0.1",
+    "sha256": "80d0abbd1937996c74e5ab460a28c7987d65e21fbddcfae2afcf030305edcb94"
+  },
+  "js/qr-scanner.js": {
+    "version": "1.0.0",
+    "sha256": "f6fa3375a3566b257c90419689e4769a0c2c4a3ce7378caf6d821e247443f569"
+  },
+  "js/store.js": {
+    "version": "4.0.21",
+    "sha256": "53fa49754e76dfa954d51093b56bd132fd370c1a1fcf2bbeb196e8eb1539f0ca"
+  }
+}
