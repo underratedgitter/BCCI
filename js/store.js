@@ -673,7 +673,7 @@ export class Store {
         ],
       },
       {
-        name: 'DR. MAHESH R. VASHI', role: 'Board Member', category: 'Executive Board', initials: 'MV', image: '/assets/mahesh-vashi.webp',
+        name: 'DR. MAHESH R. VASHI', role: 'CSR & Skill Development', category: 'Executive Board', initials: 'MV', image: '/assets/mahesh-vashi.webp',
         bio: [
           'General Manager – HR & Admin cum Site Head at Colourtex Industries Limited, Vilayat, Bharuch, with over 25 years in personnel and HR management, recruitment, training, welfare, payroll and statutory compliance. He holds a doctorate in management studies, master\'s degrees in labour welfare and HRD, an LLB and a BSc in Chemistry.',
           'He is President and founder member of the Vilayat GIDC Industries Association, past Honorary Secretary General of the Bharuch District Management Association, and a trustee of ARES/SRICT College and the NGO SHE. A DISH-certified trainer for 36 environment, health and safety programmes, he also trains on management and the Shrimad Bhagavad Gita.',
