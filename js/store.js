@@ -659,6 +659,13 @@ export class Store {
         ],
       },
       {
+        name: 'MR. BHARAT SHAH', role: 'Vendor Development & Education', category: 'Executive Board', initials: 'BS', image: '/assets/bharat-shah.webp',
+        bio: [
+          'Mr. Bharat Shah is a pharmaceutical trader in Bharuch, running Aakash Medicines, Shah Medico and Shah Medicines.',
+          'He has been President of the Bharuch & Narmada District Chemist and Druggist Association since 1995, and is Vice President of the Federation of Gujarat State Chemist & Druggist Association and a trustee of two charitable trusts.',
+        ],
+      },
+      {
         name: 'MR. NIRMAL SHAH', role: 'Membership Drive', category: 'Executive Board', initials: 'NS', image: '/assets/nirmal-shah.webp',
         bio: [
           'Managing Director of V C Shahpatel Services Pvt. Ltd., a Bharuch group in business since 1990 and certified ISO 9001, 14001 and 45001. It supplies manpower and housekeeping services to industry, including Abbott, BASF, Asian Paints and UPL.',
@@ -673,10 +680,32 @@ export class Store {
         ],
       },
       {
+        name: 'MR. RAJESHKUMAR DUDHAT', role: 'MSME & Capacity Building', category: 'Executive Board', initials: 'RD', image: '/assets/rajesh-dudhat.webp',
+        bio: [
+          'Mr. Dudhat is CEO of Kohinoor Group of Industries, which he has led since 2002. The group has 12 manufacturing companies and 15 associates across dyestuffs, pharmaceuticals, speciality chemicals, engineering, packaging and export-import trading.',
+          'With over 24 years in industry, he is also President of the Lions Club of Ankleshwar Industrial Area and a trustee of two community trusts.',
+        ],
+      },
+      {
+        name: 'MR. NIRMALSINH YADAV', role: 'Government Licensing & Media', category: 'Executive Board', initials: 'NY', image: '/assets/nirmalsinh-yadav.webp',
+        bio: [
+          'Head of Corporate Affairs and Group Nodal Officer – CSR at Deepak Group of Companies, with over 30 years in the chemical industry at UPL, GFL, SRF and Jubilant. M.Com., LL.B. and a PG Diploma in Industrial Relations and Personnel Management.',
+          'His expertise spans greenfield and brownfield projects, HR, industrial relations, government affairs and CSR. He has chaired the BDMA CSR Forum for over six years, is a past President of the Rotary Club of Bharuch Narmada Nagari, and serves on the Managing Committee of SVADES.',
+        ],
+      },
+      {
         name: 'DR. MAHESH R. VASHI', role: 'CSR & Skill Development', category: 'Executive Board', initials: 'MV', image: '/assets/mahesh-vashi.webp',
         bio: [
           'General Manager – HR & Admin cum Site Head at Colourtex Industries Limited, Vilayat, Bharuch, with over 25 years in personnel and HR management, recruitment, training, welfare, payroll and statutory compliance. He holds a doctorate in management studies, master\'s degrees in labour welfare and HRD, an LLB and a BSc in Chemistry.',
           'He is President and founder member of the Vilayat GIDC Industries Association, past Honorary Secretary General of the Bharuch District Management Association, and a trustee of ARES/SRICT College and the NGO SHE. A DISH-certified trainer for 36 environment, health and safety programmes, he also trains on management and the Shrimad Bhagavad Gita.',
+        ],
+      },
+      { name: 'MR. URJIT PATEL', role: 'Event Management & Exhibitions', category: 'Executive Board', initials: 'UP' },
+      {
+        name: 'MR. RAJESH MAKWANA', role: 'Regulatory & Finance', category: 'Executive Board', initials: 'RM', image: '/assets/rajesh-makwana.webp',
+        bio: [
+          'Senior finance and taxation professional with over 28 years in finance, taxation, treasury and compliance, and an MBA from IIM Kozhikode. Named among the "100 CFOs of India", he has held leadership roles at Zentiva (formerly Sanofi India), Gharda Chemicals and Cheminova India, and led the carve-out of Sanofi\'s Ankleshwar business into Zentiva.',
+          'Since 2015 he has led the Finance & Taxation Forum of Bharuch District Management Association, and he is a key link between Bharuch industry and the Income Tax and GST authorities.',
         ],
       },
     ];
