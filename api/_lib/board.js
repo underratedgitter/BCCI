@@ -4,13 +4,13 @@
 // Built on kv (Upstash Redis). The data is small: a few dozen profiles and a
 // couple of meetings a month.
 //
-// Every record has its own key, and no read-modify-write is shared between
-// people acting at the same time:
+// Every record has its own key. Read-modify-write paths are serialized and
+// commits are fenced against expired lock holders:
 //   - ids come from INCR counters (BM-1, BM-2…; MTG-1…), and listing is an
 //     MGET of 1..counter;
-//   - an email belongs to one profile through SET NX on its email key;
-//   - each attendance mark is its own key, written with SET NX, so fifteen
-//     members scanning in the same second cannot overwrite one another.
+//   - an email index and its profile commit together under the member lock;
+//   - attendance writes share the meeting-status lock with closing, so late
+//     scans cannot change a closed register or overwrite another mark.
 //
 // Attendance uses one permanent QR code (/board?attend=live) — printed on a
 // sticker or shown on the projector. It is "live" only while a meeting is
@@ -78,17 +78,21 @@ export async function getMemberByEmail(email) {
   return member && member.email === String(email).trim().toLowerCase() ? member : null;
 }
 
-/** Claims an email for a profile; false when another profile holds it. */
-async function claimEmail(email, id) {
-  const key = KEYS.boardMemberByEmail(email);
-  if (await withRetry(() => kv.set(key, id, { nx: true }))) return true;
-  const holder = String(await withRetry(() => kv.get(key)) || '');
-  if (holder === id) return true;
-  const holderProfile = holder ? await getMember(holder) : null;
-  if (holderProfile && holderProfile.email === email) return false;
-  // A claim left by a write that never completed: take it over.
-  await withRetry(() => kv.set(key, id));
-  return true;
+const MEMBER_LOCK = 'board:members';
+
+async function withMemberLock(fn) {
+  const lock = await acquireLock(MEMBER_LOCK);
+  if (!lock) throw new BoardError(409, 'Another profile change is in progress. Try again in a moment.', 'busy');
+  try { return await fn(lock); }
+  finally { await releaseLock(MEMBER_LOCK, lock); }
+}
+
+/** Called under MEMBER_LOCK; the email index and profile commit together. */
+async function requireAvailableEmail(email, id) {
+  const holder = await getMemberByEmail(email);
+  if (holder && holder.id !== id) {
+    throw new BoardError(409, 'Another board member already uses this email address.', 'email_taken');
+  }
 }
 
 /**
@@ -96,42 +100,42 @@ async function claimEmail(email, id) {
  * `fields` must already be validated (see validateMemberFields).
  */
 export async function saveMember(fields, { by = 'admin' } = {}) {
+  return withMemberLock((lock) => saveMemberLocked(fields, by, lock));
+}
+
+async function saveMemberLocked(fields, by, lock) {
   if (fields.id) {
     const existing = await getMember(fields.id);
     if (!existing) throw new BoardError(404, 'Board member not found.', 'not_found');
-    if (fields.email !== existing.email && !(await claimEmail(fields.email, existing.id))) {
-      throw new BoardError(409, 'Another board member already uses this email address.', 'email_taken');
-    }
+    await requireAvailableEmail(fields.email, existing.id);
     const updated = { ...existing, ...fields, id: existing.id, status: existing.status, updatedAt: nowIso(), updatedBy: by };
-    await withRetry(() => kv.set(KEYS.boardMember(existing.id), updated));
+    const ops = [['set', KEYS.boardMember(existing.id), updated], ['set', KEYS.boardMemberByEmail(fields.email), existing.id]];
     if (fields.email !== existing.email) {
       const oldKey = KEYS.boardMemberByEmail(existing.email);
-      if (String(await kv.get(oldKey) || '') === existing.id) await kv.del(oldKey);
+      if (String(await kv.get(oldKey) || '') === existing.id) ops.push(['del', oldKey]);
     }
+    await fencedWrite(MEMBER_LOCK, lock, ops);
     return { member: updated, created: false };
   }
 
-  // Checked first so a refused duplicate does not use up a member number;
-  // the claim below is still what guarantees uniqueness under a race.
-  if (await getMemberByEmail(fields.email)) {
-    throw new BoardError(409, 'A board member with this email address already exists.', 'email_taken');
-  }
-  const id = `BM-${await withRetry(() => kv.incr(KEYS.boardMemberSeq))}`;
-  if (!(await claimEmail(fields.email, id))) {
-    throw new BoardError(409, 'A board member with this email address already exists.', 'email_taken');
-  }
+  await requireAvailableEmail(fields.email);
+  const id = `BM-${await withRetry(() => kv.incr(KEYS.boardMemberSeq), 1)}`;
   const member = { ...fields, id, status: 'active', createdAt: nowIso(), createdBy: by };
-  await withRetry(() => kv.set(KEYS.boardMember(id), member));
+  await fencedWrite(MEMBER_LOCK, lock, [
+    ['set', KEYS.boardMember(id), member], ['set', KEYS.boardMemberByEmail(fields.email), id],
+  ]);
   return { member, created: true };
 }
 
 export async function setMemberStatus(id, status, { by = 'admin' } = {}) {
   if (!MEMBER_STATUS.includes(status)) throw new BoardError(400, 'Status must be active or inactive.', 'invalid');
-  const member = await getMember(id);
-  if (!member) throw new BoardError(404, 'Board member not found.', 'not_found');
-  const updated = { ...member, status, updatedAt: nowIso(), updatedBy: by };
-  await withRetry(() => kv.set(KEYS.boardMember(id), updated));
-  return updated;
+  return withMemberLock(async (lock) => {
+    const member = await getMember(id);
+    if (!member) throw new BoardError(404, 'Board member not found.', 'not_found');
+    const updated = { ...member, status, updatedAt: nowIso(), updatedBy: by };
+    await fencedWrite(MEMBER_LOCK, lock, [['set', KEYS.boardMember(id), updated]]);
+    return updated;
+  });
 }
 
 /**
@@ -305,7 +309,7 @@ export async function setMeetingStatus(id, action, { by = 'admin' } = {}) {
       if (meeting.status === 'closed') throw new BoardError(409, 'This meeting is closed. Reopen it to take attendance again.', 'closed');
       await refuseIfAnotherOpen(id, lock, 'opening');
       // Opening an already open meeting again keeps the PIN people are using.
-      if (meeting.status !== 'open' || !(await getMeetingPin(id))) await setNewPin(id);
+      if (meeting.status !== 'open' || !(await getMeetingPin(id))) await setNewPin(id, lock);
       updated = { ...meeting, status: 'open', openedAt: meeting.openedAt || at, openedBy: meeting.openedBy || by };
     } else if (action === 'close') {
       if (meeting.status !== 'open') throw new BoardError(409, 'Only a meeting that is taking attendance can be closed.', 'not_open');
@@ -318,7 +322,7 @@ export async function setMeetingStatus(id, action, { by = 'admin' } = {}) {
       // The roster stays frozen: reopening corrects marks, it does not let a
       // profile change since the meeting rewrite who belonged.
       // A fresh PIN: the one from the meeting itself may have been seen outside.
-      await setNewPin(id);
+      await setNewPin(id, lock);
       updated = { ...meeting, status: 'open', reopenedAt: at, reopenedBy: by };
     }
     // The PIN is written before a meeting opens (an open meeting always has
@@ -326,8 +330,8 @@ export async function setMeetingStatus(id, action, { by = 'admin' } = {}) {
     const ops = [['set', KEYS.boardMeeting(id), updated]];
     if (updated.status === 'open') ops.push(['set', KEYS.boardOpenMeeting, id]);
     else if (String(await withRetry(() => kv.get(KEYS.boardOpenMeeting))) === id) ops.push(['del', KEYS.boardOpenMeeting]);
+    if (action === 'close') ops.push(['del', KEYS.boardMeetingPin(id)], ['del', KEYS.boardPinVersion(id)], ['del', KEYS.boardPinFails(id)]);
     await fencedWrite(MEETING_LOCK, lock, ops);
-    if (action === 'close') await kv.del(KEYS.boardMeetingPin(id), KEYS.boardPinFails(id)).catch(() => {});
     return updated;
   });
 }
@@ -344,7 +348,7 @@ export async function deleteMeeting(id, { by = 'admin' } = {}) {
     if (String(await withRetry(() => kv.get(KEYS.boardOpenMeeting))) === id) ops.push(['del', KEYS.boardOpenMeeting]);
     await fencedWrite(MEETING_LOCK, lock, ops);
   });
-  await kv.del(KEYS.boardMeetingPin(id), KEYS.boardPinFails(id)).catch(() => {});
+  await kv.del(KEYS.boardMeetingPin(id), KEYS.boardPinVersion(id), KEYS.boardPinFails(id)).catch(() => {});
 }
 
 // ── The live (sticker) QR target ───────────────────────────────────
@@ -383,11 +387,29 @@ export async function getMeetingPin(meetingId) {
 }
 
 /** Stores a fresh PIN for a meeting, with no wrong guesses against it. */
-async function setNewPin(meetingId) {
+async function setNewPin(meetingId, lock) {
   const pin = newPin();
-  await withRetry(() => kv.set(KEYS.boardMeetingPin(meetingId), pin));
-  await kv.del(KEYS.boardPinFails(meetingId)).catch(() => {});
+  await fencedWrite(MEETING_LOCK, lock, [
+    ['set', KEYS.boardMeetingPin(meetingId), pin],
+    ['set', KEYS.boardPinVersion(meetingId), crypto.randomUUID()],
+    ['del', KEYS.boardPinFails(meetingId)],
+  ]);
   return pin;
+}
+
+/** Snapshot PIN and generation together; legacy open meetings need no migration. */
+async function pinState(meetingId) {
+  const [raw, version] = await withRetry(() => kv.mget(KEYS.boardMeetingPin(meetingId), KEYS.boardPinVersion(meetingId)));
+  const pin = raw == null ? null : String(raw).padStart(PIN_LENGTH, '0');
+  return { pin, version: version ? String(version) : pin ? `legacy:${pin}` : null };
+}
+
+async function requirePinProof(meeting, proof) {
+  const state = await pinState(meeting.id);
+  if (!proof || proof.version !== state.version) {
+    throw new BoardError(400, 'The meeting PIN changed. Enter the PIN shown in the room again.', 'pin_required');
+  }
+  if (await isPinLocked(meeting, state.pin)) throw pinLockedError();
 }
 
 async function pinFailures(meetingId) {
@@ -407,13 +429,13 @@ const pinLockedError = () => new BoardError(423, 'The meeting PIN is locked. Ask
  * counting, so a tap on the sticker before typing costs nothing.
  */
 export async function verifyMeetingPin(meeting, pin) {
-  const current = await getMeetingPin(meeting.id);
+  const { pin: current, version } = await pinState(meeting.id);
   if (await isPinLocked(meeting, current)) throw pinLockedError();
   const given = String(pin ?? '').trim();
   if (!isPinShaped(given)) {
     throw new BoardError(400, 'Enter the 4-digit meeting PIN shown in the meeting room.', 'pin_required');
   }
-  if (crypto.timingSafeEqual(Buffer.from(given), Buffer.from(current))) return;
+  if (crypto.timingSafeEqual(Buffer.from(given), Buffer.from(current))) return { version };
   const key = KEYS.boardPinFails(meeting.id);
   // One attempt only: INCR is not idempotent.
   const fails = await withRetry(() => kv.incr(key), 1);
@@ -427,28 +449,36 @@ export async function verifyMeetingPin(meeting, pin) {
 
 /**
  * The secretary's "New PIN": replaces the PIN of an open meeting and clears
- * its wrong guesses. Only the PIN key is written, never the meeting record,
- * so a close at the same moment cannot be undone by it; a PIN left behind by
- * that race is harmless, since every check first needs the meeting open.
+ * its wrong guesses. Serialized with closing and attendance writes. A new
+ * generation invalidates every previously verified PIN and name pass.
  */
 export async function rotateMeetingPin(id, { by = 'admin' } = {}) {
-  const meeting = await getMeeting(id);
-  if (!meeting) throw new BoardError(404, 'Meeting not found.', 'not_found');
-  if (meeting.status !== 'open') throw new BoardError(409, 'Only a meeting that is taking attendance has a PIN.', 'not_open');
-  const pin = await setNewPin(id);
-  console.log(`[Board] ${by} made a new PIN for ${id}`);
-  return { meeting, pin };
+  return withMeetingLock(async (lock) => {
+    const meeting = await getMeeting(id);
+    if (!meeting) throw new BoardError(404, 'Meeting not found.', 'not_found');
+    if (meeting.status !== 'open') throw new BoardError(409, 'Only a meeting that is taking attendance has a PIN.', 'not_open');
+    const pin = await setNewPin(id, lock);
+    console.log(`[Board] ${by} made a new PIN for ${id}`);
+    return { meeting, pin };
+  });
 }
 
 // ── Attendance ─────────────────────────────────────────────────────
 
 /** A board member marking themselves present by scanning the live QR. */
-export async function markBySelf(meeting, member, { userAgent = '' } = {}) {
+export async function markBySelf(meeting, member, { userAgent = '', proof } = {}) {
+  return withMeetingLock((lock) => markBySelfLocked(meeting, member, userAgent, proof, lock));
+}
+
+async function markBySelfLocked(meeting, member, userAgent, proof, meetingLock) {
+  meeting = await openMeetingFor(meeting.id);
+  await requirePinProof(meeting, proof);
+  member = await getMember(member.id);
   // The route resolves the open meeting and checks its PIN first.
   if (meeting.status !== 'open') {
     throw new BoardError(409, meeting.status === 'closed' ? 'Attendance for this meeting has closed.' : 'Attendance for this meeting has not opened yet.', 'not_open');
   }
-  if (member.status !== 'active') throw new BoardError(403, 'Your board profile is not active.', 'inactive');
+  if (!member || member.status !== 'active') throw new BoardError(403, 'Your board profile is not active.', 'inactive');
   // A reopened meeting keeps the roster it closed with.
   if (Array.isArray(meeting.roster) && !meeting.roster.includes(member.id)) {
     throw new BoardError(403, 'You are not on the board for this meeting.', 'not_on_roster');
@@ -459,7 +489,10 @@ export async function markBySelf(meeting, member, { userAgent = '' } = {}) {
   const entry = { status: 'present', at, method: 'qr', by: member.email };
   const record = { meetingId: meeting.id, memberId: member.id, status: 'present', at, method: 'qr', userAgent: String(userAgent).slice(0, 160), history: [entry] };
 
-  if (await withRetry(() => kv.set(key, record, { nx: true }))) return { meeting, record, alreadyMarked: false };
+  if (!(await withRetry(() => kv.get(key)))) {
+    await fencedWrite(MEETING_LOCK, meetingLock, [['set', key, record]]);
+    return { meeting, record, alreadyMarked: false };
+  }
 
   // The record already exists. Upgrading it is a read-modify-write, so two
   // writers on this same key (a double tap racing a secretary override) would
@@ -474,7 +507,7 @@ export async function markBySelf(meeting, member, { userAgent = '' } = {}) {
     if (current?.status === 'present') return { meeting, record: current, alreadyMarked: true };
     // Marked on leave or absent by the secretary, but here in the room after all.
     const upgraded = { ...current, ...record, history: [...(current?.history || []), entry] };
-    await fencedWrite(lockName, lock, [['set', key, upgraded]]);
+    await fencedWrite(MEETING_LOCK, meetingLock, [['set', key, upgraded]]);
     return { meeting, record: upgraded, alreadyMarked: false };
   } finally {
     await releaseLock(lockName, lock);
@@ -515,8 +548,14 @@ async function openMeetingFor(meetingId) {
  * Only names are returned (no email or phone). When this phone has already
  * marked someone at this meeting, says who, and issues no pass.
  */
-export async function openNameMarking(meeting, deviceId) {
+export async function openNameMarking(meeting, deviceId, proof) {
   requireDeviceId(deviceId);
+  return withMeetingLock(() => openNameMarkingLocked(meeting, deviceId, proof));
+}
+
+async function openNameMarkingLocked(meeting, deviceId, proof) {
+  meeting = await openMeetingFor(meeting.id);
+  await requirePinProof(meeting, proof);
   const { roster, marks } = await rosterAndMarks(meeting, await listMembers());
   const members = roster
     .filter((m) => m.status === 'active')
@@ -531,13 +570,17 @@ export async function openNameMarking(meeting, deviceId) {
   }
 
   const pass = crypto.randomBytes(24).toString('base64url');
-  await withRetry(() => kv.set(KEYS.boardNamePass(pass), { meetingId: meeting.id, device: deviceHash(deviceId) }, { ex: NAME_PASS_TTL_SECONDS }));
+  await withRetry(() => kv.set(KEYS.boardNamePass(pass), { meetingId: meeting.id, device: deviceHash(deviceId), version: proof.version }, { ex: NAME_PASS_TTL_SECONDS }));
   return { meeting: view, members, pass, markedByThisPhone: null };
 }
 
 /** Marks one name present with a pass from openNameMarking. */
 export async function markByName(pass, memberId, deviceId, { userAgent = '' } = {}) {
   requireDeviceId(deviceId);
+  return withMeetingLock((lock) => markByNameLocked(pass, memberId, deviceId, userAgent, lock));
+}
+
+async function markByNameLocked(pass, memberId, deviceId, userAgent, meetingLock) {
   const passKey = KEYS.boardNamePass(String(pass || ''));
   const rawPass = /^[A-Za-z0-9_-]{32}$/.test(String(pass || '')) ? await withRetry(() => kv.get(passKey)) : null;
   const passData = typeof rawPass === 'string' ? JSON.parse(rawPass) : rawPass;
@@ -548,6 +591,11 @@ export async function markByName(pass, memberId, deviceId, { userAgent = '' } = 
   }
 
   const meeting = await openMeetingFor(passData.meetingId);
+  const state = await pinState(meeting.id);
+  if (!passData.version || passData.version !== state.version) {
+    throw new BoardError(410, 'The meeting PIN changed. Scan the attendance QR and enter the new PIN.', 'expired');
+  }
+  if (await isPinLocked(meeting, state.pin)) throw pinLockedError();
   const member = await getMember(String(memberId || ''));
   const onRoster = Array.isArray(meeting.roster) ? meeting.roster.includes(member?.id) : member?.status === 'active';
   if (!member || member.status !== 'active' || !onRoster) {
@@ -573,7 +621,9 @@ export async function markByName(pass, memberId, deviceId, { userAgent = '' } = 
   };
   let written;
   try {
-    written = await withRetry(() => kv.set(KEYS.boardAttendance(meeting.id, member.id), record, { nx: true }));
+    const key = KEYS.boardAttendance(meeting.id, member.id);
+    written = !(await withRetry(() => kv.get(key)));
+    if (written) await fencedWrite(MEETING_LOCK, meetingLock, [['set', key, record]]);
   } catch (err) {
     // Otherwise the phone would claim a name it never marked, for three days.
     await releasePhone().catch((releaseErr) => console.warn('[Board] could not free the phone after a failed mark:', releaseErr.message));
@@ -591,6 +641,10 @@ export async function markByName(pass, memberId, deviceId, { userAgent = '' } = 
 export async function markBySecretary(meetingId, memberId, status, reason, { by = 'admin' } = {}) {
   if (!ATTENDANCE_STATUS.includes(status)) throw new BoardError(400, 'Status must be present, leave or absent.', 'invalid');
   if (String(reason || '').trim().length < 3) throw new BoardError(400, 'Give a short reason for the record, e.g. "No phone with them".', 'reason_required');
+  return withMeetingLock((lock) => markBySecretaryLocked(meetingId, memberId, status, reason, by, lock));
+}
+
+async function markBySecretaryLocked(meetingId, memberId, status, reason, by, meetingLock) {
   const meeting = await getMeeting(meetingId);
   if (!meeting) throw new BoardError(404, 'Meeting not found.', 'not_found');
   // A closed register is frozen (reopen it to correct a mark), and a mark on a
@@ -624,7 +678,7 @@ export async function markBySecretary(meetingId, memberId, status, reason, { by 
       reason: entry.reason,
       history: [...(current?.history || []), entry],
     };
-    await fencedWrite(lockName, lock, [['set', key, record]]);
+    await fencedWrite(MEETING_LOCK, meetingLock, [['set', key, record]]);
     return { meeting, member, record };
   } finally {
     await releaseLock(lockName, lock);

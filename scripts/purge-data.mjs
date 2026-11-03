@@ -39,6 +39,7 @@ const MEMBER_DATA = [
   ['bcci:board:open_meeting_indexed', 'the open-meeting index marker'],
   ['bcci:board:att:*', 'board attendance marks'],
   ['bcci:board:pin:*', 'meeting attendance PINs'],
+  ['bcci:board:pin_version:*', 'attendance pass generations'],
   ['bcci:board:pin_fails:*', 'wrong-PIN counters'],
   ['bcci:board:name_pass:*', 'mark-by-name passes'],
   ['bcci:board:device:*', 'one-mark-per-phone records'],

@@ -703,6 +703,100 @@ sec('Published roster reconciliation (admin only)');
   ck('reconciliation remains admin-only', r.status === 401 && !r.json?.websiteRoster);
 }
 
+sec('Atomic board profiles under concurrent requests');
+{
+  const email = 'race.unique@example.com';
+  const fields = { name: 'Race One', designation: 'Director', email, mobile: '9825012345', company: '' };
+  const nextId = `BM-${Number(await kv.get(KEYS.boardMemberSeq)) + 1}`;
+  const target = KEYS.boardMember(nextId);
+  const fetch0 = globalThis.fetch;
+  let unblock, reached;
+  const gate = new Promise((resolve) => { unblock = resolve; });
+  const blocked = new Promise((resolve) => { reached = resolve; });
+  let paused = false;
+  let timer;
+  // Hold the first profile commit. The old implementation exposed its email
+  // claim first, allowing the second create to steal it and create a duplicate.
+  globalThis.fetch = async (...args) => {
+    let commands = [];
+    try {
+      const data = JSON.parse(args[1]?.body);
+      commands = Array.isArray(data[0]) ? data : [data];
+    } catch {}
+    const commit = commands.some((c) => c.includes(target) && ['set', 'eval'].includes(String(c[0]).toLowerCase()));
+    if (commit && !paused) { paused = true; reached(); await gate; }
+    const response = await fetch0(...args);
+    if (paused && commands.some((c) =>
+      (String(c[0]).toLowerCase() === 'get' && c[1] === target) ||
+      (String(c[0]).toLowerCase() === 'set' && c[1] === 'bcci:lock:board:members'))) unblock();
+    return response;
+  };
+  try {
+    const first = lib.saveMember(fields);
+    await Promise.race([blocked, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('profile commit did not reach gate')), 5000); })]);
+    const results = await Promise.allSettled([first, lib.saveMember({ ...fields, name: 'Race Two' })]);
+    ck('overlapping creates produce exactly one profile and one email_taken refusal',
+      results.filter((x) => x.status === 'fulfilled').length === 1 && results.some((x) => x.status === 'rejected' && x.reason.code === 'email_taken'));
+    const matching = (await lib.listMembers()).filter((m) => m.email === email);
+    ck('the unique email index points to the only committed profile', matching.length === 1 && String(await kv.get(KEYS.boardMemberByEmail(email))) === matching[0].id);
+  } finally {
+    clearTimeout(timer); unblock(); globalThis.fetch = fetch0;
+  }
+  const brokenEmail = 'atomic.failure@example.com';
+  const failedId = `BM-${Number(await kv.get(KEYS.boardMemberSeq)) + 1}`;
+  redis.failKeys.add(KEYS.boardMemberByEmail(brokenEmail));
+  let refused = false;
+  try { await lib.saveMember({ ...fields, email: brokenEmail }); } catch { refused = true; }
+  redis.failKeys.delete(KEYS.boardMemberByEmail(brokenEmail));
+  ck('a failed email-index commit leaves no partially created profile', refused && !(await kv.get(KEYS.boardMember(failedId))) && !(await kv.get(KEYS.boardMemberByEmail(brokenEmail))));
+}
+
+sec('PIN generations and close/mark races');
+{
+  const member = (await lib.saveMember({ name: 'Generation Test', designation: 'Director', email: 'generation@example.com', mobile: '9825012345', company: '' })).member;
+  const meeting = await lib.saveMeeting({ title: 'Generation meeting', date: '2026-11-03', time: '10:00', venue: '' });
+  let open = await lib.setMeetingStatus(meeting.id, 'open');
+  const device = 'generation-device-123456789012345';
+  let proof = await lib.verifyMeetingPin(open, await lib.getMeetingPin(meeting.id));
+  let pass = await lib.openNameMarking(open, device, proof);
+  await lib.rotateMeetingPin(meeting.id);
+  ck('rotation invalidates an already issued name pass', await lib.markByName(pass.pass, member.id, device).then(() => false, (e) => e.code === 'expired'));
+  ck('rotation between verification and name-list issuance refuses the old proof', await lib.openNameMarking(open, device, proof).then(() => false, (e) => e.code === 'pin_required'));
+  ck('rotation between verification and signed-in marking refuses the old proof', await lib.markBySelf(open, member, { proof }).then(() => false, (e) => e.code === 'pin_required'));
+  proof = await lib.verifyMeetingPin(open, await lib.getMeetingPin(meeting.id));
+  pass = await lib.openNameMarking(open, device, proof);
+  await lib.setMeetingStatus(meeting.id, 'close');
+  ck('an in-flight signed-in request cannot write using an old open snapshot', await lib.markBySelf(open, member, { proof }).then(() => false, (e) => e.code === 'not_open'));
+  ck('closing removes the pass generation as well as the PIN', !(await kv.get(KEYS.boardPinVersion(meeting.id))));
+  open = await lib.setMeetingStatus(meeting.id, 'reopen');
+  ck('close/reopen invalidates passes from the previous opening', await lib.markByName(pass.pass, member.id, device).then(() => false, (e) => e.code === 'expired'));
+  ck('refused stale requests never claim the phone or create attendance', !(await kv.get(KEYS.boardAttendance(meeting.id, member.id))));
+  proof = await lib.verifyMeetingPin(open, await lib.getMeetingPin(meeting.id));
+  pass = await lib.openNameMarking(open, device, proof);
+  const result = await lib.markByName(pass.pass, member.id, device);
+  ck('a new pass with the current PIN works on that same phone', result.member.id === member.id);
+  await lib.setMeetingStatus(meeting.id, 'close');
+
+  const late = await lib.saveMeeting({ title: 'Expired writer fence', date: '2026-11-03', time: '11:00', venue: '' });
+  open = await lib.setMeetingStatus(late.id, 'open');
+  proof = await lib.verifyMeetingPin(open, await lib.getMeetingPin(late.id));
+  let intercepted = false;
+  const hook = (cmd) => {
+    if (String(cmd[0]).toUpperCase() !== 'EVAL' || !String(cmd[1]).startsWith('-- bcci-fenced-write') || !cmd.includes(KEYS.boardAttendance(late.id, member.id))) return;
+    intercepted = true;
+    redis.store.set('bcci:lock:board:meetings', 'new-holder');
+    redis.store.set(KEYS.boardMeeting(late.id), JSON.stringify({ ...open, status: 'closed' }));
+  };
+  redis.beforeCommand.push(hook);
+  try {
+    ck('a writer whose meeting lock expired cannot commit after a close', await lib.markBySelf(open, member, { proof }).then(() => false, (e) => e.statusCode === 409));
+    ck('the fenced write leaves the closed register untouched', intercepted && !(await kv.get(KEYS.boardAttendance(late.id, member.id))));
+  } finally {
+    redis.beforeCommand.splice(redis.beforeCommand.indexOf(hook), 1);
+    await kv.del('bcci:lock:board:meetings', KEYS.boardOpenMeeting);
+  }
+}
+
 console.log(`${'═'.repeat(52)}\n  ${pass} passed, ${fail} failed\n${'═'.repeat(52)}`);
 smtp.server.close();
 redis.server.close();

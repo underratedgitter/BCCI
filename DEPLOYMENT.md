@@ -99,6 +99,7 @@ Everything (records, accounts, OTP codes, sessions, rate limits, the email log) 
 | `bcci:board:meeting:<id>`, `bcci:board:open_meeting` | Board meetings and the one currently taking attendance |
 | `bcci:board:att:<meeting>:<member>` | Attendance marks |
 | `bcci:board:pin:<meeting>`, `bcci:board:pin_fails:<meeting>` | The open meeting's PIN and its wrong-guess count |
+| `bcci:board:pin_version:<meeting>` | Attendance-pass generation, renewed with each PIN and reopening |
 | `bcci:board:name_pass:<token>`, `bcci:board:device:<meeting>:<hash>` | Short-lived mark-by-name pass and one-mark-per-phone record |
 | `board:<token>` | Board portal sessions, TTL-expired |
 | `bcci:email_log` | Last 300 send attempts |

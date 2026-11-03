@@ -222,14 +222,14 @@ const PIN_IP_WINDOW_SECONDS = 600;
 /**
  * Checks the meeting PIN in the request, limiting wrong guesses per network
  * address on top of the meeting's own cap. Returns false once it has sent a
- * 429.
+ * 429. Otherwise returns the verified PIN generation, which must still match
+ * when the attendance write or name-pass issuance takes the meeting lock.
  */
 async function requirePin(req, res, meeting) {
   const pin = str(req.body?.pin, 10);
   // A missing PIN is not a guess: let the PIN check refuse it uncounted.
   if (!isPinShaped(pin)) {
-    await verifyMeetingPin(meeting, pin);
-    return true;
+    return await verifyMeetingPin(meeting, pin);
   }
   const key = `board:pin:ip:${clientIp(req)}`;
   const limit = await rateLimit(key, { max: PIN_IP_MAX_FAILS, windowSec: PIN_IP_WINDOW_SECONDS });
@@ -237,23 +237,25 @@ async function requirePin(req, res, meeting) {
     tooManyRequests(res, limit.retryAfter, 'Too many wrong PINs from this network. Wait a few minutes, or ask the secretary to mark you.');
     return false;
   }
+  let proof;
   try {
-    await verifyMeetingPin(meeting, pin);
+    proof = await verifyMeetingPin(meeting, pin);
   } catch (err) {
     // Only a wrong guess keeps its count; a locked PIN is not this caller's guess.
     if (err?.code !== 'pin_wrong') await refundRateLimit(key);
     throw err;
   }
   await refundRateLimit(key);
-  return true;
+  return proof;
 }
 
 async function attend(req, res, { member }) {
   const limit = await rateLimit(`board:attend:${member.id}`, { max: 20, windowSec: 60 });
   if (!limit.ok) return tooManyRequests(res, limit.retryAfter, 'Too many scans. Wait a moment and scan again.');
   const meeting = await resolveOpenMeeting();
-  if (!(await requirePin(req, res, meeting))) return undefined;
-  const { record, alreadyMarked } = await markBySelf(meeting, member, { userAgent: req.headers['user-agent'] });
+  const proof = await requirePin(req, res, meeting);
+  if (!proof) return undefined;
+  const { record, alreadyMarked } = await markBySelf(meeting, member, { userAgent: req.headers['user-agent'], proof });
   if (!alreadyMarked) console.log(`[Board] ${member.id} present at ${meeting.id}`);
   return res.status(200).json({
     success: true,
@@ -274,8 +276,9 @@ async function nameList(req, res) {
   const limit = await rateLimit(`board:names:ip:${clientIp(req)}`, { max: 60, windowSec: 60 });
   if (!limit.ok) return tooManyRequests(res, limit.retryAfter, 'Too many scans. Wait a moment and scan again.');
   const meeting = await resolveOpenMeeting();
-  if (!(await requirePin(req, res, meeting))) return undefined;
-  const result = await openNameMarking(meeting, str(req.body?.deviceId, 64));
+  const proof = await requirePin(req, res, meeting);
+  if (!proof) return undefined;
+  const result = await openNameMarking(meeting, str(req.body?.deviceId, 64), proof);
   return res.status(200).json({ success: true, ...result });
 }
 

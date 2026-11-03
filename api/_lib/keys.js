@@ -42,6 +42,7 @@ export const KEYS = {
   // An open meeting's attendance PIN, kept apart from the meeting record so
   // changing it can never overwrite a concurrent open/close; and its wrong guesses.
   boardMeetingPin: (meetingId) => `bcci:board:pin:${meetingId}`,
+  boardPinVersion: (meetingId) => `bcci:board:pin_version:${meetingId}`,
   boardPinFails: (meetingId) => `bcci:board:pin_fails:${meetingId}`,
   boardSession: (token) => `board:${token}`,
   // Mark-by-name: a short pass issued when the projector QR is scanned, and

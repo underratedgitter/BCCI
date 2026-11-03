@@ -28,6 +28,7 @@ await redis.set('bcci:board:open_meeting', 'MTG-1');
 await redis.set('bcci:board:open_meeting_indexed', '1');
 await redis.set('bcci:board:att:MTG-1:BM-1', { status: 'present' });
 await redis.set('bcci:board:pin:MTG-1', '1234');
+await redis.set('bcci:board:pin_version:MTG-1', 'test-generation');
 await redis.set('bcci:board:pin_fails:MTG-1', 2);
 await redis.set('bcci:board:name_pass:tok-1', { meetingId: 'MTG-1', device: 'abc' });
 await redis.set('bcci:board:device:MTG-1:abc', 'BM-1');
@@ -63,7 +64,7 @@ ck('email index gone', (await redis.get('bcci:app_email:m1@x.com')) === null);
 ck('custom membership types gone', (await redis.get('bcci:plan:gold')) === null && (await redis.zcard('bcci:plan_index')) === 0);
 const boardLeft = await Promise.all(['bcci:board:seq:member', 'bcci:board:member:BM-1', 'bcci:board:member_email:b@x.com',
   'bcci:board:seq:meeting', 'bcci:board:meeting:MTG-1', 'bcci:board:open_meeting', 'bcci:board:open_meeting_indexed',
-  'bcci:board:att:MTG-1:BM-1', 'bcci:board:pin:MTG-1', 'bcci:board:pin_fails:MTG-1',
+  'bcci:board:att:MTG-1:BM-1', 'bcci:board:pin:MTG-1', 'bcci:board:pin_version:MTG-1', 'bcci:board:pin_fails:MTG-1',
   'bcci:board:name_pass:tok-1', 'bcci:board:device:MTG-1:abc'].map((k) => redis.get(k)));
 ck('board profiles, meetings, PINs, passes, marks and counters gone', boardLeft.every((v) => v === null), JSON.stringify(boardLeft));
 ck('admin session PRESERVED', (await redis.get('admin:tok1')) === 'admin@x.com', 'should not touch sessions');

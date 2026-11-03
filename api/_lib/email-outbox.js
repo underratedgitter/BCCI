@@ -6,10 +6,19 @@ import { KEYS } from './keys.js';
 
 const MAX_ATTEMPTS = 5;
 
-export async function listEmailIntents(limit = 50) {
-  const ids = await kv.zrange(OUTBOX_INDEX, 0, Math.min(100, limit) - 1);
-  if (!ids.length) return [];
-  return (await kv.mget(...ids.map(outboxKey))).filter(Boolean);
+export async function listEmailIntents(limit = 50, { runnableOnly = false } = {}) {
+  const size = Math.max(0, Math.min(100, Math.trunc(Number(limit) || 0)));
+  if (!size) return [];
+  const result = [];
+  // Page before filtering: old exhausted entries must not starve later mail.
+  for (let offset = 0; result.length < size; offset += 50) {
+    const ids = await kv.zrange(OUTBOX_INDEX, offset, offset + 49);
+    if (!ids.length) break;
+    const items = (await kv.mget(...ids.map(outboxKey))).filter(Boolean);
+    result.push(...items.filter((item) => !runnableOnly || ['pending', 'sending'].includes(item.status)));
+    if (ids.length < 50) break;
+  }
+  return result.slice(0, size);
 }
 
 // The lease exceeds SMTP's connection/greeting/socket deadlines. A durable

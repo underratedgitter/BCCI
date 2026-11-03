@@ -120,6 +120,8 @@ function run(cmd) {
       if (String(script).startsWith('-- bcci-fenced-write')) {
         // Apply every write only while KEYS[1] still holds ARGV[1].
         if (!lockHeld) return 0;
+        // Fail before applying any writes, as an unavailable target would.
+        if (keys.slice(1).some((key) => failKeys.has(key))) throw new Error('mock-redis: simulated fenced write failure');
         for (let i = 1; i < keys.length; i++) {
           const op = args[i][0];
           const arg = args[i].slice(2);

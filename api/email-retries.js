@@ -16,7 +16,7 @@ async function handler(req, res) {
       const result = await deliverEmailIntent(id, { force: true });
       return res.status(result ? 200 : 404).json(result || { error: 'Email intent not found' });
     }
-    const due = (await listEmailIntents(20)).filter(item => item.status !== 'failed' && item.nextAttemptAt <= Date.now());
+    const due = (await listEmailIntents(20, { runnableOnly: true })).filter(item => item.nextAttemptAt <= Date.now());
     const results = [];
     // Limit work per serverless request; the admin can invoke again to drain.
     for (const item of due.slice(0, 1)) results.push({ id: item.id, ...await deliverEmailIntent(item.id) });

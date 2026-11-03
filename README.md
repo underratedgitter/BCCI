@@ -138,7 +138,7 @@ Eleven test suites plus the asset-version check, with no network access and no l
 | Suite | Covers |
 |---|---|
 | `e2e` | the real server against a mock Upstash and a **real SMTP server** — OTP, application, approval, renewal, 30 concurrent submissions |
-| `email-outbox` | decision emails retry after a failed send and are never sent twice |
+| `email-outbox` | durable decision emails, retry backoff and concurrent-send protection; delivery is at-least-once |
 | `api` | authentication, ownership, rate limits, the approval flow |
 | `data` | legacy migration, concurrent writes |
 | `client` | XSS escaping, form drafts, sign-in, accessibility |
@@ -169,6 +169,10 @@ the public list never creates sign-in accounts automatically.
 
 Both printed and projector attendance QR codes open `/board?attend=live` without
 the meeting PIN. Members enter the PIN displayed separately in the room.
+Changing the PIN or reopening attendance invalidates previously issued name
+passes. After an update, members with an older name-selection page may need to
+scan again and enter the current PIN. Attendance writes are serialized with
+closing so a closed register cannot be changed by an in-flight scan.
 
 For a focused Chrome smoke test, start `npm run dev:sandbox`, then run
 `npm run test:leadership-browser`. Set `SITE_URL` for a different local port
