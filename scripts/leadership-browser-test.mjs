@@ -17,7 +17,7 @@ try {
   await page.waitForSelector('#leadershipGrid .team-card');
   assert.equal(await page.locator('#leadershipGrid .team-card').count(), 15);
   // Cards with and without a bio/LinkedIn must share one footer line per row.
-  for (const width of [1200, 375]) {
+  for (const width of [1440, 1200, 1100, 1025, 1024, 900, 820, 769, 768, 600, 375, 320]) {
     await page.setViewportSize({ width, height: 900 });
     const footerRows = await page.evaluate(() => {
       const rows = new Map();

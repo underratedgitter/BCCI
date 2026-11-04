@@ -928,6 +928,8 @@ body.admin-area footer .footer-grid > div:has(.footer-links a) h4 {
 .team-card {
   /* Horizontal padding lives in a variable so the footer can bleed edge to edge. */
   --card-pad-x: var(--space-lg);
+  /* The footer stacks by the card's own width, not the viewport: 4-col tablet cards are narrow too. */
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -946,8 +948,9 @@ body.admin-area footer .footer-grid > div:has(.footer-links a) h4 {
 .team-avatar-img { filter: grayscale(20%); transition: filter 0.5s ease; }
 
 .team-avatar {
-  width: 160px;
-  height: 160px;
+  width: min(160px, 100%);
+  height: auto;
+  aspect-ratio: 1;
   flex: none;
   margin: 0 auto var(--space-lg);
   background: var(--navy-bg);
@@ -962,8 +965,9 @@ body.admin-area footer .footer-grid > div:has(.footer-links a) h4 {
 }
 
 .team-avatar-img-wrap {
-  width: 160px;
-  height: 160px;
+  width: min(160px, 100%);
+  height: auto;
+  aspect-ratio: 1;
   flex: none;
   margin: 0 auto var(--space-lg);
   overflow: hidden;
@@ -993,6 +997,13 @@ body.admin-area footer .footer-grid > div:has(.footer-links a) h4 {
 
 .team-badge { font-size: 0.75rem; color: var(--gray-500); }
 .team-actions { display: inline-flex; align-items: center; gap: 0.6rem; margin-left: auto; }
+
+/* Narrow cards: stack group above actions, centred. The fixed height fits
+   label + action row, so footers without actions still line up. */
+@container (max-width: 210px) {
+  .team-footer { flex-direction: column; justify-content: flex-start; min-height: 5.25rem; text-align: center; }
+  .team-actions { margin-left: 0; }
+}
 
 .team-readmore-btn {
   padding: 0.3rem 0;
@@ -2122,6 +2133,8 @@ footer h4 {
 @media (max-width: 1024px) {
   /* Payment panels need readable space before the phone breakpoint. */
   .qrcode-hero-container { grid-template-columns: minmax(0, 1fr); gap: var(--space-xl); }
+  /* Four leadership columns get too narrow for full-size portraits on tablets. */
+  .team-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   /* ── Navigation ────────────────────────────────────────────── */
   .top-bar { display: none !important; }
   .nav-links { display: none !important; }
@@ -2325,11 +2338,7 @@ footer h4 {
   .team-avatar-img-wrap { width: 104px; height: 104px; font-size: 1.2rem; }
   .team-name { font-size: 0.85rem; }
   .team-title { font-size: 0.72rem; }
-  /* Narrow two-column cards: stack group above actions, centred. */
-  /* Fixed height fits label + action row, so footers without actions still line up. */
-  .team-footer { flex-direction: column; justify-content: flex-start; min-height: 5.25rem; text-align: center; }
   .team-badge { font-size: 0.68rem; }
-  .team-actions { margin-left: 0; }
   .team-readmore-btn { font-size: 0.74rem; }
   .team-linkedin-btn { font-size: 0.62rem; padding: 0.3rem 0.7rem; }
 
