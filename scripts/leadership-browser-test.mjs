@@ -19,6 +19,8 @@ try {
   // Cards with and without a bio/LinkedIn must share one footer line per row.
   for (const width of [1440, 1200, 1100, 1025, 1024, 900, 820, 769, 768, 600, 375, 320]) {
     await page.setViewportSize({ width, height: 900 });
+    // Two frames: let the resize reflow (and container queries) settle before measuring.
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     const footerRows = await page.evaluate(() => {
       const rows = new Map();
       for (const card of document.querySelectorAll('#leadershipGrid .team-card')) {
