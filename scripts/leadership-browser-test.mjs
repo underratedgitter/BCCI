@@ -16,12 +16,25 @@ try {
   await page.goto(`${base}/about`);
   await page.waitForSelector('#leadershipGrid .team-card');
   assert.equal(await page.locator('#leadershipGrid .team-card').count(), 15);
-  await page.locator('.team-card').filter({ hasText: 'DR. MAHESH R. VASHI' }).getByRole('button', { name: 'Read more' }).click();
+  // Cards with and without a bio/LinkedIn must share one footer line per row.
+  await page.setViewportSize({ width: 1200, height: 900 });
+  const footerRows = await page.evaluate(() => {
+    const rows = new Map();
+    for (const card of document.querySelectorAll('#leadershipGrid .team-card')) {
+      const footers = card.querySelectorAll('.team-footer');
+      if (footers.length !== 1) return null;
+      const top = Math.round(card.getBoundingClientRect().top);
+      rows.set(top, [...(rows.get(top) || []), Math.round(footers[0].getBoundingClientRect().top)]);
+    }
+    return [...rows.values()].map((tops) => new Set(tops).size);
+  });
+  assert.ok(footerRows && footerRows.every((n) => n === 1), 'card footers line up within each row');
+  await page.locator('.team-card').filter({ hasText: 'DR. MAHESH R. VASHI' }).getByRole('button', { name: 'Read bio' }).click();
   await page.waitForSelector('#modalBackdrop.show');
   assert.match(await page.locator('#modalContainer').innerText(), /CSR & Skill Development/i);
   await page.locator('#modalCloseIcon').click();
   const urjit = page.locator('.team-card').filter({ hasText: 'MR. URJIT BHUPENDRABHAI PATEL' });
-  await urjit.getByRole('button', { name: 'Read more' }).click();
+  await urjit.getByRole('button', { name: 'Read bio' }).click();
   await page.waitForSelector('#modalBackdrop.show');
   assert.match(await page.locator('#modalContainer').innerText(), /SLD Infrastructure Private Limited/);
   await page.locator('.leader-profile-img').evaluate((img) => img.decode());

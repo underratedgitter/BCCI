@@ -2019,21 +2019,21 @@ class App {
         `}
         <h4 class="team-name">${escapeHtml(m.name)}</h4>
         <div class="team-title">${escapeHtml(m.role)}</div>
-        <span class="team-badge">${escapeHtml(m.category)}</span>
-        ${m.linkedin || m.bio ? `
-          <div class="team-links">
+        <!-- Every card gets the same footer so rows line up whether or not a
+             member has a bio or LinkedIn; missing actions simply aren't drawn. -->
+        <div class="team-footer">
+          <span class="team-badge">${escapeHtml(m.category)}</span>
+          <span class="team-actions">
             ${m.bio ? `
-              <button type="button" class="team-readmore-btn" data-leader="${i}" aria-haspopup="dialog">
-                <i class="fas fa-book-open" aria-hidden="true"></i> Read more
-              </button>
+              <button type="button" class="team-readmore-btn" data-leader="${i}" aria-haspopup="dialog">Read bio</button>
             ` : ''}
             ${m.linkedin ? `
-              <a href="${escapeAttr(m.linkedin)}" target="_blank" rel="noopener noreferrer" class="team-linkedin-btn" title="View ${escapeAttr(m.name)}'s LinkedIn profile">
-                <i class="fab fa-linkedin"></i> LinkedIn
+              <a href="${escapeAttr(m.linkedin)}" target="_blank" rel="noopener noreferrer" class="team-linkedin-icon" aria-label="${escapeAttr(m.name)} on LinkedIn" title="LinkedIn">
+                <i class="fab fa-linkedin-in" aria-hidden="true"></i>
               </a>
             ` : ''}
-          </div>
-        ` : ''}
+          </span>
+        </div>
       </div>
     `;
     container.innerHTML = leaders.map(card).join('');
@@ -2045,7 +2045,7 @@ class App {
     };
   }
 
-  /** A leader's full profile, opened from "Read more" on their card. */
+  /** A leader's full profile, opened from "Read bio" on their card. */
   showLeaderProfile(m) {
     this.showModal({
       title: m.name,

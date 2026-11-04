@@ -926,13 +926,15 @@ body.admin-area footer .footer-grid > div:has(.footer-links a) h4 {
 .team-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: var(--space-md); }
 
 .team-card {
+  /* Horizontal padding lives in a variable so the footer can bleed edge to edge. */
+  --card-pad-x: var(--space-lg);
   display: flex;
   flex-direction: column;
   align-items: center;
   background: var(--white);
   border: 1px solid var(--gray-200);
   border-top: 3px solid var(--gray-200);
-  padding: var(--space-xl) var(--space-lg);
+  padding: var(--space-xl) var(--card-pad-x) 0;
   text-align: center;
   transition: var(--transition-slow);
 }
@@ -970,22 +972,60 @@ body.admin-area footer .footer-grid > div:has(.footer-links a) h4 {
 
 .team-avatar-img { width: 100%; height: 100%; object-fit: cover; object-position: top center; }
 .team-name { font-size: 1rem; margin-bottom: 0.35rem; line-height: 1.3; }
-/* Room for two lines, so badges line up across a row. */
-.team-title { font-family: var(--font-mono); font-size: 0.68rem; line-height: 1.5; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.06em; min-height: 3em; margin-bottom: 0.75rem; }
-.team-links { margin-top: auto; padding-top: 0.75rem; display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; }
+/* Room for two lines, so footers line up across a row. */
+.team-title { font-size: 0.82rem; line-height: 1.4; color: var(--gray-600); min-height: 2.8em; margin-bottom: var(--space-lg); }
 
-.team-badge {
-  display: inline-block;
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  color: var(--navy);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding: 0.2rem 0.6rem;
-  background: var(--navy-bg);
-  border: 1px solid var(--navy-bg-deep);
+/* Same footer on every card: group on the left, whatever actions exist on the right. */
+.team-footer {
+  margin: auto calc(-1 * var(--card-pad-x)) 0;
+  width: calc(100% + 2 * var(--card-pad-x));
+  min-height: 3.25rem;
+  padding: 0.6rem var(--card-pad-x);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-top: 1px solid var(--gray-200);
+  text-align: left;
 }
 
+.team-badge { font-size: 0.75rem; color: var(--gray-500); }
+.team-actions { display: inline-flex; align-items: center; gap: 0.6rem; margin-left: auto; }
+
+.team-readmore-btn {
+  padding: 0.3rem 0;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--gold);
+  color: var(--navy);
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.team-readmore-btn:hover { color: var(--black); border-bottom-color: var(--navy); }
+
+.team-linkedin-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  color: var(--navy);
+  font-size: 0.9rem;
+  text-decoration: none;
+  border: 1px solid var(--gray-200);
+  transition: var(--transition);
+}
+
+.team-linkedin-icon:hover { background: #0A66C2; border-color: #0A66C2; color: var(--white); opacity: 1; }
+.team-readmore-btn:focus-visible,
+.team-linkedin-icon:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+/* LinkedIn link inside the profile dialog. */
 .team-linkedin-btn {
   display: inline-flex;
   align-items: center;
@@ -1008,27 +1048,6 @@ body.admin-area footer .footer-grid > div:has(.footer-links a) h4 {
   border-color: var(--black);
   opacity: 1;
 }
-
-/* "Read more" sits beside LinkedIn and opens the full profile. */
-.team-readmore-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.35rem 0.85rem;
-  background: var(--navy);
-  color: var(--white);
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  border: 1px solid var(--navy);
-  cursor: pointer;
-  transition: var(--transition);
-}
-
-.team-readmore-btn:hover { background: var(--black); border-color: var(--black); }
-.team-readmore-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
 .leader-profile { text-align: left; }
 .leader-profile-img { display: block; width: auto; max-width: min(160px, 100%); height: auto; max-height: 180px; object-fit: contain; margin: 0 auto var(--space-md); border: 2px solid var(--gray-200); }
@@ -2255,7 +2274,7 @@ footer h4 {
 
   /* ── Leadership section ────────────────────────────────────── */
   .team-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-sm); }
-  .team-card { padding: var(--space-lg) var(--space-md); }
+  .team-card { --card-pad-x: var(--space-md); padding: var(--space-lg) var(--card-pad-x) 0; }
 
   /* ── Sign-in ───────────────────────────────────────────────── */
   .signin-container { padding: var(--space-2xl) var(--space-xl); }
@@ -2300,13 +2319,17 @@ footer h4 {
   .president-quote { font-size: 0.9rem; line-height: 1.7; }
 
   /* ── Grids ─────────────────────────────────────────────────── */
-  .team-card { padding: var(--space-lg) var(--space-sm); }
+  .team-card { --card-pad-x: var(--space-sm); padding: var(--space-lg) var(--card-pad-x) 0; }
   .team-avatar,
   .team-avatar-img-wrap { width: 88px; height: 88px; font-size: 1.2rem; }
   .team-name { font-size: 0.85rem; }
-  .team-title { font-size: 0.6rem; }
-  .team-badge { font-size: 0.58rem; padding: 0.15rem 0.5rem; }
-  .team-linkedin-btn, .team-readmore-btn { font-size: 0.62rem; padding: 0.3rem 0.7rem; }
+  .team-title { font-size: 0.72rem; }
+  /* Narrow two-column cards: stack group above actions, centred. */
+  .team-footer { flex-direction: column; justify-content: flex-start; text-align: center; }
+  .team-badge { font-size: 0.68rem; }
+  .team-actions { margin-left: 0; }
+  .team-readmore-btn { font-size: 0.74rem; }
+  .team-linkedin-btn { font-size: 0.62rem; padding: 0.3rem 0.7rem; }
 
   /* ── About Us cards ────────────────────────────────────────── */
   .about-info-grid > div { padding: 1.25rem !important; }

@@ -64,12 +64,12 @@
     "sha256": "af1d664603d7291980d3f8e2097b569247bd9169b103d60c874fde19178736c9"
   },
   "css/styles.css": {
-    "version": "3.2.21",
-    "sha256": "e838e4644d54fc9a0ae93810ccf2ec660e478a104ed17266a07a0665d3de28dd"
+    "version": "3.2.23",
+    "sha256": "bc6170fae2df21c9c11a9e5a4ca70c138437c851d0ae7256c19231e191b9abff"
   },
   "js/app.js": {
-    "version": "5.0.36",
-    "sha256": "1e4f2c8c1dc988063818d4fd655c8557fb866a947a463bbe6fdc0fe68c035642"
+    "version": "5.0.37",
+    "sha256": "ca61c447db1c96b03f4eb29158c53bee51184fb5ecfb916b00bab29c7c50b257"
   },
   "js/board-admin.js": {
     "version": "1.1.6",
