@@ -17,18 +17,21 @@ try {
   await page.waitForSelector('#leadershipGrid .team-card');
   assert.equal(await page.locator('#leadershipGrid .team-card').count(), 15);
   // Cards with and without a bio/LinkedIn must share one footer line per row.
-  await page.setViewportSize({ width: 1200, height: 900 });
-  const footerRows = await page.evaluate(() => {
-    const rows = new Map();
-    for (const card of document.querySelectorAll('#leadershipGrid .team-card')) {
-      const footers = card.querySelectorAll('.team-footer');
-      if (footers.length !== 1) return null;
-      const top = Math.round(card.getBoundingClientRect().top);
-      rows.set(top, [...(rows.get(top) || []), Math.round(footers[0].getBoundingClientRect().top)]);
-    }
-    return [...rows.values()].map((tops) => new Set(tops).size);
-  });
-  assert.ok(footerRows && footerRows.every((n) => n === 1), 'card footers line up within each row');
+  for (const width of [1200, 375]) {
+    await page.setViewportSize({ width, height: 900 });
+    const footerRows = await page.evaluate(() => {
+      const rows = new Map();
+      for (const card of document.querySelectorAll('#leadershipGrid .team-card')) {
+        const footers = card.querySelectorAll('.team-footer');
+        if (footers.length !== 1) return null;
+        const top = Math.round(card.getBoundingClientRect().top);
+        rows.set(top, [...(rows.get(top) || []), footers[0].getBoundingClientRect().top]);
+      }
+      // Unrounded: a sub-pixel drift between footers in one row is a real misalignment.
+      return [...rows.values()].map((tops) => Math.max(...tops) - Math.min(...tops));
+    });
+    assert.ok(footerRows && footerRows.every((drift) => drift < 0.1), `card footers line up within each row at ${width}px`);
+  }
   await page.locator('.team-card').filter({ hasText: 'DR. MAHESH R. VASHI' }).getByRole('button', { name: 'Read bio' }).click();
   await page.waitForSelector('#modalBackdrop.show');
   assert.match(await page.locator('#modalContainer').innerText(), /CSR & Skill Development/i);

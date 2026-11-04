@@ -946,8 +946,8 @@ body.admin-area footer .footer-grid > div:has(.footer-links a) h4 {
 .team-avatar-img { filter: grayscale(20%); transition: filter 0.5s ease; }
 
 .team-avatar {
-  width: 140px;
-  height: 140px;
+  width: 160px;
+  height: 160px;
   flex: none;
   margin: 0 auto var(--space-lg);
   background: var(--navy-bg);
@@ -962,8 +962,8 @@ body.admin-area footer .footer-grid > div:has(.footer-links a) h4 {
 }
 
 .team-avatar-img-wrap {
-  width: 140px;
-  height: 140px;
+  width: 160px;
+  height: 160px;
   flex: none;
   margin: 0 auto var(--space-lg);
   overflow: hidden;
@@ -979,7 +979,8 @@ body.admin-area footer .footer-grid > div:has(.footer-links a) h4 {
 .team-footer {
   margin: auto calc(-1 * var(--card-pad-x)) 0;
   width: calc(100% + 2 * var(--card-pad-x));
-  min-height: 3.25rem;
+  /* Taller than the LinkedIn icon row (2rem + padding), so every footer is this exact height. */
+  min-height: 3.5rem;
   padding: 0.6rem var(--card-pad-x);
   display: flex;
   flex-wrap: wrap;
@@ -2321,11 +2322,12 @@ footer h4 {
   /* ── Grids ─────────────────────────────────────────────────── */
   .team-card { --card-pad-x: var(--space-sm); padding: var(--space-lg) var(--card-pad-x) 0; }
   .team-avatar,
-  .team-avatar-img-wrap { width: 88px; height: 88px; font-size: 1.2rem; }
+  .team-avatar-img-wrap { width: 104px; height: 104px; font-size: 1.2rem; }
   .team-name { font-size: 0.85rem; }
   .team-title { font-size: 0.72rem; }
   /* Narrow two-column cards: stack group above actions, centred. */
-  .team-footer { flex-direction: column; justify-content: flex-start; text-align: center; }
+  /* Fixed height fits label + action row, so footers without actions still line up. */
+  .team-footer { flex-direction: column; justify-content: flex-start; min-height: 5.25rem; text-align: center; }
   .team-badge { font-size: 0.68rem; }
   .team-actions { margin-left: 0; }
   .team-readmore-btn { font-size: 0.74rem; }
