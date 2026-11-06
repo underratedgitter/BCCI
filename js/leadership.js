@@ -82,7 +82,7 @@ export const LEADERSHIP = [
     ],
   },
   {
-    name: 'ADV. JIGAR S. PATEL', role: 'Legal Affairs, Arbitration & MSME Dispute Resolution', category: 'Executive Board', initials: 'JP', image: '/assets/jigar-patel.webp?v=1', linkedin: 'https://www.linkedin.com/in/jigar-patel-fciarb-0b3800179',
+    name: 'ADV. JIGAR S. PATEL', role: 'Legal Affairs', category: 'Executive Board', initials: 'JP', image: '/assets/jigar-patel.webp?v=1', linkedin: 'https://www.linkedin.com/in/jigar-patel-fciarb-0b3800179',
     bio: [
       'Adv. Jigar S. Patel is an advocate, arbitrator and mediator based in Bharuch with around two decades of practice in commercial arbitration, mediation, contractual disputes and corporate legal advisory. He holds a B.Com., LL.B., LL.M. and a Diploma in International Commercial Arbitration, and is a Fellow of the Chartered Institute of Arbitrators (UK).',
       'He is associated with leading arbitration institutions in India, Malaysia and Thailand, including the Asian International Arbitration Centre (AIAC), the Thailand Arbitration Center (THAC) and the Gujarat International Maritime Arbitration Centre (GIMAC), and has served as sole arbitrator in more than 100 domestic matters. A former Vice President of the Bharuch District Bar Association, he contributes to legal education as a visiting lecturer and through arbitration-related publications.',

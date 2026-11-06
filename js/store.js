@@ -4,7 +4,7 @@
    localStorage holds session tokens only; it is never the source of truth.
    ========================================================================== */
 
-import { LEADERSHIP } from './leadership.js?v=1.0.2';
+import { LEADERSHIP } from './leadership.js?v=1.0.3';
 
 const API_BASE = ''; // same origin
 

@@ -72,8 +72,8 @@
     "sha256": "e5270a6a258645bfc5b8fff4cca153b2d5fbaccbed54f1c2216d64a24f405443"
   },
   "js/app.js": {
-    "version": "5.0.38",
-    "sha256": "46438c762953dfc8047b6d90dee2401cea789f7fbcaa0a364650f9960b2d4f58"
+    "version": "5.0.39",
+    "sha256": "ac9a23346eeca9d809a05395563a6635c2416ce254ba84dd371cf636593b0c36"
   },
   "js/board-admin.js": {
     "version": "1.1.6",
@@ -92,15 +92,15 @@
     "sha256": "80d0abbd1937996c74e5ab460a28c7987d65e21fbddcfae2afcf030305edcb94"
   },
   "js/leadership.js": {
-    "version": "1.0.2",
-    "sha256": "b6a96c27919709e7a192c4acb0a2b6a1be85b977805f7a53a93fd56b65a28522"
+    "version": "1.0.3",
+    "sha256": "56a6289af8242607c5ddc09bdcfb0b5b307c08bcde63385e5506925d6e254fd2"
   },
   "js/qr-scanner.js": {
     "version": "1.0.0",
     "sha256": "f6fa3375a3566b257c90419689e4769a0c2c4a3ce7378caf6d821e247443f569"
   },
   "js/store.js": {
-    "version": "4.0.24",
-    "sha256": "ac421199921dc78ad10024ab335df6b4c45e46d0c2b179f65e500dcb5e7fb071"
+    "version": "4.0.25",
+    "sha256": "e9da2ba055f60ac10ba2b1cfbfc4e5c549980f919324ce82ca6be097634711c5"
   }
 }
