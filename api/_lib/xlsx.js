@@ -16,7 +16,7 @@ import { deflateRawSync, crc32 } from 'node:zlib';
 // Order matters: a cell's style is its index in this list.
 const STYLE_NAMES = ['default', 'header', 'title', 'present', 'leave', 'absent', 'none', 'percent', 'wrap'];
 
-export const STYLES = Object.freeze(Object.fromEntries(STYLE_NAMES.map((n, i) => [n, i])));
+const STYLES = Object.freeze(Object.fromEntries(STYLE_NAMES.map((n, i) => [n, i])));
 
 const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
@@ -54,7 +54,7 @@ const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 </styleSheet>`;
 
 /** Column letters for a 0-based index: 0 → A, 25 → Z, 26 → AA. */
-export function columnName(index) {
+function columnName(index) {
   let n = index + 1;
   let name = '';
   while (n > 0) {

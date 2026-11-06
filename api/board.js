@@ -128,7 +128,16 @@ async function boardSession(req) {
   if (!token || token.length < 32) return null;
   const key = KEYS.boardSession(token);
   const raw = await withRetry(() => kv.get(key));
-  const session = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  let session;
+  try {
+    session = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  } catch (err) {
+    // A corrupt session row vouches for nobody. Drop it and let the browser
+    // sign in again, rather than failing every request with a 500.
+    console.warn(`[Board] unreadable session cleared: ${err?.message || err}`);
+    await kv.del(key).catch(() => {});
+    return null;
+  }
   if (!session?.memberId) return null;
   const member = await getMember(session.memberId);
   if (!member || member.status !== 'active' || member.email !== session.email) return null;
@@ -416,7 +425,9 @@ const admin = {
 
 const ADMIN_GET = new Set(['members', 'meetings', 'meeting', 'live', 'register']);
 const member = { 'request-code': requestCode, 'verify-code': verifyCode, names: nameList, 'mark-name': markName };
-const signedIn = { me, attend, 'sign-out': signOut };
+// 'sign-out' is dispatched before this map is consulted: revoking a token must
+// work even when its session no longer resolves.
+const signedIn = { me, attend };
 const SIGNED_IN_GET = new Set(['me']);
 
 async function handler(req, res) {
@@ -431,6 +442,14 @@ async function handler(req, res) {
     if (Object.hasOwn(member, action)) {
       if (isGet) return res.status(405).json({ success: false, error: 'Use POST.' });
       return await member[action](req, res);
+    }
+
+    // Signing out is handled before the session is looked up: an expired,
+    // revoked or deactivated session is exactly when the browser still holds a
+    // token that has to be revoked on the server.
+    if (action === 'sign-out') {
+      if (isGet) return res.status(405).json({ success: false, error: 'Method not allowed.' });
+      return await signOut(req, res, { token: bearerToken(req) });
     }
 
     if (Object.hasOwn(signedIn, action)) {

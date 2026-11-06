@@ -18,6 +18,19 @@ import {
 
 const SESSION_TTL_SECONDS = 8 * 60 * 60;
 
+// Wrong sign-ins are counted per network address *and* per address+username,
+// so an attacker on one network cannot lock the real administrator out. The
+// per-username ceiling is only a backstop against a distributed campaign, so
+// it is far looser than anything a person would reach.
+const LOGIN_MAX_FAILURES = 10;
+const LOGIN_WINDOW_SECONDS = 900;
+const LOGIN_USERNAME_CEILING = 100;
+
+// scrypt is deliberately expensive; hashing a megabyte-long password would
+// cost seconds of CPU per attempt, so an over-long one is refused first. The
+// value is never trimmed — spaces are legitimate password characters.
+const MAX_PASSWORD_LENGTH = 200;
+
 async function handler(req, res) {
   applyCors(req, res, 'POST, DELETE, OPTIONS');
   if (handlePreflight(req, res)) return;
@@ -39,17 +52,29 @@ async function handler(req, res) {
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password required' });
   }
+  // Refused before the limits, so an over-long password cannot use up another
+  // administrator's allowance — and before safeEqual hashes it.
+  if (password.length > MAX_PASSWORD_LENGTH) {
+    return res.status(400).json({ error: `Password must be at most ${MAX_PASSWORD_LENGTH} characters long.` });
+  }
 
   // Brute-force protection: the admin password is a single shared secret, so
   // an unlimited guess rate against it is the whole attack.
   const ip = clientIp(req);
-  const byIp = await rateLimit(`adminlogin:ip:${ip}`, { max: 10, windowSec: 900 });
+  const byIp = await rateLimit(`adminlogin:ip:${ip}`, { max: LOGIN_MAX_FAILURES, windowSec: LOGIN_WINDOW_SECONDS });
   if (!byIp.ok) {
     return tooManyRequests(res, byIp.retryAfter, 'Too many sign-in attempts. Please try again later.');
   }
-  const byUser = await rateLimit(`adminlogin:user:${email}`, { max: 10, windowSec: 900 });
+  // Keyed on the username *and* the network: one network cannot lock the real
+  // administrator out of their own account.
+  const byUser = await rateLimit(`adminlogin:user:${email}:${ip}`, { max: LOGIN_MAX_FAILURES, windowSec: LOGIN_WINDOW_SECONDS });
   if (!byUser.ok) {
     return tooManyRequests(res, byUser.retryAfter, 'Too many sign-in attempts. Please try again later.');
+  }
+  // Far looser backstop against a distributed guessing campaign.
+  const byUsername = await rateLimit(`adminlogin:username:${email}`, { max: LOGIN_USERNAME_CEILING, windowSec: LOGIN_WINDOW_SECONDS });
+  if (!byUsername.ok) {
+    return tooManyRequests(res, byUsername.retryAfter, 'Too many sign-in attempts for this account. Please try again later.');
   }
 
   const adminEmails = (process.env.ADMIN_EMAILS || process.env.ADMIN_USERNAME || '')
@@ -72,7 +97,11 @@ async function handler(req, res) {
   }
 
   // Only failures count toward lockout: a correct password gives the attempt back.
-  await Promise.all([refundRateLimit(`adminlogin:ip:${ip}`), refundRateLimit(`adminlogin:user:${email}`)]);
+  await Promise.all([
+    refundRateLimit(`adminlogin:ip:${ip}`),
+    refundRateLimit(`adminlogin:user:${email}:${ip}`),
+    refundRateLimit(`adminlogin:username:${email}`),
+  ]);
 
   const token = crypto.randomUUID();
   await withRetry(() =>

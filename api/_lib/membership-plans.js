@@ -34,6 +34,9 @@ export const PLAN_NAME_MAX = 60;
 export const PLAN_FEE_MAX = 10000000; // ₹1 crore
 export const MAX_CUSTOM_PLANS = 25;
 
+const tooManyPlansMessage = () =>
+  `You can add up to ${MAX_CUSTOM_PLANS} membership types. Delete one you no longer offer first.`;
+
 // Letters, digits and the punctuation tier names actually use. No "₹": the
 // amount is appended by the server, never typed into the name.
 const PLAN_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9 &()'.,/+-]*$/;
@@ -126,11 +129,14 @@ export async function createMembershipPlan(input, createdBy) {
   if (existing.some(p => p.id === plan.id)) {
     throw new PlanError(409, `"${plan.name}" is already a membership type.`);
   }
-  if (existing.length >= MAX_CUSTOM_PLANS) {
-    throw new PlanError(409, `You can add up to ${MAX_CUSTOM_PLANS} membership types. Delete one you no longer offer first.`);
-  }
+  // Fast path with a clear message. The same cap is enforced again inside the
+  // insert, under the plan lock, so this read-then-insert cannot be raced past
+  // by two admins adding a tier at the same moment.
+  if (existing.length >= MAX_CUSTOM_PLANS) throw new PlanError(409, tooManyPlansMessage());
 
-  if (!(await insertCustomPlan(plan))) {
+  const inserted = await insertCustomPlan(plan, { max: MAX_CUSTOM_PLANS });
+  if (!inserted.ok) {
+    if (inserted.reason === 'limit') throw new PlanError(409, tooManyPlansMessage());
     throw new PlanError(409, `"${plan.name}" is already a membership type.`);
   }
   return publicPlan(plan);

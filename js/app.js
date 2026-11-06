@@ -64,6 +64,23 @@ function escapeAttr(value) {
   return escapeHtml(value).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+/**
+ * A URL that is safe to put in an href built from data: only absolute http(s)
+ * links (and mailto:) survive. `javascript:`, `data:` or a stray string yields
+ * '' so the caller can drop the link altogether rather than render it.
+ */
+function safeHref(value) {
+  if (typeof value !== 'string') return '';
+  const url = value.trim();
+  if (!/^(https?:\/\/|mailto:)/i.test(url)) return '';
+  try {
+    const parsed = new URL(url);
+    return ['http:', 'https:', 'mailto:'].includes(parsed.protocol) ? url : '';
+  } catch {
+    return '';
+  }
+}
+
 /** Formats a date defensively — bad input renders as a dash, not "Invalid Date". */
 function formatDate(value) {
   // A bare "YYYY-MM-DD" parses as UTC midnight, which is the previous day
@@ -71,6 +88,16 @@ function formatDate(value) {
   const dateOnly = typeof value === 'string' && /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   const d = dateOnly ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3])) : new Date(value);
   return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-IN');
+}
+
+/**
+ * The API reports whether a notification email actually went out with the
+ * response. An absent field (an older API, or an action that sends no mail) is
+ * treated as sent, so only an explicit false counts as a failure.
+ */
+function emailWasSent(result) {
+  const flag = result?.emailSent ?? result?.application?.emailSent;
+  return flag !== false;
 }
 
 /** Honours prefers-reduced-motion — CSS scroll-behavior does not apply to
@@ -201,7 +228,6 @@ class App {
     this.currentView = 'home';
     this.adminAuthed = this.store.isAdminAuthed();
     this.currentPaymentProofBase64 = null;
-    this.currentPaymentProofFile = null;
     this.docFiles = {};
     this.init();
   }
@@ -359,7 +385,6 @@ class App {
     }
   }
 
-  /* ════════════════════════════════════════════════════════════════════
   /* ════════════════════════════════════════════════════════════════════
      APPLICANT AUTHENTICATION — Password & OTP Gates
      ════════════════════════════════════════════════════════════════════ */
@@ -824,7 +849,7 @@ class App {
 
     // ── 6. Delegated Event Listeners ─────────────────────────────────
     document.addEventListener('click', (e) => {
-      const signOutBtn = e.target.closest('#applicantSignOutBtn') || e.target.closest('.btnUserSignOut');
+      const signOutBtn = e.target.closest('#applicantSignOutBtn');
       const detailsBtn = e.target.closest('.btnViewMemberDetails');
       const cardBtn = e.target.closest('.btnViewDigitalCard');
       const renewBtn = e.target.closest('.btnRenewMembership');
@@ -853,8 +878,6 @@ class App {
         });
       }
     });
-
-    this.updateApplicantAuthUI();
   }
 
   async updateApplicantAuthUI() {
@@ -878,7 +901,31 @@ class App {
         membershipSubmitBtn.style.cursor = 'pointer';
       }
 
-      const memberApp = await this.store.getApplicationByEmail(session.email);
+      let memberApp = null;
+      try {
+        memberApp = await this.store.getApplicationByEmail(session.email);
+      } catch (err) {
+        // A failed request is not the same as "no application": falling through
+        // would show an existing member the blank join form and invite them to
+        // apply again. Say what happened and offer a retry instead.
+        console.error('[Auth UI] Could not load your application:', err);
+        if (wrapper) wrapper.style.display = 'none';
+        if (emailDisplay) {
+          emailDisplay.innerHTML = `
+            <div style="font-size: 0.92rem; font-weight: 700; color: #FCA5A5;">
+              <i class="fas fa-triangle-exclamation"></i> We could not load your membership details.
+            </div>
+            <div style="font-size: 0.82rem; color: #CBD5E1; margin-top: 3px;">
+              Check your connection, then retry.
+            </div>
+            <button type="button" class="btn-secondary" id="applicantAuthRetryBtn" style="margin-top: 0.6rem; padding: 0.35rem 0.85rem; font-size: 0.78rem;">
+              <i class="fas fa-redo"></i> Retry
+            </button>
+          `;
+          emailDisplay.querySelector('#applicantAuthRetryBtn')?.addEventListener('click', () => this.updateApplicantAuthUI());
+        }
+        return;
+      }
 
       if (memberApp && memberApp.status === 'Approved') {
         const validity = this.store.getMembershipValidity(memberApp);
@@ -1156,7 +1203,7 @@ class App {
 
     // Bind action buttons
     setTimeout(() => {
-      this.generateCardQR(app.id, app.repName, app.company, 'modalCardQRCode');
+      this.generateCardQR(app.id, 'modalCardQRCode');
       document.getElementById('viewMemberDetailsFromCardBtn')?.addEventListener('click', () => {
         this.closeModal();
         this.showMembershipDetailsModal(app);
@@ -1401,11 +1448,26 @@ class App {
 
         try {
           const resApp = await this.store.renewMembership(app.id, utr, renewalFee);
+          if (!resApp) {
+            // Nothing came back, so nothing was renewed. Keep the dialog (and
+            // the UTR entered in it) instead of reporting a success that did
+            // not happen.
+            this.showToast('Your renewal could not be confirmed. Please try again.', 'error');
+            if (submitBtn) {
+              submitBtn.disabled = false;
+              submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Confirm 1-Year Membership Renewal';
+            }
+            return;
+          }
           this.closeModal();
-          if (resApp?.renewalStatus === 'Pending Verification') {
-            this.showToast(`Renewal request for ${app.id} submitted for Secretariat verification!`, 'success');
+          const pending = resApp.renewalStatus === 'Pending Verification';
+          const outcome = pending
+            ? `Renewal request for ${app.id} submitted for Secretariat verification!`
+            : `Membership ${app.id} successfully renewed for +1 Year!`;
+          if (!emailWasSent(resApp)) {
+            this.showToast(`${outcome} The confirmation email could not be sent.`, 'warning');
           } else {
-            this.showToast(`Membership ${app.id} successfully renewed for +1 Year!`, 'success');
+            this.showToast(outcome, 'success');
           }
           this.updateApplicantAuthUI();
           if (this.currentView === 'card') {
@@ -1570,7 +1632,15 @@ class App {
               validity = this.store.getMembershipValidity(memberApp);
             }
           }
-          dropdown.innerHTML = this._buildProfileDropdownHtml(activeSession, memberApp, validity);
+          // The fetch above can outlive the session: signing out meanwhile must
+          // not be undone by a profile card rendered from a stale session.
+          const currentSession = this.store.getApplicantSession();
+          if (!currentSession || !currentSession.email) {
+            dropdown.classList.remove('open');
+            dropdown.innerHTML = '';
+            return;
+          }
+          dropdown.innerHTML = this._buildProfileDropdownHtml(currentSession, memberApp, validity);
           this._bindProfileDropdownActions(dropdown);
         }
       };
@@ -1588,14 +1658,6 @@ class App {
         }
       });
     }
-
-    document.querySelectorAll('#navAuthContainer [data-view-nav], #mobileDrawerAuthContainer [data-view-nav]').forEach(el => {
-      el.onclick = (e) => {
-        e.preventDefault();
-        this.closeMobileDrawer();
-        this.renderView(el.getAttribute('data-view-nav'));
-      };
-    });
 
     // Populate dropdowns if already open
     this._populateProfileDropdowns();
@@ -1748,7 +1810,30 @@ class App {
     });
   }
 
+  /**
+   * One place for "the admin session is gone": any admin request that comes
+   * back 401 lands here, whichever handler made it. The store has already
+   * dropped the stale session, so the UI just has to follow it.
+   */
+  handleAdminSessionExpired() {
+    this.adminAuthed = false;
+    this.updateNavAuthUI();
+    this.showToast('Your admin session expired. Please sign in again.', 'warning');
+    this.renderView('signin');
+  }
+
+  /** Releases the Board & Meetings tab if it is mounted. */
+  destroyBoardAdmin() {
+    try {
+      this._boardAdmin?.destroy?.();
+    } catch (err) {
+      console.error('[Board] admin teardown failed:', err);
+    }
+    this._boardAdmin = null;
+  }
+
   async handleAdminSignOut() {
+    this.destroyBoardAdmin();
     await this.store.clearAdminSession();
     this.adminAuthed = false;
     this.updateNavAuthUI();
@@ -1858,9 +1943,13 @@ class App {
       return this.renderView('admin', { updateHistory });
     }
 
+    const previousView = this.currentView;
     this.currentView = viewId;
     // Leaving the board portal must release the camera if it is scanning.
     if (viewId !== 'board') this._boardPortal?.destroy();
+    // The admin portal's "Board & Meetings" tab is mounted inside the admin
+    // view; leaving the portal has to release it (modals, listeners, camera).
+    if (previousView === 'admin' && viewId !== 'admin') this.destroyBoardAdmin();
 
     // The admin entry pages are a walled garden: no public navigation,
     // no apply/sign-in calls to action — just the brand mark, with its
@@ -1995,6 +2084,9 @@ class App {
           toast: (m, t) => this.showToast(m, t),
           showModal: (o) => this.showModal(o),
           closeModal: () => this.closeModal(),
+          // A 401 from any board request means the admin session is gone; the
+          // module hands control back here rather than failing silently.
+          onUnauthorized: () => this.handleAdminSessionExpired(),
         },
       });
       await this._boardAdmin.mount();
@@ -2008,7 +2100,9 @@ class App {
     const container = document.getElementById('leadershipGrid');
     if (!container) return;
     const leaders = this.store.getLeadership();
-    const card = (m, i) => `
+    const card = (m, i) => {
+      const linkedin = safeHref(m.linkedin);
+      return `
       <div class="team-card">
         ${m.image ? `
           <div class="team-avatar-img-wrap">
@@ -2027,8 +2121,8 @@ class App {
             ${m.bio ? `
               <button type="button" class="team-readmore-btn" data-leader="${i}" aria-haspopup="dialog">Read bio</button>
             ` : ''}
-            ${m.linkedin ? `
-              <a href="${escapeAttr(m.linkedin)}" target="_blank" rel="noopener noreferrer" class="team-linkedin-icon" aria-label="${escapeAttr(m.name)} on LinkedIn" title="LinkedIn">
+            ${linkedin ? `
+              <a href="${escapeAttr(linkedin)}" target="_blank" rel="noopener noreferrer" class="team-linkedin-icon" aria-label="${escapeAttr(m.name)} on LinkedIn" title="LinkedIn">
                 <i class="fab fa-linkedin-in" aria-hidden="true"></i>
               </a>
             ` : ''}
@@ -2036,6 +2130,7 @@ class App {
         </div>
       </div>
     `;
+    };
     container.innerHTML = leaders.map(card).join('');
     // Assigned, not added: this view re-renders on every visit to Home/About.
     container.onclick = (e) => {
@@ -2047,6 +2142,7 @@ class App {
 
   /** A leader's full profile, opened from "Read bio" on their card. */
   showLeaderProfile(m) {
+    const linkedin = safeHref(m.linkedin);
     this.showModal({
       title: m.name,
       content: `
@@ -2056,8 +2152,8 @@ class App {
           <div class="leader-profile-bio">
             ${m.bio.map((para) => `<p>${escapeHtml(para)}</p>`).join('')}
           </div>
-          ${m.linkedin ? `
-            <a href="${escapeAttr(m.linkedin)}" target="_blank" rel="noopener noreferrer" class="team-linkedin-btn">
+          ${linkedin ? `
+            <a href="${escapeAttr(linkedin)}" target="_blank" rel="noopener noreferrer" class="team-linkedin-btn">
               <i class="fab fa-linkedin"></i> LinkedIn
             </a>
           ` : ''}
@@ -2282,7 +2378,7 @@ class App {
       this.currentCardStatus = { text: validityText, tone: validityClass };
 
       // Generate QR code
-      this.generateCardQR(app.id, app.repName, app.company);
+      this.generateCardQR(app.id);
 
       // Bind action buttons
       setTimeout(() => {
@@ -2381,6 +2477,10 @@ class App {
       return;
     }
 
+    // Every lookup takes a ticket. A slower earlier response (the visitor
+    // retyped the ID, or hit Retry) must not overwrite the newer result.
+    const seq = (this._verifySeq = (this._verifySeq || 0) + 1);
+
     container.innerHTML = `
       <div style="text-align: center; color: var(--text-muted); padding: 2rem;">
         <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i>
@@ -2391,8 +2491,18 @@ class App {
     try {
       const res = await fetch(`/api/applications?verifyId=${encodeURIComponent(memberId)}`);
       const data = await res.json().catch(() => null);
+      if (seq !== this._verifySeq) return;
 
-      if (!res.ok || !data || !data.success || !data.member) {
+      // "Could not check" is not "not found": only a real 404 (or an explicit
+      // success:false with no member) may condemn a credential. A 429, a 5xx
+      // or a proxy error means the registry was never consulted.
+      const notFound = res.status === 404 || (!!data && data.success === false && !data.member);
+      if (!notFound && (!data || !data.success || !data.member)) {
+        this._renderVerifyUnavailable(container, data?.error || `The registry answered with status ${res.status}.`);
+        return;
+      }
+
+      if (notFound) {
         container.innerHTML = `
           <div style="text-align: center; padding: 1.5rem 0.5rem;">
             <i class="fas fa-times-circle" style="font-size: 3rem; color: var(--danger); margin-bottom: 1rem;"></i>
@@ -2485,23 +2595,38 @@ class App {
         this.renderVerificationView();
       });
     } catch (err) {
-      container.innerHTML = `
-        <div style="text-align: center; padding: 1.5rem 0.5rem;">
-          <i class="fas fa-wifi" style="font-size: 2.5rem; color: var(--text-muted); margin-bottom: 1rem;"></i>
-          <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem;">Verification Offline</h3>
-          <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 1.5rem;">
-            Unable to connect to the BCCI verification registry. Please verify your connection and try again.
-          </p>
-          <button type="button" class="btn-primary" id="verifyRetryBtn">
-            <i class="fas fa-redo"></i> Retry
-          </button>
-        </div>
-      `;
-      document.getElementById('verifyRetryBtn')?.addEventListener('click', () => this.renderVerificationView());
+      // A dropped connection or a stalled request: same "cannot check" state
+      // as a 429/5xx, never the "unverified" verdict.
+      if (seq !== this._verifySeq) return;
+      console.error('[Verify] Registry lookup failed:', err);
+      this._renderVerifyUnavailable(container, 'Check your connection and try again.');
     }
   }
 
-  generateCardQR(memberId, name, company, containerId = 'cardQRCode') {
+  /**
+   * The registry could not be consulted (429, 5xx, network). Saying "unverified"
+   * here would mark a perfectly valid credential as fake, so the page says the
+   * check itself failed and offers a retry.
+   */
+  _renderVerifyUnavailable(container, detail = '') {
+    if (!container) return;
+    container.innerHTML = `
+      <div style="text-align: center; padding: 1.5rem 0.5rem;">
+        <i class="fas fa-triangle-exclamation" style="font-size: 2.5rem; color: #D97706; margin-bottom: 1rem;"></i>
+        <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem;">Verification unavailable</h3>
+        <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 0.75rem; max-width: 460px; margin-left: auto; margin-right: auto;">
+          We could not reach the BCCI verification registry, so this credential could not be checked. Please try again in a moment.
+        </p>
+        ${detail ? `<p style="color: var(--text-muted); font-size: 0.82rem; margin-bottom: 1.5rem; word-break: break-word;">${escapeHtml(detail)}</p>` : '<div style="margin-bottom: 1.5rem;"></div>'}
+        <button type="button" class="btn-primary" id="verifyRetryBtn">
+          <i class="fas fa-redo"></i> Retry
+        </button>
+      </div>
+    `;
+    document.getElementById('verifyRetryBtn')?.addEventListener('click', () => this.renderVerificationView());
+  }
+
+  generateCardQR(memberId, containerId = 'cardQRCode') {
     const qrContainer = document.getElementById(containerId);
     if (!qrContainer) return;
 
@@ -2801,8 +2926,6 @@ class App {
         return;
       }
 
-      this.currentPaymentProofFile = file;
-
       const reader = new FileReader();
       reader.onload = (e) => {
         const rawBase64 = e.target.result;
@@ -2843,6 +2966,7 @@ class App {
           imgEl.src = this.currentPaymentProofBase64;
           this._updateFormProgress(document.getElementById('membershipForm'));
           imgEl.setAttribute('data-lightbox', 'true');
+          this._decorateLightboxImages(preview);
           fileNameEl.textContent = file.name;
           preview.style.display = 'block';
           placeholder.style.display = 'none';
@@ -2876,7 +3000,6 @@ class App {
         e.preventDefault(); e.stopPropagation();
         fileInput.value = '';
         this.currentPaymentProofBase64 = null;
-        this.currentPaymentProofFile = null;
         this._updateFormProgress(document.getElementById('membershipForm'));
         // An empty src is invalid and can re-request the page; drop it instead.
         imgEl.removeAttribute('src'); fileNameEl.textContent = '';
@@ -3180,10 +3303,13 @@ class App {
     }
 
     // Tie the message to the field so a screen reader reads it out when the
-    // field is focused, instead of leaving a red box nobody hears about.
-    if (!errorDiv.id) {
-      errorDiv.id = `err-${name || Math.random().toString(36).slice(2, 8)}`;
-    }
+    // field is focused, instead of leaving a red box nobody hears about. The
+    // form is part of the id: both forms have an "email"/"phone"/"name" field,
+    // so a bare `err-email` was claimed twice and aria-describedby pointed at
+    // whichever one the browser found first.
+    const formId = input.form?.id || 'form';
+    const wantedId = `err-${formId}-${name || Math.random().toString(36).slice(2, 8)}`;
+    if (errorDiv.id !== wantedId) errorDiv.id = wantedId;
     errorDiv.setAttribute('role', 'alert');
 
     if (name === 'paymentProof') {
@@ -3390,7 +3516,6 @@ class App {
           membershipForm.reset();
           this.updateMembershipTotalFee();
           this.currentPaymentProofBase64 = null;
-          this.currentPaymentProofFile = null;
           this.docFiles = {};
           membershipForm.querySelectorAll('input[type="file"][data-doc]').forEach((fi) => {
             fi.value = '';
@@ -3527,6 +3652,9 @@ class App {
         if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Authenticating…'; }
 
         try {
+          // setAdminAuth never throws: it resolves { success, error } for every
+          // outcome (a network failure included), so its error text is shown
+          // here rather than being swallowed by a catch that cannot run.
           const result = await this.store.setAdminAuth(user, pass);
           if (result.success) {
             this.adminAuthed = true;
@@ -3537,8 +3665,6 @@ class App {
           } else {
             this.showToast(result.error || 'Invalid credentials.', 'warning');
           }
-        } catch (err) {
-          this.showToast('Authentication failed. Please try again.', 'error');
         } finally {
           if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In to Admin Portal'; }
         }
@@ -3562,7 +3688,7 @@ class App {
         ).join('');
       }
     });
-    ['metricTotal', 'metricPending', 'metricApproved', 'metricRejected'].forEach((id) => {
+    ['metricTotal', 'metricPending', 'metricApproved', 'metricRejected', 'metricEnquiries'].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.textContent = '—';
     });
@@ -3832,8 +3958,13 @@ class App {
       const updated = await this.store.updateApplicationStatus(id, 'Approved');
       if (!updated) return;
 
+      const emailSent = emailWasSent(updated);
       await this.renderAdminPortal();
-      this.showToast(`Application ${id} approved. Confirmation email sent to ${updated.email}.`, 'success');
+      if (emailSent) {
+        this.showToast(`Application ${id} approved. Confirmation email sent to ${updated.email}.`, 'success');
+      } else {
+        this.showToast(`Application ${id} approved, but the confirmation email could not be sent. Please notify ${updated.email} directly.`, 'warning');
+      }
 
       this.showModal({
         titleHtml: `<i class="fas fa-envelope-open-text" style="color: #10B981;"></i> Membership approved`,
@@ -3841,7 +3972,9 @@ class App {
           <div style="font-size: 0.9rem; line-height: 1.6;">
             <div style="background: #ECFDF5; border: 1px solid #A7F3D0; padding: 1rem; border-radius: 8px; margin-bottom: 1.25rem; color: #065F46;">
               <div style="font-weight: 700; font-size: 1rem; margin-bottom: 0.25rem;"><i class="fas fa-check-circle"></i> Application ${escapeHtml(updated.id)} approved</div>
-              <div>A confirmation email with the digital membership card was sent to <strong>${escapeHtml(updated.email)}</strong>.</div>
+              <div>${emailSent
+                ? `A confirmation email with the digital membership card was sent to <strong>${escapeHtml(updated.email)}</strong>.`
+                : `The confirmation email could not be sent to <strong>${escapeHtml(updated.email)}</strong> — please notify the member directly.`}</div>
             </div>
             <button class="btn-secondary" id="modalCloseBtn" style="width: 100%; justify-content: center;">Close</button>
           </div>
@@ -3849,10 +3982,7 @@ class App {
       });
     } catch (err) {
       if (err.status === 401) {
-        this.adminAuthed = false;
-        this.updateNavAuthUI();
-        this.showToast('Your admin session expired. Please sign in again.', 'warning');
-        this.renderView('signin');
+        this.handleAdminSessionExpired();
         return;
       }
       this.showToast(err.message || 'Could not approve the application. Please try again.', 'error');
@@ -3864,6 +3994,10 @@ class App {
     try {
       app = await this.store.getApplicationById(id);
     } catch (err) {
+      if (err.status === 401) {
+        this.handleAdminSessionExpired();
+        return;
+      }
       this.showToast(err.message || 'Could not load that application.', 'error');
       return;
     }
@@ -3901,11 +4035,20 @@ class App {
           const updated = await this.store.updateApplicationStatus(id, 'Rejected', reason);
           this.closeModal();
           if (!updated) return;
+          const emailSent = emailWasSent(updated);
           await this.renderAdminPortal();
-          this.showToast(`Application ${id} rejected. Notification sent to ${updated.email}.`, 'warning');
+          if (emailSent) {
+            this.showToast(`Application ${id} rejected. Notification sent to ${updated.email}.`, 'warning');
+          } else {
+            this.showToast(`Application ${id} rejected, but the notification email could not be sent. Please inform ${updated.email} directly.`, 'warning');
+          }
         } catch (err) {
           confirmBtn.disabled = false;
           confirmBtn.innerHTML = '<i class="fas fa-times"></i> Confirm rejection';
+          if (err.status === 401) {
+            this.handleAdminSessionExpired();
+            return;
+          }
           this.showToast(err.message || 'Could not reject the application. Please try again.', 'error');
         }
       });
@@ -3916,9 +4059,18 @@ class App {
     try {
       const updated = await this.store.approveRenewal(id);
       if (!updated) return;
+      const emailSent = emailWasSent(updated);
       await this.renderAdminPortal();
-      this.showToast(`Membership renewal for ${id} approved (+1 Year). Confirmation sent to ${updated.email}.`, 'success');
+      if (emailSent) {
+        this.showToast(`Membership renewal for ${id} approved (+1 Year). Confirmation sent to ${updated.email}.`, 'success');
+      } else {
+        this.showToast(`Membership renewal for ${id} approved (+1 Year), but the confirmation email could not be sent. Please inform ${updated.email} directly.`, 'warning');
+      }
     } catch (err) {
+      if (err.status === 401) {
+        this.handleAdminSessionExpired();
+        return;
+      }
       this.showToast(err.message || 'Could not approve membership renewal.', 'error');
     }
   }
@@ -3930,9 +4082,18 @@ class App {
     try {
       const updated = await this.store.rejectRenewal(id, reason);
       if (!updated) return;
+      const emailSent = emailWasSent(updated);
       await this.renderAdminPortal();
-      this.showToast(`Membership renewal for ${id} rejected. Notification sent to ${updated.email}.`, 'warning');
+      if (emailSent) {
+        this.showToast(`Membership renewal for ${id} rejected. Notification sent to ${updated.email}.`, 'warning');
+      } else {
+        this.showToast(`Membership renewal for ${id} rejected, but the notification email could not be sent. Please inform ${updated.email} directly.`, 'warning');
+      }
     } catch (err) {
+      if (err.status === 401) {
+        this.handleAdminSessionExpired();
+        return;
+      }
       this.showToast(err.message || 'Could not reject membership renewal.', 'error');
     }
   }
@@ -4297,9 +4458,18 @@ class App {
     const link = document.createElement('a');
     link.href = url;
     link.download = `BCCI_Membership_Full_Data_${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      document.body.appendChild(link);
+      link.click();
+    } catch (err) {
+      console.error('[Export] Download could not start:', err);
+      this.showToast('Could not start the download. Please try again.', 'error');
+      return;
+    } finally {
+      // The blob URL pins the whole CSV in memory until it is revoked.
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
 
     this.showToast('Full membership data exported successfully!', 'success');
   }
@@ -4318,8 +4488,19 @@ class App {
       events = await this.store.getEvents();
     } catch (err) {
       console.error('[Admin Events] Failed to load:', err);
-      const errHtml = `<tr><td colspan="6" style="text-align:center;padding:2rem;color:#EF4444;"><i class="fas fa-exclamation-triangle"></i> Failed to load events.</td></tr>`;
-      if (tableBody) tableBody.innerHTML = errHtml;
+      // Both containers, because only one of them is visible at a given width
+      // — leaving the other on its old rows (or a shimmer) hides the failure.
+      const failure = `<div style="text-align:center;padding:2rem;color:#EF4444;">
+        <i class="fas fa-exclamation-triangle" style="font-size:1.8rem;display:block;margin-bottom:0.5rem;"></i>
+        ${escapeHtml(err.message || 'Failed to load events.')}
+        <br><br><button type="button" class="btn-primary" data-admin-events-retry style="font-size:0.85rem;"><i class="fas fa-redo"></i> Retry</button>
+      </div>`;
+      if (tableBody) tableBody.innerHTML = `<tr><td colspan="6" style="padding:0;">${failure}</td></tr>`;
+      if (cardsEl) cardsEl.innerHTML = failure;
+      document.querySelectorAll('[data-admin-events-retry]').forEach((btn) => {
+        btn.addEventListener('click', () => this.renderAdminEvents());
+      });
+      this.showToast(err.message || 'Could not load events.', 'error');
       return;
     }
 
@@ -4579,7 +4760,11 @@ class App {
           }, 50);
 
         } catch (err) {
-          this.showToast('Failed to load attendees list.', 'error');
+          if (err.status === 401) {
+            this.handleAdminSessionExpired();
+            return;
+          }
+          this.showToast(err.message || 'Failed to load attendees list.', 'error');
         }
       };
     });
@@ -5163,7 +5348,7 @@ class App {
           result.emailSent === false ? 'warning' : 'success'
         );
         await this.renderEventsPage();
-        this.showUniversalEventTicketModal(result.event || event, result.attendee, result.ticketId);
+        this.showUniversalEventTicketModal(result.event || event, result.attendee, result.ticketId, result.emailSent !== false);
       } catch (err) {
         if (errorAlert) {
           errorAlert.textContent = err.message || 'Failed to complete registration. Please try again.';
@@ -5179,7 +5364,7 @@ class App {
     });
   }
 
-  showUniversalEventTicketModal(event, attendee, ticketId) {
+  showUniversalEventTicketModal(event, attendee, ticketId, emailSent = true) {
     if (!event || !attendee) return;
     // Only a stored ticket ID is shown: one made up here would not match the email.
     const tktId = ticketId || attendee.ticketId || '';
@@ -5222,10 +5407,12 @@ class App {
       titleHtml: `<i class="fas fa-ticket-alt" style="color: var(--accent-gold);"></i> Official BCCI Event Admission Pass`,
       content: `
         <div class="universal-ticket-modal-content" style="padding: 0.5rem 0;">
-          <div style="background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px; padding: 0.85rem 1rem; margin-bottom: 1.25rem; font-size: 0.88rem; color: #1E3E62; display: flex; align-items: center; gap: 10px;">
-            <i class="fas fa-check-circle" style="font-size: 1.4rem; color: #10B981; flex-shrink: 0;"></i>
+          <div style="background: ${emailSent ? '#EFF6FF' : '#FFFBEB'}; border: 1px solid ${emailSent ? '#BFDBFE' : '#FDE68A'}; border-radius: 8px; padding: 0.85rem 1rem; margin-bottom: 1.25rem; font-size: 0.88rem; color: ${emailSent ? '#1E3E62' : '#92400E'}; display: flex; align-items: center; gap: 10px;">
+            <i class="fas ${emailSent ? 'fa-check-circle' : 'fa-triangle-exclamation'}" style="font-size: 1.4rem; color: ${emailSent ? '#10B981' : '#F59E0B'}; flex-shrink: 0;"></i>
             <div>
-              <strong>Registration Confirmed!</strong> A confirmation email with this e-ticket has been sent to <strong>${escapeHtml(attendee.email)}</strong>.
+              ${emailSent
+                ? `<strong>Registration Confirmed!</strong> A confirmation email with this e-ticket has been sent to <strong>${escapeHtml(attendee.email)}</strong>.`
+                : `<strong>Registration Confirmed</strong> — but the e-ticket email could not be sent to <strong>${escapeHtml(attendee.email)}</strong>. Screenshot this pass and show it at the desk.`}
             </div>
           </div>
 
@@ -5397,9 +5584,11 @@ class App {
 
     container.innerHTML = `
       <button class="modal-close" id="modalCloseIcon" aria-label="Close dialog">&times;</button>
-      <h3 class="modal-title">${heading}</h3>
+      <h3 class="modal-title" id="modalTitle">${heading}</h3>
       <div>${content}</div>
     `;
+    // Receipts and other images inside a dialog are lightboxes too.
+    this._decorateLightboxImages(container);
     backdrop.classList.add('show');
     if (typeof document !== 'undefined' && document.body) document.body.classList.add('modal-open');
     document.getElementById('modalCloseIcon')?.addEventListener('click', () => this.closeModal());
@@ -5565,7 +5754,8 @@ class App {
 
     const required = [...form.querySelectorAll('[required]')];
     const done = required.filter((el) => {
-      if (el.name === 'paymentProof') return !!this.currentPaymentProofBase64;
+      // A receipt or UTR satisfies the receipt rule, and neither is a [required]
+      // field, so no paymentProof case is needed here.
       if (el.type === 'file') return !!this.docFiles[el.name];
       return !!(el.value || '').trim();
     }).length;
@@ -5624,8 +5814,10 @@ class App {
       if (offline) {
         // Remember only what we disable here, so coming back online restores
         // exactly those and never blanket-enables a button that is disabled for
-        // its own reason (e.g. an unverified membership form).
-        this._submitButtonsDisabledOffline = [];
+        // its own reason (e.g. an unverified membership form). A second offline
+        // event must keep the buttons already recorded — resetting the list
+        // would drop them, and they would stay disabled once back online.
+        this._submitButtonsDisabledOffline ??= [];
         document.querySelectorAll('form button[type="submit"]').forEach((btn) => {
           if (!btn.disabled) {
             this._submitButtonsDisabledOffline.push(btn);
@@ -5686,35 +5878,70 @@ class App {
     }, 4000);
   }
 
+  /**
+   * A [data-lightbox] image opens a dialog, so it has to behave like the button
+   * it is: focusable, announced as a button, and openable with Enter/Space. Runs
+   * over everything in `root`, so images rendered later into a modal or the
+   * payment-receipt preview are covered too.
+   */
+  _decorateLightboxImages(root = document) {
+    root.querySelectorAll('img[data-lightbox]').forEach((img) => {
+      img.setAttribute('tabindex', '0');
+      img.setAttribute('role', 'button');
+      if (!img.hasAttribute('aria-label')) {
+        const alt = (img.getAttribute('alt') || '').trim();
+        img.setAttribute('aria-label', alt ? `Open image: ${alt}` : 'Open image');
+      }
+    });
+  }
+
+  /** Only same-origin paths and inline images are ever shown, so a crafted
+      src cannot turn the lightbox into an injection point. */
+  _isSafeLightboxSrc(value) {
+    return typeof value === 'string' &&
+      (/^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=\s]+$/.test(value) ||
+        /^(?!\/\/)[./A-Za-z0-9_-][^\s:]*$/.test(value));
+  }
+
+  _openLightboxImage(img) {
+    if (!img) return;
+    const src = img.getAttribute('src');
+    if (!this._isSafeLightboxSrc(src)) return;
+    const alt = img.getAttribute('alt') || 'BCCI photo';
+    this.showModal({
+      title: alt,
+      content: `<div style="text-align: center;"><img src="${escapeAttr(src)}" alt="${escapeAttr(alt)}" class="lightbox-img-view" /><div style="margin-top: 1rem; color: #94A3B8; font-size: 0.85rem;"><i class="fas fa-search-plus"></i> High resolution view</div></div>`
+    });
+  }
+
   setupLightboxEvents() {
+    this._decorateLightboxImages();
+
     document.addEventListener('click', (e) => {
       const imgTarget = e.target.closest('[data-lightbox]');
       const btnTarget = e.target.closest('[data-img-src]');
 
-      // Only same-origin paths and inline images are ever shown, so a crafted
-      // src cannot turn the lightbox into an injection point.
-      const safeSrc = (value) =>
-        typeof value === 'string' &&
-        (/^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=\s]+$/.test(value) ||
-          /^(?!\/\/)[./A-Za-z0-9_-][^\s:]*$/.test(value));
-
       if (imgTarget) {
-        const src = imgTarget.getAttribute('src');
-        const alt = imgTarget.getAttribute('alt') || 'BCCI photo';
-        if (!safeSrc(src)) return;
-        this.showModal({
-          title: alt,
-          content: `<div style="text-align: center;"><img src="${escapeAttr(src)}" alt="${escapeAttr(alt)}" class="lightbox-img-view" /><div style="margin-top: 1rem; color: #94A3B8; font-size: 0.85rem;"><i class="fas fa-search-plus"></i> High resolution view</div></div>`
-        });
+        this._openLightboxImage(imgTarget);
       } else if (btnTarget) {
         const src = btnTarget.getAttribute('data-img-src');
         const title = btnTarget.getAttribute('data-img-title') || 'BCCI event photo';
-        if (!safeSrc(src)) return;
+        if (!this._isSafeLightboxSrc(src)) return;
         this.showModal({
           title,
           content: `<div style="text-align: center;"><img src="${escapeAttr(src)}" alt="${escapeAttr(title)}" class="lightbox-img-view" /><div style="margin-top: 1rem; color: #94A3B8; font-size: 0.85rem;"><i class="fas fa-camera"></i> Official BCCI media archive</div></div>`
         });
       }
+    });
+
+    // The same images are reachable by keyboard; Enter/Space must do what a
+    // click does. Mouse behaviour is unchanged.
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+      const img = e.target?.closest?.('[data-lightbox]');
+      if (!img) return;
+      e.preventDefault();
+      this._openLightboxImage(img);
     });
   }
 

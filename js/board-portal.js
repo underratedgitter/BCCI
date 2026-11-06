@@ -22,7 +22,7 @@ const PIN_IN_TEXT = /[?&]pin=(\d{4})(?!\d)/;
 export function parseAttendQr(text) {
   const value = String(text || '');
   if (!ATTEND_IN_TEXT.test(value)) return null;
-  return { live: true, pin: PIN_IN_TEXT.exec(value)?.[1] || '' };
+  return { pin: PIN_IN_TEXT.exec(value)?.[1] || '' };
 }
 
 /** Server answers that mean "ask for the PIN (again)". */
@@ -56,18 +56,17 @@ const STATUS_CHIP = {
 };
 
 export class BoardPortal {
-  /** @param {{ root: HTMLElement, store: object, toast: (msg: string, type?: string) => void }} opts */
-  constructor({ root, store, toast }) {
+  /** @param {{ root: HTMLElement, store: object }} opts */
+  constructor({ root, store }) {
     this.root = root;
     this.store = store;
-    this.toast = toast;
     this.scanner = null;
     this.pendingAttend = null;
     this.email = '';
     this.busy = false;
   }
 
-  /** @param {{ attend?: { live: boolean, pin: string } | null }} opts */
+  /** @param {{ attend?: { pin: string } | null }} opts */
   async mount({ attend = null } = {}) {
     this.pendingAttend = attend;
     if (this.store.getBoardSession()) await this.showSignedIn();
@@ -437,7 +436,7 @@ export class BoardPortal {
     this.pinBox.replaceChildren(this.pinForm((pin) => {
       this.pinBox.hidden = true;
       this.pinBox.replaceChildren();
-      this.attend({ live: true, pin });
+      this.attend({ pin });
     }, notice));
     this.pinBox.querySelector('input')?.focus();
   }
@@ -467,7 +466,7 @@ export class BoardPortal {
     } catch (err) {
       if (err.status === 401) {
         this.stopScan();
-        this.pendingAttend = { live: true, pin };
+        this.pendingAttend = { pin };
         this.showSignIn();
         return;
       }
@@ -491,6 +490,13 @@ export class BoardPortal {
       this.resultBox.replaceWith(result);
       this.resultBox = result;
     } catch (err) {
+      if (err.status === 401) {
+        // The session has ended (the store forgets it): a signed-in page would
+        // only be stale from here, so ask them to sign in again instead.
+        this.data = null;
+        this.showSignIn();
+        return;
+      }
       console.warn('[BoardPortal] could not refresh history:', err.message);
     }
   }

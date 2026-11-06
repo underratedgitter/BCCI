@@ -21,15 +21,6 @@ export const redis = new Redis({
 
 export { KEYS, withRetry };
 
-/** Redis is reachable and responding. Used by /api/health. */
-export async function ping() {
-  const probe = `bcci:health:${Date.now()}`;
-  await redis.set(probe, '1', { ex: 10 });
-  const v = await redis.get(probe);
-  await redis.del(probe).catch(() => {});
-  return v === '1' || v === 1;
-}
-
 // ── Status normalisation ───────────────────────────────────────────
 // Historic rows were written as 'pending' (lowercase) while every reader
 // compares against 'Pending'. Everything funnels through here so the two can
@@ -60,15 +51,32 @@ function timeOf(record) {
 
 // ── One-time migration from the legacy single-blob layout ──────────
 
+// A cold start's migration is a handful of writes, so a couple of seconds is
+// ample; the wait is bounded so a request can never spin on it.
+const MIGRATION_POLL_MS = 50;
+const MIGRATION_POLLS = 40;
+const MIGRATION_CLAIM_TTL_SECONDS = 300;
+
+/**
+ * Waits for a concurrent cold start's migration to finish.
+ * Returns true when this caller took the claim over (the other one released it,
+ * e.g. after a failure, or its lease ran out) and must run the migration
+ * itself; false when the migration is done. Throws a retryable 503 when neither
+ * happens within the bounded wait, so a request never spins forever.
+ */
 async function waitForMigration(markerKey) {
-  // A concurrent cold start holds the claim; wait for it to finish rather than
-  // serving an empty list.
-  for (let i = 0; i < 40; i++) {
-    await new Promise((r) => setTimeout(r, 50));
+  for (let i = 0; i < MIGRATION_POLLS; i++) {
+    await new Promise((r) => setTimeout(r, MIGRATION_POLL_MS));
     const status = await redis.get(markerKey);
-    if (status === 'done' || !status) return;
+    if (status === 'done') return false;
+    // No claim at all means the migration is unfinished (the other cold start
+    // released it or crashed): take it over rather than serve a list as if it
+    // were complete.
+    if (!status && (await redis.set(markerKey, 'running', { nx: true, ex: MIGRATION_CLAIM_TTL_SECONDS }))) {
+      return true;
+    }
   }
-  // Still running after 2 s: answering now would show an empty or partial
+  // Still running after the wait: answering now would show an empty or partial
   // list as if it were the whole one. withRetry tries again; then the caller
   // gets a 503 and can retry.
   throw Object.assign(new Error('Records are being upgraded. Please try again in a moment.'), { statusCode: 503 });
@@ -78,17 +86,14 @@ async function migrateLegacy({ legacyKey, indexKey, recordKey, emailKey, marker 
   const markerKey = KEYS.migrated(marker);
   const status = await redis.get(markerKey);
   if (status === 'done') return;
-  if (status) {
-    // Another cold start is mid-migration ('running').
-    await waitForMigration(markerKey);
-    return;
-  }
 
   // Claim the migration so two concurrent cold starts don't both run it.
-  const claimed = await redis.set(markerKey, 'running', { nx: true, ex: 300 });
+  let claimed = !status && (await redis.set(markerKey, 'running', { nx: true, ex: MIGRATION_CLAIM_TTL_SECONDS }));
   if (!claimed) {
-    await waitForMigration(markerKey);
-    return;
+    // Another cold start holds the claim ('running'), or it was released before
+    // finishing: wait for it, taking the claim over if it is released.
+    claimed = await waitForMigration(markerKey);
+    if (!claimed) return;
   }
 
   try {
@@ -99,7 +104,10 @@ async function migrateLegacy({ legacyKey, indexKey, recordKey, emailKey, marker 
         if (!record?.id) continue;
         // Never overwrite: a record already under its own key is newer than
         // the legacy copy (this runs again if the marker is ever deleted).
-        if (!(await redis.set(recordKey(record.id), record, { nx: true }))) continue;
+        await redis.set(recordKey(record.id), record, { nx: true });
+        // The index entry and the email lookup are idempotent, so they are
+        // written even when the record already existed: a marker deleted
+        // mid-migration must still end with a complete index.
         await redis.zadd(indexKey, { score: timeOf(record), member: record.id });
         // Nor take an email over from an application filed since.
         if (emailKey && record.email) {
@@ -229,25 +237,54 @@ export async function getApplicationByEmail(email) {
   });
 }
 
+// ── The email lookup index ─────────────────────────────────────────
+// bcci:app_email:<address> holds the id of the one application filed under that
+// address. It is claimed with NX and never taken from a record that exists.
+
+/**
+ * Points the email lookup key for `email` at `id`, atomically.
+ * Returns { ok: true, created } when the key now belongs to `id` — `created` is
+ * true only when this call is what put it there, the one case a caller may
+ * delete it again — and { ok: false, holder } when another application holds it
+ * (`holder` is null when it could not be read: momentarily contended).
+ */
+async function claimEmailIndex(email, id) {
+  const key = KEYS.appByEmail(email);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (await redis.set(key, id, { nx: true })) return { ok: true, created: true };
+    const holder = await redis.get(key);
+    // Released between the two calls: try the claim again.
+    if (holder == null) continue;
+    // Ours already, e.g. when withRetry re-runs after a slow first attempt.
+    if (String(holder) === String(id)) return { ok: true, created: false };
+    // Another id holds the key. That is only a stale claim — a crash between
+    // the claim and the record write — when its record was never written.
+    if (await redis.exists(KEYS.app(String(holder)))) return { ok: false, holder: String(holder) };
+    // Withdraw the stale claim, but only while it still holds that same id.
+    if (String((await redis.get(key)) ?? '') === String(holder)) await redis.del(key);
+  }
+  // Still contended after several tries and the holder is gone each time: the
+  // address is free but not for us yet. null tells the caller to say so.
+  const holder = await redis.get(key);
+  return { ok: false, holder: holder == null ? null : String(holder) };
+}
+
 export async function putApplication(app) {
   const record = normalizeApplication(app);
   return withRetry(async () => {
+    // Claimed before anything is written, and atomically: two filings for the
+    // same address can never both believe they own it.
+    let emailIndexCreated = false;
     if (record.email) {
-      const emailKey = KEYS.appByEmail(record.email);
-      const claimed = await redis.set(emailKey, record.id, { nx: true });
-      if (!claimed) {
-        const existingId = await redis.get(emailKey);
-        // The claim is ours when withRetry re-runs after a slow first attempt,
-        // and stale when a crash landed between the claim and the record write.
-        // Either way the email is free; anything else is a genuine duplicate.
-        const holderExists = existingId && existingId !== record.id && (await redis.exists(KEYS.app(existingId)));
-        if (holderExists) {
-          const err = new Error(`An application for this email already exists (${existingId}).`);
-          err.statusCode = 409;
-          throw err;
-        }
-        await redis.set(emailKey, record.id);
+      const claim = await claimEmailIndex(record.email, record.id);
+      if (!claim.ok) {
+        const err = new Error(claim.holder
+          ? `An application for this email already exists (${claim.holder}).`
+          : 'This email address is being claimed by another submission. Please try again in a moment.');
+        err.statusCode = 409;
+        throw err;
       }
+      emailIndexCreated = claim.created;
     }
     try {
       // One transaction, so the list summary can never disagree with the record.
@@ -258,11 +295,37 @@ export async function putApplication(app) {
         .zadd(KEYS.appIndex, { score: timeOf(record), member: record.id })
         .exec();
     } catch (err) {
-      if (record.email) await redis.del(KEYS.appByEmail(record.email)).catch(() => {});
+      // Withdraw only the lookup this call created for this record: another
+      // application's claim, or a key merely found pointing here, must survive.
+      if (emailIndexCreated) await redis.del(KEYS.appByEmail(record.email)).catch(() => {});
       throw err;
     }
     return record;
   });
+}
+
+/**
+ * Keeps the email lookup index in step after an edit. Best effort: the record
+ * is the source of truth and has already been committed, so a lookup that
+ * cannot be updated is reported, never turned into a failed edit.
+ */
+async function syncApplicationEmailIndex(id, current, next) {
+  const oldEmail = String(current?.email || '').trim();
+  const newEmail = String(next?.email || '').trim();
+  if (newEmail) {
+    const claim = await claimEmailIndex(newEmail, id);
+    // Another application still uses this address: keep the old lookup rather
+    // than leave this record unreachable by email.
+    if (!claim.ok) {
+      console.warn(`[Applications] ${id}: the email lookup for ${newEmail} is held by ${claim.holder || 'another submission'}; keeping ${oldEmail || 'its previous one'}`);
+      return;
+    }
+  }
+  if (oldEmail && oldEmail.toLowerCase() !== newEmail.toLowerCase()) {
+    const oldKey = KEYS.appByEmail(oldEmail);
+    // Only drop the old address while it still points at this record.
+    if (String((await redis.get(oldKey)) ?? '') === String(id)) await redis.del(oldKey);
+  }
 }
 
 /**
@@ -298,8 +361,13 @@ export async function updateApplication(id, mutate, notificationFor = null) {
       // without a usable date keep their slot rather than jumping to the top.
       const submitted = Date.parse(next.submittedAt || '');
       if (Number.isFinite(submitted)) ops.push(['zadd', KEYS.appIndex, submitted, id]);
-      if (next.email) ops.push(['set', KEYS.appByEmail(next.email), next.id]);
       await fencedWrite(lockName, lock, ops);
+      // The email lookup follows the record it points at, so it is written after
+      // the commit: it is claimed with NX (never taken from another application)
+      // and the old address is dropped when the email changed.
+      await syncApplicationEmailIndex(id, current, next).catch((err) => {
+        console.warn(`[Applications] ${id}: the email lookup was not updated:`, err?.message || err);
+      });
       return next;
     } finally {
       await releaseLock(lockName, lock);
@@ -385,10 +453,6 @@ export async function listEvents({ limit = 100, offset = 0 } = {}) {
   });
 }
 
-export async function countEvents() {
-  return (await redis.zcard(KEYS.eventIndex)) || 0;
-}
-
 export async function deleteEvent(id) {
   if (!id) return false;
   return withRetry(async () => {
@@ -424,26 +488,67 @@ export async function listCustomPlans() {
   });
 }
 
-/** Stores a new plan; false when a plan with the same id already exists. */
-export async function insertCustomPlan(plan) {
+// Serializes plan adds, so the cap below is checked against a count nobody can
+// change until this insert has finished.
+const PLAN_LOCK = 'membership-plans';
+
+/**
+ * Stores a new plan together with its index entry.
+ * Returns { ok: true } when it was written, { ok: false, reason: 'duplicate' }
+ * when the id is taken, and { ok: false, reason: 'limit' } when `max` plans
+ * already exist. The cap and the write happen under one lock, so two admins
+ * adding a tier at the same moment cannot overshoot it.
+ */
+export async function insertCustomPlan(plan, { max = Infinity } = {}) {
   if (!plan || !plan.id) throw new Error('Membership plan must have an ID');
   return withRetry(async () => {
-    // NX makes the id (a slug of the name) the uniqueness guarantee, so two
-    // admins adding the same tier at once cannot both succeed.
-    const created = await redis.set(KEYS.plan(plan.id), plan, { nx: true });
-    if (!created) return false;
-    await redis.zadd(KEYS.planIndex, { score: Date.parse(plan.createdAt) || Date.now(), member: plan.id });
-    return true;
+    const lock = await acquireLock(PLAN_LOCK);
+    if (!lock) {
+      throw Object.assign(new Error('Membership types are being updated. Please try again in a moment.'), { statusCode: 409 });
+    }
+    try {
+      // NX makes the id (a slug of the name) the uniqueness guarantee, so two
+      // admins adding the same tier at once cannot both succeed.
+      const created = await redis.set(KEYS.plan(plan.id), plan, { nx: true });
+      if (!created) {
+        // A retried attempt whose first write landed is this same plan, not a clash.
+        const stored = await redis.get(KEYS.plan(plan.id));
+        return stored && stored.createdAt === plan.createdAt ? { ok: true } : { ok: false, reason: 'duplicate' };
+      }
+      // Under the same lock the claim above was taken with, so the count cannot
+      // change between the check and the write: the cap is exact.
+      if (Number.isFinite(max) && (await redis.zcard(KEYS.planIndex)) >= max) {
+        await redis.del(KEYS.plan(plan.id)).catch(() => {});
+        return { ok: false, reason: 'limit' };
+      }
+      try {
+        // The plan and its index entry commit together, so a plan can never be
+        // stored without appearing in the list (or the other way round).
+        await redis
+          .multi()
+          .set(KEYS.plan(plan.id), plan)
+          .zadd(KEYS.planIndex, { score: Date.parse(plan.createdAt) || Date.now(), member: plan.id })
+          .exec();
+      } catch (err) {
+        // Leave neither half behind, so the next attempt starts clean.
+        await redis.del(KEYS.plan(plan.id)).catch(() => {});
+        throw err;
+      }
+      return { ok: true };
+    } finally {
+      await releaseLock(PLAN_LOCK, lock);
+    }
   });
 }
 
-/** Removes a plan; false when it did not exist. */
+/** Removes a plan and its index entry together; false when it did not exist. */
 export async function deleteCustomPlan(id) {
   if (!id) return false;
   return withRetry(async () => {
-    const removed = await redis.del(KEYS.plan(id));
-    await redis.zrem(KEYS.planIndex, id);
-    return removed > 0;
+    // Both halves go in one transaction, so no listing can keep serving a plan
+    // whose record is gone.
+    const [removed] = await redis.multi().del(KEYS.plan(id)).zrem(KEYS.planIndex, id).exec();
+    return Number(removed) > 0;
   });
 }
 

@@ -21,6 +21,9 @@
 .bcci-membership-card {
   position: relative;
   width: 100%;
+  /* Plain fallback first: cqw is unsupported in older Safari/Chrome, and a
+     dropped clamp() left the card with the inherited 16px root size. */
+  font-size: 11px;
   font-size: clamp(7.5px, 2.62cqw, 11px);
   aspect-ratio: 1.586 / 1;
   background: linear-gradient(145deg, #0c1829 0%, #162a48 40%, #0e1d35 100%);

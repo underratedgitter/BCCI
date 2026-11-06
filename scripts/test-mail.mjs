@@ -13,6 +13,12 @@
 import { verifyTransport, sendEmail, TEMPLATES, resolveSmtpConfig } from '../api/_lib/email.js';
 
 const recipient = process.argv[2];
+// Checked before anything is configured, connected to or sent.
+if (recipient !== undefined && !/^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(recipient)) {
+  console.error(`\n  Not a usable email address: ${JSON.stringify(recipient)}`);
+  console.error('  Usage: node --env-file-if-exists=.env.local scripts/test-mail.mjs [you@example.com]\n');
+  process.exit(1);
+}
 
 const mask = (v) => (v ? v.slice(0, 2) + '•'.repeat(Math.max(4, v.length - 2)) : '(not set)');
 const show = (label, value, note = '') =>
@@ -38,7 +44,7 @@ show('From header', from);
 if (user) {
   const fromAddress = ((from.match(/<([^>]+)>/) || [])[1] || from).trim().toLowerCase();
   const account = user.trim().toLowerCase();
-  const isGoogle = /(^|\.)gmail\.com$|(^|\.)googlemail\.com$/.test(host) || host === 'smtp.gmail.com';
+  const isGoogle = /(^|\.)gmail\.com$|(^|\.)googlemail\.com$/.test(host);
 
   if (fromAddress !== account) {
     const sameDomain = fromAddress.split('@')[1] === account.split('@')[1];

@@ -78,11 +78,64 @@ const RECOMMENDED = [
 ];
 
 /**
+ * The REST endpoint the Upstash client calls. A typo — a missing scheme, a URL
+ * copied with a path — would otherwise surface only as failing requests.
+ * Returns a problem worth reporting, or null when the value is usable.
+ */
+function redisUrlProblem(value) {
+  let url;
+  try {
+    url = new URL(String(value).trim());
+  } catch {
+    return `UPSTASH_REDIS_REST_URL is not a URL ("${value}"). Use the REST URL from the Upstash console, e.g. https://your-instance.upstash.io.`;
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    return `UPSTASH_REDIS_REST_URL must start with https:// ("${value}" does not).`;
+  }
+  if (!url.hostname) {
+    return `UPSTASH_REDIS_REST_URL has no host ("${value}"). Use the REST URL from the Upstash console, e.g. https://your-instance.upstash.io.`;
+  }
+  return null;
+}
+
+/**
+ * ALLOWED_ORIGIN is compared character for character with the browser's Origin
+ * header, which is a bare origin — scheme, host and port only. A path, a query
+ * or a trailing slash there matches nothing, so each entry is checked and the
+ * corrected form is suggested.
+ */
+function allowedOriginProblems(value) {
+  const problems = [];
+  for (const entry of String(value).split(',').map((o) => o.trim())) {
+    if (!entry) continue;
+    if (entry === '*' || entry.startsWith('*.')) {
+      problems.push(`ALLOWED_ORIGIN entry "${entry}" is a wildcard — list the origins themselves, e.g. https://bccibharuch.in.`);
+      continue;
+    }
+    let url;
+    try {
+      url = new URL(entry);
+    } catch {
+      problems.push(`ALLOWED_ORIGIN entry "${entry}" is not a URL — use a bare origin such as https://bccibharuch.in.`);
+      continue;
+    }
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+      problems.push(`ALLOWED_ORIGIN entry "${entry}" must be an http(s) origin, e.g. https://bccibharuch.in.`);
+      continue;
+    }
+    if (url.origin !== entry) {
+      problems.push(`ALLOWED_ORIGIN entry "${entry}" must be a bare origin with no path, query or trailing slash — use "${url.origin}".`);
+    }
+  }
+  return problems;
+}
+
+/**
  * Reports configuration problems at startup instead of letting them surface
  * later as a form that silently fails.
  * @returns {{ok: boolean, errors: string[], warnings: string[]}}
  */
-export function checkConfig(env = process.env) {
+function checkConfig(env = process.env) {
   const errors = [];
   const warnings = [];
 
@@ -96,6 +149,13 @@ export function checkConfig(env = process.env) {
       : undefined;
     if (!env[key] && !fallback) warnings.push(`${key} is not set — ${why}.`);
   }
+
+  if (env.UPSTASH_REDIS_REST_URL) {
+    const problem = redisUrlProblem(env.UPSTASH_REDIS_REST_URL);
+    if (problem) errors.push(problem);
+  }
+  // A misspelt origin breaks CORS silently, so it is reported before it can.
+  if (env.ALLOWED_ORIGIN) errors.push(...allowedOriginProblems(env.ALLOWED_ORIGIN));
 
   if (env.ADMIN_PASSWORD && env.ADMIN_PASSWORD.length < 12) {
     warnings.push('ADMIN_PASSWORD is shorter than 12 characters — use a long random secret.');

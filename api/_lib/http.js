@@ -141,8 +141,8 @@ export function clientIp(req) {
 
 /**
  * Fixed-window limiter. Returns { ok, retryAfter }.
- * The TTL is set only when the counter is created, so repeated attempts can
- * never extend their own window.
+ * The TTL is set only when the counter has no window of its own, so neither a
+ * repeated attempt nor a refunded one can extend (slide) the window.
  */
 export async function rateLimit(key, { max, windowSec }) {
   const k = `bcci:rl:${key}`;
@@ -150,7 +150,11 @@ export async function rateLimit(key, { max, windowSec }) {
   // but answered slowly would count a single request twice.
   const count = await withRetry(() => kv.incr(k), 1);
   if (count === 1) {
-    await withRetry(() => kv.expire(k, windowSec)).catch(() => {});
+    // The TTL belongs to the window, not to the first request: a counter that a
+    // refund took back to 0 keeps its original deadline, so counting back up to
+    // 1 must not restart (slide) the window.
+    const ttl = await withRetry(() => kv.ttl(k), 1).catch(() => -1);
+    if (ttl < 0) await withRetry(() => kv.expire(k, windowSec)).catch(() => {});
     return { ok: true, remaining: max - 1 };
   }
   if (count > max) {
@@ -173,8 +177,15 @@ export async function rateLimit(key, { max, windowSec }) {
  * Best effort — a failed refund only leaves the stricter count in place.
  */
 export async function refundRateLimit(key) {
+  const k = `bcci:rl:${key}`;
   try {
-    await withRetry(() => kv.decr(`bcci:rl:${key}`), 1);
+    const left = await withRetry(() => kv.decr(k), 1);
+    // DECR creates the key when the request it refunds was never counted (or its
+    // window already ended), and such a key has no TTL of its own: leaving it
+    // would hold the key below zero forever. At zero or below it goes.
+    if (Number(left) <= 0 && (await withRetry(() => kv.ttl(k), 1).catch(() => -2)) < 0) {
+      await withRetry(() => kv.del(k), 1).catch(() => {});
+    }
   } catch (err) {
     console.warn(`[rateLimit] refund failed for ${key}:`, err?.message || err);
   }
@@ -241,15 +252,16 @@ export function cleanPhone(value) {
 /**
  * Wraps a handler so an unexpected throw becomes a clean 500 with a
  * correlation id in the logs, rather than a raw stack trace to the client.
- * An error carrying a 4xx `statusCode` (e.g. the storage layer's 409 for a
- * duplicate application) is a deliberate refusal: its message goes back as is.
+ * An error carrying a 4xx status is a deliberate refusal: its message goes back
+ * as is. `statusCode` is the storage layer's spelling (a duplicate application);
+ * `status` is what BoardError and PlanError carry.
  */
 export function withErrorHandling(name, handler) {
   return async (req, res) => {
     try {
       return await handler(req, res);
     } catch (err) {
-      const status = Number(err?.statusCode);
+      const status = Number(err?.statusCode ?? err?.status);
       if (Number.isInteger(status) && status >= 400 && status < 500 && !res.headersSent) {
         return res.status(status).json({ success: false, error: err.message });
       }

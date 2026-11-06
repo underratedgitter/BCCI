@@ -30,6 +30,10 @@ function check(name, cond, detail = '') {
 }
 
 const consoleErrors = [];
+/** Errors recorded since `mark` — one step's worth, not the whole run's. */
+function errorsSince(mark) {
+  return consoleErrors.slice(mark);
+}
 function watch(page, tag) {
   page.on('console', (m) => {
     if (m.type() === 'error') consoleErrors.push(`[${tag}] ${m.text().slice(0, 200)}`);
@@ -252,6 +256,7 @@ const memberStatus = await member.content();
 check('approved member sees Active status', memberStatus.includes('Active Member'), memberStatus.slice(0, 200));
 
 // Enquiry from the browser.
+const enquiryMark = consoleErrors.length;
 await member.goto(BASE + '/enquiry', { waitUntil: 'networkidle' });
 await member.fill('#enquiryName', 'Site Enquirer');
 await member.fill('#enquiryPhone', '9825012348');
@@ -259,10 +264,16 @@ await member.fill('#enquiryEmail', `enq-${stamp}@example.com`);
 await member.fill('#enquirySubject', 'Browser test enquiry');
 await member.fill('#enquiryMessage', 'Hello from the full-site browser test, please ignore.');
 await member.locator('#enquiryForm button[type="submit"]').click();
-await new Promise((r) => setTimeout(r, 2500));
-check('enquiry submits', consoleErrors.length === 0);
+// The portal answers a stored enquiry with a "Thank You for Contacting BCCI"
+// modal; its absence means the submit failed even if nothing logged an error.
+await member.waitForSelector('text=Thank You for Contacting BCCI', { timeout: 15000 }).catch(() => {});
+const enquiryThanks = await member.locator('text=Thank You for Contacting BCCI').isVisible().catch(() => false);
+check('enquiry submits and shows the confirmation', enquiryThanks);
+check('enquiry step raised no console errors', errorsSince(enquiryMark).length === 0, errorsSince(enquiryMark).slice(0, 3).join(' | '));
+await member.click('#modalCloseBtn').catch(() => {});
 
 // Events: broadcast → public register.
+const broadcastMark = consoleErrors.length;
 await admin.goto(BASE + '/admin-bcci', { waitUntil: 'networkidle' });
 await admin.locator('[data-tab="events"]').click().catch(() => {});
 await new Promise((r) => setTimeout(r, 1000));
@@ -274,6 +285,9 @@ await admin.fill('#eventCapacityInput', '50');
 await admin.fill('#eventDescInput', 'End-to-end browser test event.');
 await admin.locator('#tab-events button[type="submit"], #tab-events .btn-primary').first().click().catch(() => {});
 await new Promise((r) => setTimeout(r, 2500));
+check('broadcast step raised no console errors', errorsSince(broadcastMark).length === 0, errorsSince(broadcastMark).slice(0, 3).join(' | '));
+
+const registerMark = consoleErrors.length;
 await member.goto(BASE + '/events', { waitUntil: 'networkidle' });
 await new Promise((r) => setTimeout(r, 1500));
 const eventsText = await member.locator('#eventsGrid').innerText().catch(() => '');
@@ -283,15 +297,30 @@ await member.fill('#joinNameInput', 'Event Guest').catch(() => {});
 await member.fill('#joinEmailInput', `guest-${stamp}@example.com`).catch(() => {});
 await member.fill('#joinPhoneInput', '9825012349').catch(() => {});
 await member.locator('#joinEventForm button[type="submit"]').click().catch(() => {});
-await new Promise((r) => setTimeout(r, 2500));
-check('public event registration works', consoleErrors.length === 0);
+// A successful registration opens the admission pass (or the pending-payment
+// notice for a paid event). Assert that, rather than "no console errors".
+await member.waitForFunction(
+  () => /Registration (Confirmed|Received|Pending)/i.test(document.getElementById('modalContainer')?.innerText || ''),
+  null,
+  { timeout: 20000 }
+).catch(() => {});
+const ticketText = await member.locator('#modalContainer').innerText().catch(() => '');
+check(
+  'public event registration confirms with a pass',
+  /Registration (Confirmed|Received|Pending)/i.test(ticketText) && ticketText.includes('Event Guest'),
+  ticketText.slice(0, 150)
+);
+check('event registration step raised no console errors', errorsSince(registerMark).length === 0, errorsSince(registerMark).slice(0, 3).join(' | '));
+await member.click('#modalCloseBtn').catch(() => {});
 
 // Verification + card pages for the approved member.
+const verifyMark = consoleErrors.length;
 await member.goto(`${BASE}/verify/${refId}`, { waitUntil: 'networkidle' });
 await new Promise((r) => setTimeout(r, 2000));
 check('public verify page resolves member', (await member.content()).includes('SiteTest Co'));
 await member.goto(BASE + '/card', { waitUntil: 'networkidle' });
 check('card page renders', (await member.content()).includes('Membership Card'));
+check('verification/card steps raised no console errors', errorsSince(verifyMark).length === 0, errorsSince(verifyMark).slice(0, 3).join(' | '));
 
 console.log('\nMobile viewport (390px)');
 console.log('───────────────────────');

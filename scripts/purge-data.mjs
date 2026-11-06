@@ -7,8 +7,9 @@
  *   node --env-file=.env.local scripts/purge-data.mjs --confirm --all
  *
  * Default scope is member data: applications, enquiries, the indexes that
- * point at them, and the legacy blobs. `--all` additionally clears sessions,
- * pending OTPs, rate-limit counters, the email log and the reminder ledger.
+ * point at them, queued outbox email and the legacy blobs. `--all` additionally
+ * clears sessions, pending OTPs, rate-limit counters, the email log and the
+ * reminder ledger.
  *
  * A dry run is the default on purpose — it prints exactly what would go, and
  * nothing is deleted until you pass --confirm.
@@ -44,6 +45,10 @@ const MEMBER_DATA = [
   ['bcci:board:name_pass:*', 'mark-by-name passes'],
   ['bcci:board:device:*', 'one-mark-per-phone records'],
   ['bcci:board:seq:*', 'board id counters'],
+  // Queued decision emails carry the member's own details, so they go with the
+  // member data — a purge must not leave them behind to be delivered later.
+  ['bcci:email_outbox', 'pending email outbox index'],
+  ['bcci:email_outbox:*', 'pending email outbox entries'],
   ['bcci:applications', 'legacy applications blob'],
   ['bcci:enquiries', 'legacy enquiries blob'],
   ['bcci:migrated:*', 'migration markers'],
@@ -82,8 +87,23 @@ async function keysMatching(pattern) {
 
 const groups = all ? [...MEMBER_DATA, ...OPERATIONAL] : MEMBER_DATA;
 
+/**
+ * The Redis host these keys live in, so an operator can see which database a
+ * purge would hit before it hits it. Only the host is printed — never the token.
+ */
+function redisTarget() {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  if (!url) return '(UPSTASH_REDIS_REST_URL is not set)';
+  try {
+    return new URL(url).host || '(URL has no host)';
+  } catch {
+    return '(UPSTASH_REDIS_REST_URL is not a valid URL)';
+  }
+}
+
 console.log(`\nRedis purge — ${confirm ? 'LIVE' : 'DRY RUN'}`);
 console.log('─'.repeat(34));
+console.log(`  target: ${redisTarget()}`);
 console.log(`  scope: ${all ? 'member data + operational keys' : 'member data only'}`);
 if (!confirm) console.log('  nothing will be deleted without --confirm');
 console.log('');

@@ -26,7 +26,7 @@ const ATTEND_CHIP = {
 };
 
 const chip = ([className, text]) => el('span', { className, text });
-const button = (text, className = 'btn-secondary', attrs = {}) => el('button', { type: 'button', className: `${className} board-btn`, text, ...attrs });
+const button = (text, className = 'btn-secondary') => el('button', { type: 'button', className: `${className} board-btn`, text });
 
 function field(id, label, input, hint) {
   return el('div', { className: 'form-group' },
@@ -37,7 +37,7 @@ function field(id, label, input, hint) {
 
 export class BoardAdmin {
   /**
-   * @param {{ root: HTMLElement, store: object, ui: { toast: Function, showModal: Function, closeModal: Function } }} opts
+   * @param {{ root: HTMLElement, store: object, ui: { toast: Function, showModal: Function, closeModal: Function, onUnauthorized?: Function } }} opts
    */
   constructor({ root, store, ui }) {
     this.root = root;
@@ -47,10 +47,41 @@ export class BoardAdmin {
     this.websiteRoster = [];
     this.meetings = [];
     this.projector = null;
+    this.unauthorizedNotified = false;
   }
 
   api(action, { method = 'GET', body, query = '' } = {}) {
     return this.store.apiCall(`/api/board?action=${action}${query}`, { method, body, auth: 'admin' });
+  }
+
+  /**
+   * Tell the host app that the admin session has ended, at most once per
+   * lapse. Without the callback, say so in plain words ourselves; the API's
+   * bare "Unauthorized" is never shown to anyone.
+   */
+  notifyUnauthorized() {
+    if (this.unauthorizedNotified) return;
+    this.unauthorizedNotified = true;
+    if (this.ui.onUnauthorized) this.ui.onUnauthorized();
+    else this.ui.toast('Your admin session has ended. Sign in again to continue.', 'error');
+  }
+
+  /**
+   * True for a 401, which every caller handles the same way: hand it to
+   * onUnauthorized (the host app owns the sign-in) instead of toasting the
+   * API's bare "Unauthorized". Anything else returns false and is shown as before.
+   */
+  handleUnauthorized(err) {
+    if (err?.status !== 401) return false;
+    this.notifyUnauthorized();
+    return true;
+  }
+
+  /** Leaving the tab: stop the projector's polling and release its wake lock. */
+  destroy() {
+    const projector = this.projector;
+    this.projector = null;
+    projector?.stop({ notify: false });
   }
 
   async mount() {
@@ -93,9 +124,11 @@ export class BoardAdmin {
       this.websiteRoster = m.websiteRoster || [];
       this.meetings = mt.meetings || [];
     } catch (err) {
+      if (this.handleUnauthorized(err)) return;
       this.ui.toast(err.message || 'Could not load the board.', 'error');
       return;
     }
+    this.unauthorizedNotified = false;
     this.renderMembers();
     this.renderMeetings();
   }
@@ -141,7 +174,7 @@ export class BoardAdmin {
         }
         await onSaved(result.member);
       } catch (err) {
-        this.ui.toast(err.message || 'The profile could not be saved.', 'error');
+        if (!this.handleUnauthorized(err)) this.ui.toast(err.message || 'The profile could not be saved.', 'error');
       } finally {
         submit.disabled = false;
       }
@@ -250,7 +283,7 @@ export class BoardAdmin {
         if (!meeting) form.reset();
         await onSaved(result.meeting);
       } catch (err) {
-        this.ui.toast(err.message || 'The meeting could not be saved.', 'error');
+        if (!this.handleUnauthorized(err)) this.ui.toast(err.message || 'The meeting could not be saved.', 'error');
       } finally {
         submit.disabled = false;
       }
@@ -274,7 +307,9 @@ export class BoardAdmin {
             await this.refresh();
             this.openProjector(m.id);
           } catch (err) {
-            this.ui.toast(err.message, 'error');
+            if (!this.handleUnauthorized(err)) this.ui.toast(err.message, 'error');
+          } finally {
+            // A refresh that failed after a successful open must not leave the button dead.
             open.disabled = false;
           }
         });
@@ -334,7 +369,7 @@ export class BoardAdmin {
     try {
       detail = await this.api('meeting', { query: `&id=${encodeURIComponent(meetingId)}` });
     } catch (err) {
-      this.ui.toast(err.message, 'error');
+      if (!this.handleUnauthorized(err)) this.ui.toast(err.message, 'error');
       return;
     }
     const { meeting, rows, counts } = detail;
@@ -352,7 +387,8 @@ export class BoardAdmin {
       const actionsCell = el('td', {});
       const showButtons = () => {
         if (meeting.status !== 'open') {
-          actionsCell.replaceChildren(el('small', { className: 'board-cell-sub', text: meeting.status === 'closed' ? 'Reopen to change' : 'Open attendance first' }));
+          // Only a closed meeting reaches here: scheduled ones never show the Attendance action.
+          actionsCell.replaceChildren(el('small', { className: 'board-cell-sub', text: 'Reopen to change' }));
           return;
         }
         const actions = el('div', { className: 'board-actions' });
@@ -380,7 +416,7 @@ export class BoardAdmin {
             this.ui.toast(`${r.name} marked ${ATTEND_CHIP[status][1].toLowerCase()}.`, 'success');
             await reload();
           } catch (err) {
-            this.ui.toast(err.message, 'error');
+            if (!this.handleUnauthorized(err)) this.ui.toast(err.message, 'error');
             save.disabled = false;
           }
         });
@@ -418,7 +454,7 @@ export class BoardAdmin {
       const name = await this.store.downloadFile('/api/board?action=register', { fallbackName: 'BCCI_Board_Attendance_Register.xlsx' });
       this.ui.toast(`Downloaded ${name}.`, 'success');
     } catch (err) {
-      this.ui.toast(err.message || 'The register could not be downloaded.', 'error');
+      if (!this.handleUnauthorized(err)) this.ui.toast(err.message || 'The register could not be downloaded.', 'error');
     } finally {
       btn.disabled = false;
     }
@@ -430,6 +466,7 @@ export class BoardAdmin {
       api: (a, o) => this.api(a, o),
       meetingId,
       onPrintSticker: () => this.printQrSticker(),
+      onUnauthorized: () => this.notifyUnauthorized(),
       onExit: () => {
         this.projector = null;
         this.refresh();
@@ -498,7 +535,9 @@ export class BoardAdmin {
       this.ui.toast(successMessage, 'success');
       await this.refresh();
     } catch (err) {
-      this.ui.toast(err.message || 'That did not work.', 'error');
+      if (!this.handleUnauthorized(err)) this.ui.toast(err.message || 'That did not work.', 'error');
+    } finally {
+      // The action may have worked and only the follow-up refresh failed.
       btn.disabled = false;
     }
   }
@@ -511,11 +550,12 @@ export class BoardAdmin {
  * it is up.
  */
 class Projector {
-  constructor({ api, meetingId, onPrintSticker, onExit }) {
+  constructor({ api, meetingId, onPrintSticker, onExit, onUnauthorized }) {
     this.api = api;
     this.meetingId = meetingId;
     this.onPrintSticker = onPrintSticker;
     this.onExit = onExit;
+    this.onUnauthorized = onUnauthorized;
     this.qrDrawn = false;
     this.closed = false;
     this.timer = null;
@@ -524,6 +564,8 @@ class Projector {
     this.onVisibility = () => {
       if (document.visibilityState === 'visible' && !this.stopped) this.keepAwake();
     };
+    // A tab going away (navigation, close, bfcache) keeps no timer and no wake lock.
+    this.onPageHide = () => this.stop({ notify: false });
   }
 
   start() {
@@ -562,32 +604,60 @@ class Projector {
     document.body.append(this.overlay);
     document.body.classList.add('modal-open');
     document.addEventListener('visibilitychange', this.onVisibility);
+    window.addEventListener('pagehide', this.onPageHide);
     this.keepAwake();
     this.poll();
   }
 
+  /**
+   * Hold a screen wake lock while the overlay is up. Only one is kept: a
+   * second request supersedes (and releases) the first, and a sentinel that
+   * arrives after stop() is released at once rather than pinning the screen
+   * awake for a projector that has already gone.
+   */
   async keepAwake() {
+    if (this.stopped) return;
+    const previous = this.wakeLock;
+    this.wakeLock = null;
+    previous?.release?.().catch(() => {});
     try {
-      this.wakeLock = await navigator.wakeLock?.request('screen');
+      const sentinel = await navigator.wakeLock?.request('screen');
+      if (this.stopped) {
+        sentinel?.release?.().catch(() => {});
+        return;
+      }
+      this.wakeLock = sentinel;
     } catch (err) {
       console.warn('[Projector] screen may sleep:', err.message);
     }
   }
 
+  /**
+   * A 401 means the admin session has ended: stop the poll timer (retrying
+   * cannot help) and let the host app ask for a fresh sign-in. True when the
+   * error was a 401 and has been handled.
+   */
+  handleUnauthorized(err) {
+    if (err?.status !== 401) return false;
+    clearTimeout(this.timer);
+    this.timer = null;
+    this.onUnauthorized?.();
+    return true;
+  }
+
   async poll() {
-    if (this.stopped) return;
+    if (this.stopped || this.closed) return;
     let data;
     try {
       data = await this.api('live', { query: `&id=${encodeURIComponent(this.meetingId)}` });
     } catch (err) {
       if (this.stopped || this.closed) return;
-      if (err.status === 409 || err.status === 404) {
-        this.showClosed(err.message);
+      if (this.handleUnauthorized(err)) {
+        this.showClosed('Your admin session has ended. Exit, sign in again and reopen the projector.');
         return;
       }
-      if (err.status === 401) {
-        // Retrying cannot help once the admin session has ended.
-        this.showClosed('Your admin session has ended. Exit, sign in again and reopen the projector.');
+      if (err.status === 409 || err.status === 404) {
+        this.showClosed(err.message);
         return;
       }
       this.banner.hidden = false;
@@ -657,6 +727,10 @@ class Projector {
       clearTimeout(this.timer);
       await this.poll();
     } catch (err) {
+      if (this.handleUnauthorized(err)) {
+        this.showClosed('Your admin session has ended. Exit, sign in again and reopen the projector.');
+        return;
+      }
       this.banner.hidden = false;
       this.banner.textContent = err.message;
     } finally {
@@ -672,6 +746,10 @@ class Projector {
       await this.api('meeting-close', { method: 'POST', body: { id: this.meetingId } });
       this.showClosed('Attendance is closed.');
     } catch (err) {
+      if (this.handleUnauthorized(err)) {
+        this.showClosed('Your admin session has ended. Exit, sign in again and reopen the projector.');
+        return;
+      }
       this.banner.hidden = false;
       this.banner.textContent = err.message;
       this.closeBtn.disabled = false;
@@ -689,15 +767,22 @@ class Projector {
     this.closeBtn.disabled = true;
   }
 
-  stop() {
+  /**
+   * Tear the overlay down. Notifying onExit refreshes the meetings list behind
+   * it — skipped when the tab is going away and there is nothing to refresh.
+   */
+  stop({ notify = true } = {}) {
     if (this.stopped) return;
     this.stopped = true;
     clearTimeout(this.timer);
+    this.timer = null;
+    window.removeEventListener('pagehide', this.onPageHide);
     document.removeEventListener('visibilitychange', this.onVisibility);
     this.wakeLock?.release?.().catch(() => {});
+    this.wakeLock = null;
     if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
     this.overlay?.remove();
     document.body.classList.remove('modal-open');
-    this.onExit?.();
+    if (notify) this.onExit?.();
   }
 }

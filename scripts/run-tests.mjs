@@ -10,6 +10,10 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
+// A suite that never finishes (a hung socket, a promise nobody settles) used to
+// hold the whole run open forever. It gets killed and counted as a failure.
+const SUITE_TIMEOUT_MS = 120000;
+
 const SUITES = [
   { name: 'email-outbox', file: 'tests/email-outbox.test.mjs' },
   { name: 'e2e', file: 'tests/e2e.test.mjs' },
@@ -43,16 +47,22 @@ for (const suite of SUITES) {
   const started = Date.now();
   const child = spawnSync(process.execPath, [suite.file], {
     cwd: ROOT,
-    env: { ...process.env, ...suite.env },
+    env: process.env,
     encoding: 'utf8',
     maxBuffer: 128 * 1024 * 1024,
+    timeout: SUITE_TIMEOUT_MS,
+    killSignal: 'SIGKILL',
   });
   const elapsed = `${Date.now() - started}ms`;
   const output = `${child.stdout || ''}${child.stderr || ''}`;
+  const timedOut = child.signal === 'SIGKILL' || child.error?.code === 'ETIMEDOUT';
 
   let status = 'PASS';
   let detail = tally(output);
-  if (child.error || child.status !== 0) {
+  if (timedOut) {
+    status = 'FAIL';
+    detail = `timeout ${Math.round(SUITE_TIMEOUT_MS / 1000)}s`;
+  } else if (child.error || child.status !== 0) {
     status = 'FAIL';
     detail = `exit ${child.status ?? 'error'}`;
   }

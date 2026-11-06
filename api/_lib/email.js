@@ -459,7 +459,17 @@ async function deliver({ to, subject, html }) {
     return { success: true, provider: 'smtp' };
   } catch (err) {
     console.error('[Email] SMTP error:', err.message);
-    cachedTransport = null; // Clear transport so stale serverless connections don't hang subsequent attempts
+    // Drop the pooled transport so stale serverless connections don't hang
+    // subsequent attempts — but close it first, or its sockets are only
+    // released when the garbage collector gets round to them.
+    if (cachedTransport === transport) {
+      cachedTransport = null;
+      try {
+        await transport.close();
+      } catch (closeErr) {
+        console.warn('[Email] closing the failed transport did not finish:', closeErr?.message || closeErr);
+      }
+    }
     return { success: false, provider: 'smtp', error: err.message };
   }
 }
@@ -541,6 +551,8 @@ export async function sendEmailWithin(message, ms = EMAIL_DEADLINE_MS) {
 }
 
 export function adminRecipients() {
-  const raw = process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || SUPPORT_EMAIL;
+  // Same fallback chain as the admin sign-in itself, so a deployment that names
+  // its admin only in ADMIN_USERNAME still gets the notifications.
+  const raw = process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || process.env.ADMIN_USERNAME || SUPPORT_EMAIL;
   return raw.split(',').map((e) => e.trim()).filter(Boolean);
 }

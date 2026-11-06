@@ -16,7 +16,7 @@ const MAX_LIST_ROWS = 60;
 const TICKET_IN_TEXT = /TKT-[A-Z0-9-]{6,80}/i;
 
 /** The ticket code inside whatever a QR held (a bare code or a /pass link). */
-export function extractTicketId(text) {
+function extractTicketId(text) {
   const match = String(text || '').match(TICKET_IN_TEXT);
   return match ? match[0].toUpperCase() : null;
 }
@@ -158,23 +158,33 @@ export class CheckInDesk {
   async submit(ticketId, method, { undo = false } = {}) {
     if (this.busy) return;
     this.busy = true;
+    let result;
     try {
-      const result = await this.store.checkInAttendee(this.event.id, ticketId, { method, undo });
-      this.merge(result.attendee);
-      const who = this.describe(result.attendee);
-      if (undo) this.show('idle', `Check-in cleared for ${who}.`);
-      else if (result.alreadyCheckedIn) this.show('warn', `Already checked in at ${timeOf(result.attendee.checkedInAt)} — ${who}`);
-      else {
-        this.show('ok', `Checked in: ${who}`);
-        navigator.vibrate?.(120);
-      }
+      // Only the network call sits in the try. Merge, render and vibrate run
+      // once the scan is known to have succeeded, so a slip in them can never
+      // send an accepted check-in down the failure path and queue it as lost.
+      result = await this.store.checkInAttendee(this.event.id, ticketId, { method, undo });
     } catch (err) {
-      this.handleFailure(err, ticketId, method, undo);
-    } finally {
       this.busy = false;
-      this.renderSummary();
-      this.renderList();
+      try {
+        this.handleFailure(err, ticketId, method, undo);
+      } finally {
+        this.renderSummary();
+        this.renderList();
+      }
+      return;
     }
+    this.busy = false;
+    this.merge(result.attendee);
+    const who = this.describe(result.attendee);
+    if (undo) this.show('idle', `Check-in cleared for ${who}.`);
+    else if (result.alreadyCheckedIn) this.show('warn', `Already checked in at ${timeOf(result.attendee.checkedInAt)} — ${who}`);
+    else {
+      this.show('ok', `Checked in: ${who}`);
+      navigator.vibrate?.(120);
+    }
+    this.renderSummary();
+    this.renderList();
   }
 
   handleFailure(err, ticketId, method, undo) {
@@ -230,18 +240,23 @@ export class CheckInDesk {
         if (item.eventId === this.event.id) this.merge(result.attendee);
         synced++;
       } catch (err) {
-        if (!err?.status) {
-          offline = true;
+        const status = Number(err?.status) || 0;
+        // A definitive client error (400, 403, 404, 409, 422 …) is the only
+        // thing the server will never take: everything else — a dead network,
+        // an expired session, a timeout, a rate limit, any 5xx — can still
+        // succeed later, so the scan is kept.
+        const definitive = status >= 400 && status < 500
+          && status !== 401 && status !== 408 && status !== 429;
+        if (!definitive) {
           remaining.push(item);
-        } else if (err.status === 401) {
-          // Keep the scan: it succeeds once someone signs back in.
-          remaining.push(item);
-          offline = true;
-        } else {
-          problems.push(`${err.data?.attendee?.name || item.ticketId}: ${err.message}`);
-          const known = this.attendees.get(item.ticketId);
-          if (known) this.attendees.set(item.ticketId, { ...known, queued: false });
+          // A dead connection or a dead session stops the batch; one 5xx must
+          // not strand every scan queued behind it.
+          if (!status || status === 401) offline = true;
+          continue;
         }
+        problems.push(`${err.data?.attendee?.name || item.ticketId}: ${err.message}`);
+        const known = this.attendees.get(item.ticketId);
+        if (known) this.attendees.set(item.ticketId, { ...known, queued: false });
       }
     }
     // Scans queued while this flush was awaiting the network are in storage
@@ -321,6 +336,18 @@ export class CheckInDesk {
   }
 
   exportCsv() {
+    // Scans that never reached the server would otherwise be exported as
+    // absentees, which is the one thing a register must not get wrong.
+    const waiting = readQueue().filter((q) => q.eventId === this.event.id);
+    if (waiting.length) {
+      const many = waiting.length !== 1;
+      const question = `${waiting.length} offline scan${many ? 's' : ''} for this event ${many ? 'have' : 'has'} not synced yet. `
+        + `The CSV will mark ${many ? 'them' : 'it'} "Queued (unsynced)" instead of absent. Export anyway?`;
+      if (typeof window.confirm === 'function' && !window.confirm(question)) {
+        this.show('warn', `${waiting.length} offline scan${many ? 's are' : ' is'} still waiting to sync — the export was cancelled.`);
+        return;
+      }
+    }
     // A cell starting with =, +, - or @ runs as a formula in Excel and Sheets;
     // names here are typed by the public, so prefix them.
     const cell = (value) => {
@@ -328,13 +355,18 @@ export class CheckInDesk {
       const guarded = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
       return `"${guarded.replace(/"/g, '""')}"`;
     };
+    // attendeeDeskView may or may not carry the desk user yet, and it could be
+    // an object on the day it does; never print "[object Object]" in a cell.
+    const deskUser = (a) => (typeof a.checkedInBy === 'string'
+      ? a.checkedInBy
+      : a.checkedInBy?.email || a.checkedInBy?.name || '');
     const headers = ['Ticket ID', 'Name', 'Company', 'Email', 'Phone', 'Payment', 'Attended', 'Checked In At', 'Method', 'Checked In By'];
     const rows = [...this.attendees.values()].map((a) => [
       a.ticketId, a.name, a.company, a.email, a.phone,
       isPending(a) ? 'Pending' : 'Confirmed',
-      a.checkedInAt ? 'Yes' : 'No',
+      a.checkedInAt ? 'Yes' : a.queued ? 'Queued (unsynced)' : 'No',
       a.checkedInAt ? new Date(a.checkedInAt).toLocaleString('en-IN') : '',
-      a.checkInMethod || '', a.checkedInBy || '',
+      a.checkInMethod || '', deskUser(a),
     ].map(cell).join(','));
     const csv = '﻿' + [headers.map(cell).join(','), ...rows].join('\r\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));

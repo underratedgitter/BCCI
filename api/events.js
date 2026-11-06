@@ -49,6 +49,8 @@ function attendeeDeskView(a) {
     paymentStatus: a.paymentStatus,
     checkedInAt: a.checkedInAt || null,
     checkInMethod: a.checkInMethod || null,
+    // Who marked them present: the CSV export shows it on the scan log.
+    checkedInBy: a.checkedInBy || null,
   };
 }
 
@@ -171,7 +173,11 @@ async function handler(req, res) {
 
       const result = await registerForEvent(eventId, { name, email, phone, company, paymentRef });
       if (!result.success) {
-        return res.status(409).json({ success: false, error: result.error || 'Registration could not be completed.' });
+        const message = result.error || 'Registration could not be completed.';
+        // The event was checked above, so a "not found" here means it was
+        // deleted between the two reads: that is a 404, not a conflict.
+        const status = /event not found/i.test(message) ? 404 : 409;
+        return res.status(status).json({ success: false, error: message });
       }
 
       // Only a stored ticket ID is useful: confirmation looks it up by ID.
@@ -364,7 +370,13 @@ async function handler(req, res) {
 
       const result = await confirmEventPayment(eventId, ticketId, adminEmail || 'admin');
       if (!result.success) {
-        return res.status(400).json({ success: false, error: result.error || 'Failed to confirm attendee payment.' });
+        // Same mapping as check-in: a deleted event or an unknown ticket is a
+        // 404, a lock held by another writer is a 503 — only a genuinely bad
+        // request is a 400.
+        const message = result.error || 'Failed to confirm attendee payment.';
+        const code = /not found/i.test(message) ? 'not_found' : /busy/i.test(message) ? 'busy' : 'invalid';
+        const status = { not_found: 404, busy: 503, invalid: 400 }[code];
+        return res.status(status).json({ success: false, code, error: message });
       }
 
       // Dispatch the confirmed official E-Ticket with real venue / meeting credentials only if not already confirmed
@@ -459,6 +471,11 @@ async function handler(req, res) {
     const eventId = str(req.query?.id || req.body?.id, 100);
     if (!eventId) {
       return res.status(400).json({ success: false, error: 'Event ID is required to delete.' });
+    }
+    // deleteEvent is a blind DEL, so a second delete would otherwise report
+    // success for an event that is already gone.
+    if (!(await getEvent(eventId))) {
+      return res.status(404).json({ success: false, error: 'Event not found.' });
     }
 
     await deleteEvent(eventId);

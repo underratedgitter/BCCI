@@ -21,7 +21,6 @@ export {
   getEvent,
   putEvent,
   listEvents,
-  countEvents,
   deleteEvent,
   getEventAttendees,
   registerForEvent,

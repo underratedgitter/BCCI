@@ -19,7 +19,13 @@ function loadJsQR() {
     jsQRLoading = new Promise((resolve, reject) => {
       const s = document.createElement('script');
       s.src = JSQR_SRC;
-      s.onload = () => (window.jsQR ? resolve(window.jsQR) : reject(new Error('QR decoder failed to initialise.')));
+      s.onload = () => {
+        if (window.jsQR) return resolve(window.jsQR);
+        // Clear the cache before rejecting, or every later attempt hands back
+        // this same rejected promise and the camera can never start.
+        jsQRLoading = null;
+        reject(new Error('QR decoder failed to initialise.'));
+      };
       s.onerror = () => {
         jsQRLoading = null;
         reject(new Error('Could not load the QR decoder.'));
@@ -64,7 +70,7 @@ async function createDecoder() {
 }
 
 /** A message a person can act on, for a camera that would not start. */
-export function cameraErrorMessage(err) {
+function cameraErrorMessage(err) {
   if (!navigator.mediaDevices?.getUserMedia) return 'This browser cannot use the camera here.';
   if (err?.name === 'NotAllowedError' || err?.name === 'SecurityError') {
     return 'Camera permission was refused. Allow camera access for this site in your browser settings, then try again.';
@@ -88,6 +94,9 @@ export class QrScanner {
     this.decode = null;
     this.lastText = null;
     this.lastAt = 0;
+    // Bumped by stop() and by every start(), so a start() that is still
+    // waiting on the camera can tell that it has been superseded or cancelled.
+    this.startToken = 0;
   }
 
   get running() {
@@ -96,22 +105,55 @@ export class QrScanner {
 
   async start() {
     if (this.stream) return;
+    const token = ++this.startToken;
     if (!navigator.mediaDevices?.getUserMedia) throw new Error(cameraErrorMessage());
+
     try {
       this.decode = this.decode || await createDecoder();
-      this.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
-      this.video.muted = true;
-      this.video.setAttribute('playsinline', '');
-      this.video.srcObject = this.stream;
+    } catch (err) {
+      if (token === this.startToken) this.stop();
+      throw new Error(cameraErrorMessage(err), { cause: err });
+    }
+    if (token !== this.startToken) return; // stopped while the decoder loaded
+
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+    } catch (err) {
+      // Only permission and device failures reach cameraErrorMessage, which
+      // exists to explain exactly those.
+      if (token === this.startToken) this.stop();
+      throw new Error(cameraErrorMessage(err), { cause: err });
+    }
+
+    if (token !== this.startToken) {
+      // stop() (or a second start()) ran while the permission prompt was up:
+      // release the tracks we were just handed instead of leaving the camera on.
+      stream.getTracks().forEach((t) => t.stop());
+      return;
+    }
+
+    this.stream = stream;
+    this.video.muted = true;
+    this.video.setAttribute('playsinline', '');
+    this.video.srcObject = stream;
+    try {
       await this.video.play();
     } catch (err) {
-      this.stop();
-      throw new Error(cameraErrorMessage(err));
+      // The camera was allowed; the video element itself would not start, so
+      // telling the user permission was refused would send them to the wrong
+      // browser setting.
+      if (token === this.startToken) this.stop();
+      throw new Error('Camera access was allowed, but the video would not start. Tap “Start camera” again, or type the ticket code instead.', { cause: err });
     }
+    if (token !== this.startToken) return; // stopped while video.play() settled
     this.schedule();
   }
 
   stop() {
+    // Cancels a start() still in flight, so it stops the stream it is about to
+    // receive rather than assigning it to a camera that was already closed.
+    this.startToken++;
     clearTimeout(this.timer);
     this.timer = null;
     this.stream?.getTracks().forEach((t) => t.stop());
@@ -133,6 +175,9 @@ export class QrScanner {
     if (!this.stream) return;
     try {
       const text = await this.decode(this.video);
+      // stop() can land while the frame is being decoded; a code read from a
+      // camera that has since been closed must not reach onText.
+      if (!this.stream) return;
       const now = Date.now();
       if (text && !(text === this.lastText && now - this.lastAt < this.repeatMs)) {
         this.lastText = text;

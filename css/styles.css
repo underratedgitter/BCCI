@@ -12,8 +12,6 @@
   --white: #FFFFFF;
   --warm-white: #FAF9F7;
   --off-white: #F3F1ED;
-  --cream: #EDE9E1;
-  --linen: #E8E4DB;
 
   --gray-50: #F7F6F3;
   --gray-100: #EDECEA;
@@ -23,8 +21,6 @@
   --gray-500: #6E6B63;
   --gray-600: #504D47;
   --gray-700: #3A3832;
-  --gray-800: #252320;
-  --gray-900: #151311;
 
   --navy: #1B2A4A;
   --navy-light: #2C3E6B;
@@ -35,12 +31,7 @@
   --charcoal: #2D3748;
 
   --gold: #B8860B;
-  --gold-light: #FDF6E3;
   --gold-bg: #FAF3E0;
-
-  --teal: #2C7A7B;
-  --teal-light: #E6FFFA;
-  --teal-bg: #F0FDFA;
 
   --success: #276749;
   --success-bg: #E6F4EA;
@@ -65,10 +56,6 @@
   --radius-lg: 16px;
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
   --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
-  --shadow-lg: 0 12px 32px rgba(0,0,0,0.1);
-
-  --accent: var(--navy);
-  --accent-light: var(--navy-bg);
 
   /* ── Typography ──────────────────────────────────────────────── */
   --font-display: 'DM Serif Display', Georgia, 'Times New Roman', serif;
@@ -83,12 +70,10 @@
   --space-xl: 2.5rem;
   --space-2xl: 4rem;
   --space-3xl: 6rem;
-  --space-4xl: 5.5rem;
+  --space-4xl: 7rem;
 
   /* ── Rules & Lines ───────────────────────────────────────────── */
   --rule: 1px solid var(--gray-200);
-  --rule-dark: 1px solid var(--gray-300);
-  --rule-accent: 1px solid var(--black);
 
   --transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
   --transition-slow: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
@@ -157,7 +142,12 @@ a {
   position: relative;
 }
 
-a:hover { opacity: 0.6; }
+/* Dimming is a hover cue, not a contrast tool: navigation links that carry
+   small text keep their full opacity (see .mobile-bottom-tab and
+   .mobile-drawer-link below), otherwise 0.6 opacity drops them under 4.5:1.
+   :where() adds no specificity, so this still loses to the per-component
+   opacity overrides exactly as the original a:hover did. */
+a:hover:where(:not(.mobile-bottom-tab):not(.mobile-drawer-link)) { opacity: 0.6; }
 
 /* ── Scroll Reveal & Fluid View Animations ────────────────────── */
 .reveal {
@@ -229,10 +219,6 @@ small, .mono {
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
-
-/* ── Refined Spacing Utilities ────────────────────────────────── */
-.uppercase { text-transform: uppercase; }
-.muted { color: var(--gray-400); }
 
 /* ==========================================================================
    TOP BAR
@@ -326,6 +312,7 @@ body.admin-area footer .footer-grid > div:has(.footer-links a) h4 {
   align-items: center;
   gap: 0;
   list-style: none;
+  flex-shrink: 0;
 }
 
 .nav-link {
@@ -363,10 +350,6 @@ body.admin-area footer .footer-grid > div:has(.footer-links a) h4 {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  flex-shrink: 0;
-}
-
-.nav-links {
   flex-shrink: 0;
 }
 
@@ -708,7 +691,7 @@ body.admin-area footer .footer-grid > div:has(.footer-links a) h4 {
 .profile-dropdown-actions button:hover { background: var(--gray-50); }
 .profile-dropdown-actions .pd-btn-primary { color: var(--primary); }
 .profile-dropdown-actions .pd-btn-primary:hover { background: var(--navy-bg); color: var(--primary); }
-.profile-dropdown-actions .pd-btn-gold { color: #B8860B; }
+.profile-dropdown-actions .pd-btn-gold { color: #8B6914; }
 .profile-dropdown-actions .pd-btn-gold:hover { background: var(--gold-bg); color: #8B6914; }
 .profile-dropdown-actions .pd-btn-danger { color: var(--danger); }
 .profile-dropdown-actions .pd-btn-danger:hover { background: var(--danger-bg); }
@@ -1221,7 +1204,7 @@ body.admin-area footer .footer-grid > div:has(.footer-links a) h4 {
   gap: 1rem;
   font-family: var(--font-mono);
   font-size: 0.68rem;
-  color: var(--gray-400);
+  color: var(--gray-500);
   margin-bottom: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -1297,11 +1280,12 @@ body.admin-area footer .footer-grid > div:has(.footer-links a) h4 {
   position: relative;
   border: var(--rule);
   background: var(--warm-white);
-  cursor: pointer;
   margin-bottom: var(--space-xl);
 }
 
-.qrcode-img { width: 100%; height: auto; display: block; }
+/* Only the image carries a click handler (data-lightbox), so the pointer
+   cursor belongs there — not on the frame around it. */
+.qrcode-img { width: 100%; height: auto; display: block; cursor: pointer; }
 .qrcode-img-hover {
   position: absolute;
   inset: 0;
@@ -1318,6 +1302,9 @@ body.admin-area footer .footer-grid > div:has(.footer-links a) h4 {
   color: var(--gray-500);
   opacity: 0;
   transition: opacity 0.2s ease;
+  /* The overlay sits on top of the zoomable image; without this it swallows
+     the click and the lightbox never opens. */
+  pointer-events: none;
 }
 
 .qrcode-img-frame:hover .qrcode-img-hover { opacity: 1; }
@@ -1341,7 +1328,7 @@ body.admin-area footer .footer-grid > div:has(.footer-links a) h4 {
 .payment-details-list { list-style: none; }
 .payment-details-list li { padding: 0.75rem 0; border-bottom: var(--rule); font-size: 0.9rem; }
 .payment-details-list li:last-child { border-bottom: none; }
-.pay-label { font-family: var(--font-mono); font-size: 0.68rem; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 0.25rem; }
+.pay-label { font-family: var(--font-mono); font-size: 0.68rem; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 0.25rem; }
 .pay-val { color: var(--black); font-weight: 600; }
 .highlight-upi { color: var(--black) !important; font-family: var(--font-mono) !important; font-size: 0.95rem !important; font-weight: 600 !important; }
 
@@ -1407,7 +1394,6 @@ body.admin-area footer .footer-grid > div:has(.footer-links a) h4 {
   color: var(--black);
   background: transparent;
   transition: var(--transition);
-  outline: none;
   -webkit-appearance: none;
 }
 
@@ -1416,13 +1402,21 @@ body.admin-area footer .footer-grid > div:has(.footer-links a) h4 {
   border-bottom-width: 2px;
 }
 
+/* The inputs only have a bottom border, so keyboard users need their own
+   visible focus ring (outline:none used to remove it entirely). */
+.form-control:focus-visible,
+.form-select:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
+}
+
 .form-control.is-valid { border-bottom-color: var(--success); }
 .form-control.is-invalid { border-bottom-color: var(--danger); }
 
 .form-hint {
   font-family: var(--font-mono);
   font-size: 0.68rem;
-  color: var(--gray-400);
+  color: var(--gray-500);
   margin-top: 0.35rem;
 }
 
@@ -1446,6 +1440,14 @@ body.admin-area footer .footer-grid > div:has(.footer-links a) h4 {
 .file-upload-box.dragover { border-color: var(--black); }
 .file-upload-box.is-valid { border-color: var(--success); }
 .file-upload-box.is-invalid { border-color: var(--danger); }
+
+/* The real <input type="file"> is visually clipped inside the box, so the box
+   has to show the focus ring on its behalf. */
+.file-upload-box:focus-within {
+  border-color: var(--black);
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
+}
 
 /* ==========================================================================
    MODAL
@@ -1594,11 +1596,16 @@ body.admin-area footer .footer-grid > div:has(.footer-links a) h4 {
 .admin-menu-item.active { background: var(--navy); color: var(--white); border-left: 3px solid var(--gold); }
 .admin-menu-item:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
 
+/* Five cards: auto-fit keeps them on one row at desktop widths instead of the
+   fixed 4-column grid that stranded the fifth card beside three empty cells.
+   The grid must not paint its own background — with an odd card count any
+   partial last row would show the backing colour as an empty grey block. The
+   cards are already white, rounded and shadowed, so the 1px gap is enough. */
 .admin-metrics-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 1px;
-  background: var(--gray-200);
+  background: transparent;
   margin-bottom: var(--space-2xl);
   min-width: 0;
   max-width: 100%;
@@ -1666,7 +1673,8 @@ body.admin-area footer .footer-grid > div:has(.footer-links a) h4 {
 }
 
 /* ── Data Tables ───────────────────────────────────────────────── */
-.table-responsive { overflow-x: auto; }
+/* .table-responsive is declared once, in "Responsive hardening" below, so the
+   scroll behaviour lives in a single place. */
 
 .data-table {
   width: 100%;
@@ -1769,9 +1777,9 @@ body.admin-area footer .footer-grid > div:has(.footer-links a) h4 {
 
 .admin-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem; }
 .admin-card-company { font-family: var(--font-body); font-weight: 600; font-size: 0.95rem; }
-.admin-card-id { font-family: var(--font-mono); font-size: 0.68rem; color: var(--gray-400); letter-spacing: 0.04em; }
+.admin-card-id { font-family: var(--font-mono); font-size: 0.68rem; color: var(--gray-500); letter-spacing: 0.04em; }
 .admin-card-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.85rem; margin-bottom: 1rem; }
-.admin-card-meta strong { font-family: var(--font-mono); font-size: 0.68rem; text-transform: uppercase; color: var(--gray-400); letter-spacing: 0.06em; }
+.admin-card-meta strong { font-family: var(--font-mono); font-size: 0.68rem; text-transform: uppercase; color: var(--gray-500); letter-spacing: 0.06em; }
 .admin-card-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 
 /* ==========================================================================
@@ -1784,7 +1792,9 @@ footer {
 }
 
 footer h4 {
-  color: var(--gold);
+  /* --gold (#B8860B) lands at ~4.3:1 on the navy footer; the lighter accent
+     gold clears 4.5:1 for this small uppercase text. */
+  color: var(--accent-gold);
   font-family: var(--font-mono);
   font-size: 0.68rem;
   font-weight: 500;
@@ -1850,12 +1860,20 @@ footer h4 {
   padding-bottom: env(safe-area-inset-bottom, 0.5rem);
 }
 
+/* Safari safe-area support sits here, ahead of the width media queries below,
+   so the tighter narrow-screen padding there still wins. */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .mobile-bottom-nav {
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
+}
+
 .mobile-bottom-tab {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.2rem;
-  color: var(--gray-400);
+  color: var(--gray-500);
   font-family: var(--font-mono);
   font-size: 0.6rem;
   font-weight: 500;
@@ -1867,6 +1885,8 @@ footer h4 {
 }
 
 .mobile-bottom-tab.active { color: var(--black); }
+/* No hover dimming: at 0.6 opacity this 0.6rem label drops below 4.5:1. */
+.mobile-bottom-tab:hover { opacity: 1; }
 .mobile-bottom-tab i { font-size: 1.1rem; }
 
 /* ==========================================================================
@@ -1883,6 +1903,8 @@ footer h4 {
 
 .mobile-drawer-backdrop.show { display: block; }
 
+/* One block: the base geometry plus the delayed visibility that keeps the
+   closed drawer out of the tab order and away from screen readers. */
 .mobile-drawer {
   position: fixed;
   top: 0;
@@ -1893,12 +1915,11 @@ footer h4 {
   border-right: var(--rule);
   z-index: 1200;
   transform: translateX(-100%);
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow-y: auto;
+  visibility: hidden;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s linear 0.3s;
 }
 
-.mobile-drawer { visibility: hidden; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s linear 0.3s; }
-/* Hidden once closed, so its links leave the tab order and screen readers. */
 .mobile-drawer.open { transform: translateX(0); visibility: visible; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s; }
 
 @media (min-width: 1025px) {
@@ -1958,6 +1979,8 @@ footer h4 {
 .mobile-drawer-link:hover, .mobile-drawer-link.active {
   color: var(--black);
   text-decoration: none;
+  /* Skip the global a:hover dimming so the label keeps full contrast. */
+  opacity: 1;
 }
 
 .mobile-drawer-actions { margin-bottom: var(--space-xl); }
@@ -2024,7 +2047,8 @@ footer h4 {
   border: 2px solid var(--gold);
   font-size: 1rem;
   cursor: pointer;
-  z-index: 2500;
+  /* Below the modal backdrop (2000) so an open dialog always covers it. */
+  z-index: 1900;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2035,7 +2059,9 @@ footer h4 {
   transform: translateY(10px);
 }
 
-#scrollToTopBtn:hover { background: var(--navy-light); color: var(--white); border-color: var(--gold); transform: translateY(0); }
+/* The visibility transform is applied inline by js/app.js, so a hover
+   transform here could never take effect — only the colour changes. */
+#scrollToTopBtn:hover { background: var(--navy-light); color: var(--white); border-color: var(--gold); }
 
 /* ==========================================================================
    SIGN-IN PAGE
@@ -2150,7 +2176,8 @@ footer h4 {
   .admin-sidebar { position: static; }
   .admin-menu { display: flex; overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .admin-menu-item { white-space: nowrap; border-bottom: none; border-right: var(--rule); }
-  .admin-metrics-grid { grid-template-columns: repeat(2, 1fr); }
+  /* Narrower cards, still auto-fit so a partial row never paints a grey hole. */
+  .admin-metrics-grid { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
   .footer-grid { grid-template-columns: 1fr 1fr; gap: var(--space-xl); }
   .services-grid { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
   .blogs-grid { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
@@ -2168,8 +2195,7 @@ footer h4 {
   }
 
   /* ── Navigation ────────────────────────────────────────────── */
-  .top-bar { display: none !important; }
-  .nav-links { display: none !important; }
+  /* .top-bar and .nav-links are already hidden by the 1024px query above. */
   .nav-actions { display: none !important; }
   .nav-actions * { display: none !important; }
   .nav-profile-wrapper { display: none !important; }
@@ -2269,13 +2295,13 @@ footer h4 {
 
   /* ── Admin ─────────────────────────────────────────────────── */
   .data-table { display: none; }
-  .admin-mobile-cards { display: block; }
-  .admin-metrics-grid { grid-template-columns: 1fr 1fr; }
+  /* .admin-mobile-cards is switched on by the 900px query below. */
+  .admin-metrics-grid { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
   .admin-layout { gap: var(--space-lg); }
 
   /* ── Modals ────────────────────────────────────────────────── */
   .modal-backdrop { padding: 1rem; }
-  .modal-box { margin: 0; padding: var(--space-xl); max-height: 80vh; }
+  .modal-box { margin: 0; padding: var(--space-xl); }
   .modal-title { font-size: 1.15rem; }
 
   /* ── Membership layout grid ────────────────────────────────── */
@@ -2462,15 +2488,6 @@ footer h4 {
   .signin-icon { width: 48px; height: 48px; font-size: 1.2rem; }
 }
 
-/* ==========================================================================
-   SAFARI & iOS SAFE AREAS
-   ========================================================================== */
-@supports (padding-bottom: env(safe-area-inset-bottom)) {
-  .mobile-bottom-nav {
-    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
-  }
-}
-
 body.modal-open {
   overflow: hidden;
 }
@@ -2490,8 +2507,6 @@ body.modal-open {
   /* When modal is open for digital pass or event ticket, print only the pass */
   body.modal-open main,
   body:has(.modal-backdrop.show) main,
-  body.modal-open header,
-  body:has(.modal-backdrop.show) header,
   #view-card .section-header {
     display: none !important;
   }
@@ -2544,13 +2559,11 @@ body.modal-open {
 }
 
 @media (max-width: 900px) {
-  /* Below this the desktop tables are unreadable; the card layout takes over. */
+  /* Below this the desktop tables are unreadable; the card layout takes over.
+     The base .admin-mobile-cards rule is display:none, which is what applies
+     again above this breakpoint. */
   .table-responsive { display: none; }
   .admin-mobile-cards { display: block; }
-}
-
-@media (min-width: 901px) {
-  .admin-mobile-cards { display: none; }
 }
 
 @media (max-width: 768px) {
@@ -2564,12 +2577,11 @@ body.modal-open {
     min-height: 44px;
   }
 
-  /* Modals get the full width they need, minus a small gutter. */
+  /* Modals get the full width they need, minus a small gutter. Height and
+     scrolling stay at the base .modal-box values (85vh, overflow-y: auto). */
   .modal-box {
     width: calc(100vw - 2rem);
     max-width: 100%;
-    max-height: 85vh;
-    overflow-y: auto;
   }
 
   /* Two-column detail grids collapse rather than squeeze. */
@@ -2648,15 +2660,8 @@ body.modal-open {
   .draft-notice { font-size: 0.85rem; }
 }
 
-/* Respect a reduced-motion preference across the whole site. */
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-}
+/* Respect a reduced-motion preference across the whole site — declared once,
+   in the Accessibility block at the top of this file. */
 
 /* ══════════════════════════════════════════════════════════════════
    LOADING STATES + FORM PROGRESS

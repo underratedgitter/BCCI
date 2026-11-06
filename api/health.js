@@ -3,8 +3,14 @@
 // actually configured and reachable, so a misconfigured deploy is visible
 // immediately instead of surfacing as a broken form later.
 
-import { pingKv } from './_lib/kv.js';
+import { kv } from './_lib/kv.js';
 import { applyCors, handlePreflight, withErrorHandling } from './_lib/http.js';
+
+// A read-only round trip is enough to prove the store is reachable and the
+// credentials work: the response to a GET (even "null") comes from Redis
+// itself. It never writes, so a health check every few seconds costs no
+// writes and leaves no key behind.
+const REACHABILITY_KEY = 'bcci:health:reachable';
 
 async function handler(req, res) {
   applyCors(req, res, 'GET, OPTIONS');
@@ -26,7 +32,10 @@ async function handler(req, res) {
   // Upstash Redis holds the records, OTP codes, sessions and rate limits.
   if (checks.redis.configured) {
     try {
-      checks.redis.reachable = await pingKv();
+      // Read-only probe: throws when the store is unreachable or the
+      // credentials are rejected, which is all this check needs to know.
+      await kv.get(REACHABILITY_KEY);
+      checks.redis.reachable = true;
     } catch (err) {
       // The response is public; an error string can name an internal host,
       // port or credential. Log it, report only that it is unreachable.

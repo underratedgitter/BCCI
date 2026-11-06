@@ -25,12 +25,17 @@ export async function listEmailIntents(limit = 50, { runnableOnly = false } = {}
 // sending claim is written BEFORE SMTP, so a crash does not lose the intent.
 // Delivery is at-least-once: SMTP acceptance followed by a crash before the
 // sent write is intrinsically ambiguous and may duplicate on a later retry.
+//
+// Never throws: every caller has already committed the business write that
+// queued the email, so a delivery or storage failure is reported as
+// { success: false, error } and retried later from the index.
 export async function deliverEmailIntent(id, { force = false, send = sendEmail, now = Date.now } = {}) {
   if (!id) return null;
   const lockName = `email-outbox:${id}`;
-  const token = await acquireLock(lockName, 120, 1, 0);
-  if (!token) return { success: false, pending: true };
+  let token = null;
   try {
+    token = await acquireLock(lockName, 120, 1, 0);
+    if (!token) return { success: false, pending: true };
     const item = await kv.get(outboxKey(id));
     if (!item) return null;
     if (item.status === 'sent') return { success: true, alreadySent: true };
@@ -75,6 +80,12 @@ export async function deliverEmailIntent(id, { force = false, send = sendEmail, 
     ]);
     if (!result.success) console.warn(`[Email outbox] ${id}: attempt ${next.attempts}, ${status}`);
     return { success: !!result.success, pending: status === 'pending', exhausted: status === 'failed' };
+  } catch (err) {
+    // A storage failure, a lapsed lock or an unexpected crash here must not be
+    // turned into a failed business action: the intent stays in the index (the
+    // lease below releases) and the retry surface reports the message.
+    console.warn(`[Email outbox] ${id}: delivery attempt did not complete:`, err?.message || err);
+    return { success: false, error: String(err?.message || err || 'Email delivery failed') };
   } finally {
     await releaseLock(lockName, token);
   }

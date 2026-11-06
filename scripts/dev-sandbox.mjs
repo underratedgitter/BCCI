@@ -17,6 +17,9 @@ import { startMockSmtp } from '../tests/smtp-server.mjs';
 
 const ADMIN_EMAIL = 'admin@bccibharuch.in';
 const ADMIN_PASSWORD = 'sandbox-admin-password';
+// Resolved once: the browser origin the API accepts must be the port the
+// server actually listens on, not a hard-coded 3000.
+const PORT = process.env.PORT || '3000';
 
 const redisMock = await startMockRedis();
 const smtp = await startMockSmtp();
@@ -26,14 +29,14 @@ process.env.UPSTASH_REDIS_REST_TOKEN = 'sandbox';
 process.env.ADMIN_EMAILS = ADMIN_EMAIL;
 process.env.ADMIN_PASSWORD = ADMIN_PASSWORD;
 process.env.INTERNAL_API_SECRET = 'sandbox-internal-secret';
-process.env.ALLOWED_ORIGIN = 'http://localhost:3000';
+process.env.ALLOWED_ORIGIN = `http://localhost:${PORT}`;
 process.env.SMTP_HOST = '127.0.0.1';
 process.env.SMTP_PORT = String(smtp.port);
 process.env.SMTP_SECURE = 'false';
 process.env.SMTP_USER = 'sandbox@bccibharuch.in';
 process.env.SMTP_PASS = 'sandbox';
 process.env.EMAIL_FROM = `BCCI Bharuch <${ADMIN_EMAIL}>`;
-process.env.PORT = process.env.PORT || '3000';
+process.env.PORT = PORT;
 
 // ── Seed data, so the admin panel is not empty ─────────────────────
 const { putApplication, putEnquiry } = await import('../api/_lib/records.js');
@@ -95,16 +98,15 @@ setInterval(() => {
 // ── Boot the real server ───────────────────────────────────────────
 await import('../server.js');
 
-const port = process.env.PORT;
 setTimeout(() => {
   console.log(`
   ╭──────────────────────────────────────────────────────────╮
   │  SANDBOX — nothing here touches production               │
   ╰──────────────────────────────────────────────────────────╯
 
-    Site        http://localhost:${port}
-    Admin       http://localhost:${port}/admin-bcci
-    Health      http://localhost:${port}/api/health
+    Site        http://localhost:${PORT}
+    Admin       http://localhost:${PORT}/admin-bcci
+    Health      http://localhost:${PORT}/api/health
 
     Admin sign-in
       username  ${ADMIN_EMAIL}

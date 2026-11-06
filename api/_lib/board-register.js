@@ -15,13 +15,13 @@ const MARK = { present: { v: 'P', s: 'present' }, leave: { v: 'L', s: 'leave' },
 const STATUS_WORD = { present: 'Present', leave: 'Leave', absent: 'Absent' };
 
 /** "2026-08-15" → "15 Aug 2026", without a time-zone shift. */
-export function dayLabel(isoDate) {
+function dayLabel(isoDate) {
   const [y, m, d] = String(isoDate).split('-').map(Number);
   return y && m && d ? `${d} ${MONTHS.at(m - 1)} ${y}` : String(isoDate || '');
 }
 
 /** A timestamp in India time, e.g. "15 Aug 2026, 10:42 am". */
-export function istLabel(iso) {
+function istLabel(iso) {
   if (!iso) return '';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';

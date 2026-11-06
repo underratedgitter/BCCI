@@ -27,16 +27,8 @@ export class Store {
     const { method = 'GET', body, auth = null, retries = method === 'GET' ? 2 : 0 } = options;
 
     const headers = { 'Content-Type': 'application/json' };
-    if (auth === 'admin') {
-      const session = this.getAdminSession();
-      if (session?.token) headers['Authorization'] = `Bearer ${session.token}`;
-    } else if (auth === 'applicant') {
-      const session = this.getApplicantSession();
-      if (session?.token) headers['Authorization'] = `Bearer ${session.token}`;
-    } else if (auth === 'board') {
-      const session = this.getBoardSession();
-      if (session?.token) headers['Authorization'] = `Bearer ${session.token}`;
-    }
+    const token = this._sessionFor(auth)?.token;
+    if (token) headers['Authorization'] = `Bearer ${token}`;
 
     let lastErr;
     for (let attempt = 0; attempt <= retries; attempt++) {
@@ -51,24 +43,34 @@ export class Store {
         });
 
         let data = {};
+        let bodyErr = null;
         try {
           data = await res.json();
-        } catch {
-          // Non-JSON response (a proxy error page, say).
-          if (!res.ok) throw new Error(`Server returned ${res.status}.`);
+        } catch (err) {
+          // Non-JSON response (a proxy error page, say). Remembered rather
+          // than thrown here so the status below still reaches the error.
+          bodyErr = err;
         }
 
         if (!res.ok) {
           // An expired or revoked session should clear itself rather than
           // leaving the UI in a signed-in state that no longer works.
-          if (res.status === 401) {
-            if (auth === 'admin') this.forgetAdminSession();
-            if (auth === 'applicant') this.forgetApplicantSession();
-            if (auth === 'board') this.forgetBoardSession();
-          }
-          const error = new Error(data.error || `Request failed (${res.status}).`);
+          if (res.status === 401) this._forgetSession(auth);
+          const error = new Error((data && data.error)
+            || (bodyErr ? `Server returned ${res.status}.` : `Request failed (${res.status}).`));
           error.status = res.status;
           error.data = data;
+          if (bodyErr) error.cause = bodyErr;
+          throw error;
+        }
+
+        if (bodyErr) {
+          // A 2xx whose body we cannot read is a failure, not an empty
+          // success: resolving `{}` would look like "no records" to callers.
+          const error = new Error(`Server returned ${res.status} with a response that could not be read.`);
+          error.status = res.status;
+          error.data = {};
+          error.cause = bodyErr;
           throw error;
         }
 
@@ -92,6 +94,21 @@ export class Store {
       throw netErr;
     }
     throw lastErr;
+  }
+
+  /** The stored session an `auth` option names, or null. */
+  _sessionFor(auth) {
+    if (auth === 'admin') return this.getAdminSession();
+    if (auth === 'applicant') return this.getApplicantSession();
+    if (auth === 'board') return this.getBoardSession();
+    return null;
+  }
+
+  /** Forgets the session an `auth` option names (a no-op for null). */
+  _forgetSession(auth) {
+    if (auth === 'admin') this.forgetAdminSession();
+    else if (auth === 'applicant') this.forgetApplicantSession();
+    else if (auth === 'board') this.forgetBoardSession();
   }
 
   /* ════════════════════════════════════════════════════════════════════
@@ -144,9 +161,12 @@ export class Store {
       );
       return result.application || null;
     } catch (err) {
+      // Signed out reads the same as "no record" for this form; anything else
+      // (a dead network, a 5xx) has to reach the caller, which can tell
+      // "try again" apart from "you have no application".
       if (err.status === 401) return null;
       console.error('[Store] Failed to fetch application:', err.message);
-      return null;
+      throw err;
     }
   }
 
@@ -197,31 +217,43 @@ export class Store {
   getMembershipValidity(app) {
     if (!app || app.status !== 'Approved') return null;
 
+    // One corrupt date in one record must not throw the whole list down
+    // (Date#toISOString raises RangeError on an invalid date).
+    const asDate = (value) => {
+      const d = new Date(value);
+      return Number.isNaN(d.getTime()) ? null : d;
+    };
+
     // validFrom (set for members imported from the Secretariat register) is the
     // date their membership year started; otherwise the year runs from approval.
-    const approvedDate = new Date(app.validFrom || app.approvedAt || app.submittedAt || Date.now());
+    const startRaw = app.validFrom || app.approvedAt || app.submittedAt;
+    const approvedDate = startRaw ? asDate(startRaw) : new Date();
     const yearsToAdd = Number(app.renewalYears) || 1;
     // Mirrors validUntil() in api/applications.js: a renewal stores expiresAt.
-    let validUntil;
-    if (app.expiresAt && Number.isFinite(Date.parse(app.expiresAt))) {
-      validUntil = new Date(app.expiresAt);
-    } else {
+    let validUntil = asDate(app.expiresAt);
+    if (!validUntil && approvedDate) {
       validUntil = new Date(approvedDate);
       validUntil.setFullYear(validUntil.getFullYear() + yearsToAdd);
+      // An absurd renewalYears lands outside the range a Date can hold.
+      if (Number.isNaN(validUntil.getTime())) validUntil = null;
     }
+    const valid = Boolean(validUntil);
 
-    const daysRemaining = Math.ceil((validUntil.getTime() - Date.now()) / 86400000);
+    const daysRemaining = valid ? Math.ceil((validUntil.getTime() - Date.now()) / 86400000) : null;
 
-    let state = 'ACTIVE';
-    if (daysRemaining <= 0) state = 'EXPIRED';
-    else if (daysRemaining <= 30) state = 'RENEWAL_DUE';
+    let state = 'UNKNOWN';
+    if (valid) {
+      state = 'ACTIVE';
+      if (daysRemaining <= 0) state = 'EXPIRED';
+      else if (daysRemaining <= 30) state = 'RENEWAL_DUE';
+    }
 
     const fmt = { day: 'numeric', month: 'long', year: 'numeric' };
     return {
-      approvedDate: approvedDate.toLocaleDateString('en-IN', fmt),
-      validUntilDate: validUntil.toLocaleDateString('en-IN', fmt),
-      validUntilISO: validUntil.toISOString(),
-      daysRemaining: Math.max(0, daysRemaining),
+      approvedDate: approvedDate ? approvedDate.toLocaleDateString('en-IN', fmt) : 'Unknown',
+      validUntilDate: valid ? validUntil.toLocaleDateString('en-IN', fmt) : 'Unknown',
+      validUntilISO: valid ? validUntil.toISOString() : null,
+      daysRemaining: valid ? Math.max(0, daysRemaining) : null,
       yearsTenure: yearsToAdd,
       state,
     };
@@ -566,8 +598,11 @@ export class Store {
    */
   async downloadFile(endpoint, { auth = 'admin', fallbackName = 'download' } = {}) {
     const headers = {};
-    const session = auth === 'admin' ? this.getAdminSession() : null;
-    if (session?.token) headers['Authorization'] = `Bearer ${session.token}`;
+    // The same Authorization rules as apiCall: 'admin' is the default because
+    // the attendance register is an admin endpoint, but 'board'/'applicant'
+    // work too rather than silently sending no token.
+    const token = this._sessionFor(auth)?.token;
+    if (token) headers['Authorization'] = `Bearer ${token}`;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     let res;
@@ -581,7 +616,7 @@ export class Store {
     if (!res.ok) {
       let message = `Download failed (${res.status}).`;
       try { message = (await res.json()).error || message; } catch {}
-      if (res.status === 401 && auth === 'admin') this.forgetAdminSession();
+      if (res.status === 401) this._forgetSession(auth);
       throw Object.assign(new Error(message), { status: res.status });
     }
     const disposition = res.headers.get('Content-Disposition') || '';

@@ -25,6 +25,29 @@ const SESSION_TTL_SECONDS = 24 * 60 * 60; // 24 hours
 const OTP_TTL_SECONDS = 600; // 10 minutes
 const MAX_OTP_ATTEMPTS = 5;
 
+// Wrong sign-ins are counted per account *and* per network address, so a
+// shared or hostile network can never lock the real owner out of their own
+// account. The per-address ceiling is only a backstop against a distributed
+// guessing campaign, so it is far looser than a human would ever reach.
+const LOGIN_MAX_FAILURES = 10;
+const LOGIN_WINDOW_SECONDS = 900;
+const LOGIN_ADDRESS_CEILING = 100;
+
+/**
+ * Long passwords are refused before any hashing: scrypt over a megabyte costs
+ * seconds of CPU per attempt, which is a denial of service in itself. The
+ * value is never trimmed — spaces are legitimate password characters.
+ */
+const MAX_PASSWORD_LENGTH = 200;
+
+function readPassword(value) {
+  if (typeof value !== 'string') return { password: '' };
+  if (value.length > MAX_PASSWORD_LENGTH) {
+    return { error: `Password must be at most ${MAX_PASSWORD_LENGTH} characters long.` };
+  }
+  return { password: value };
+}
+
 // Pre-computed dummy salt & hash to ensure constant-time response for absent accounts (SEC-01)
 const DUMMY_SALT = '0123456789abcdef0123456789abcdef';
 const DUMMY_HASH = '0123456789abcdef'.repeat(8);
@@ -53,7 +76,11 @@ async function handler(req, res) {
   // ── 1. LOGIN ──────────────────────────────────────────────────────────
   if (action === 'login') {
     const email = str(req.body?.email, 254).toLowerCase();
-    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    const passwordField = readPassword(req.body?.password);
+    if (passwordField.error) {
+      return res.status(400).json({ success: false, error: passwordField.error });
+    }
+    const password = passwordField.password;
 
     if (!isEmail(email)) {
       return res.status(400).json({ success: false, error: 'A valid email address is required.' });
@@ -63,13 +90,20 @@ async function handler(req, res) {
     }
 
     const ip = clientIp(req);
-    const ipLimit = await rateLimit(`applicantlogin:ip:${ip}`, { max: 10, windowSec: 900 });
+    const ipLimit = await rateLimit(`applicantlogin:ip:${ip}`, { max: LOGIN_MAX_FAILURES, windowSec: LOGIN_WINDOW_SECONDS });
     if (!ipLimit.ok) {
       return tooManyRequests(res, ipLimit.retryAfter, 'Too many login attempts. Please try again later.');
     }
-    const emailLimit = await rateLimit(`applicantlogin:email:${email}`, { max: 10, windowSec: 900 });
-    if (!emailLimit.ok) {
-      return tooManyRequests(res, emailLimit.retryAfter, 'Too many login attempts for this account. Please try again later.');
+    // Keyed on this account *and* this network: a shared or hostile network
+    // cannot lock the real owner out of their own account.
+    const addressLimit = await rateLimit(`applicantlogin:email:${email}:${ip}`, { max: LOGIN_MAX_FAILURES, windowSec: LOGIN_WINDOW_SECONDS });
+    if (!addressLimit.ok) {
+      return tooManyRequests(res, addressLimit.retryAfter, 'Too many login attempts for this account. Please try again later.');
+    }
+    // Far looser backstop against a distributed guessing campaign.
+    const ceiling = await rateLimit(`applicantlogin:account:${email}`, { max: LOGIN_ADDRESS_CEILING, windowSec: LOGIN_WINDOW_SECONDS });
+    if (!ceiling.ok) {
+      return tooManyRequests(res, ceiling.retryAfter, 'This account has seen too many sign-in attempts. Please try again later.');
     }
 
     const account = await getAccount(email);
@@ -87,7 +121,11 @@ async function handler(req, res) {
     }
 
     // Only failures count toward lockout: a correct password gives the attempt back.
-    await Promise.all([refundRateLimit(`applicantlogin:ip:${ip}`), refundRateLimit(`applicantlogin:email:${email}`)]);
+    await Promise.all([
+      refundRateLimit(`applicantlogin:ip:${ip}`),
+      refundRateLimit(`applicantlogin:email:${email}:${ip}`),
+      refundRateLimit(`applicantlogin:account:${email}`),
+    ]);
 
     const token = crypto.randomUUID();
     const sessionData = { email, issuedAt: Date.now() };
@@ -112,7 +150,11 @@ async function handler(req, res) {
   if (action === 'register') {
     const email = str(req.body?.email, 254).toLowerCase();
     const code = str(req.body?.code, 12);
-    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    const passwordField = readPassword(req.body?.password);
+    if (passwordField.error) {
+      return res.status(400).json({ success: false, error: passwordField.error });
+    }
+    const password = passwordField.password;
 
     if (!isEmail(email)) {
       return res.status(400).json({ success: false, error: 'A valid email address is required.' });
@@ -161,6 +203,7 @@ async function handler(req, res) {
     // password is replaced (its old sessions are revoked by passwordUpdatedAt)
     // — say so rather than claiming a new account was created.
     const existingAccount = await getAccount(email);
+    const accountExisted = Boolean(existingAccount);
     await saveAccount(email, password);
 
     // Clean up OTP and rate limiter
@@ -174,11 +217,17 @@ async function handler(req, res) {
       kv.set(KEYS.applicantSession(token), sessionData, { ex: SESSION_TTL_SECONDS })
     );
 
-    return res.status(201).json({
-      success: true,
-      message: existingAccount?.passwordHash
+    // 201 only when an account was actually created; replacing the password of
+    // one that already existed is a 200, so a client can tell the two apart.
+    const message = !accountExisted
+      ? 'Account created successfully.'
+      : existingAccount?.passwordHash
         ? 'An account already existed for this email; its password has been updated.'
-        : 'Account created successfully.',
+        : 'An account already existed for this email; a password has now been set for it.';
+    return res.status(accountExisted ? 200 : 201).json({
+      success: true,
+      created: !accountExisted,
+      message,
       session: {
         token,
         email,
@@ -245,7 +294,11 @@ async function handler(req, res) {
   if (action === 'reset-password') {
     const email = str(req.body?.email, 254).toLowerCase();
     const code = str(req.body?.code, 12);
-    const newPassword = typeof req.body?.newPassword === 'string' ? req.body.newPassword : '';
+    const passwordField = readPassword(req.body?.newPassword);
+    if (passwordField.error) {
+      return res.status(400).json({ success: false, error: passwordField.error });
+    }
+    const newPassword = passwordField.password;
 
     if (!isEmail(email)) {
       return res.status(400).json({ success: false, error: 'A valid email address is required.' });

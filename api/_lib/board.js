@@ -28,7 +28,7 @@ import { kv, KEYS, withRetry } from './kv.js';
 import { acquireLock, releaseLock, fencedWrite } from './records.js';
 
 const MEMBER_STATUS = ['active', 'inactive'];
-export const ATTENDANCE_STATUS = ['present', 'leave', 'absent'];
+const ATTENDANCE_STATUS = ['present', 'leave', 'absent'];
 
 /** A failure the caller should show the person, with an HTTP status. */
 export class BoardError extends Error {
@@ -112,7 +112,7 @@ async function saveMemberLocked(fields, by, lock) {
     const ops = [['set', KEYS.boardMember(existing.id), updated], ['set', KEYS.boardMemberByEmail(fields.email), existing.id]];
     if (fields.email !== existing.email) {
       const oldKey = KEYS.boardMemberByEmail(existing.email);
-      if (String(await kv.get(oldKey) || '') === existing.id) ops.push(['del', oldKey]);
+      if (String(await withRetry(() => kv.get(oldKey)) || '') === existing.id) ops.push(['del', oldKey]);
     }
     await fencedWrite(MEMBER_LOCK, lock, ops);
     return { member: updated, created: false };
@@ -371,7 +371,7 @@ export async function resolveOpenMeeting() {
 
 const PIN_LENGTH = 4;
 /** Wrong PINs one meeting accepts before its PIN locks: 30 of 10,000 is a 0.3% chance per PIN. */
-export const PIN_MAX_FAILS = 30;
+const PIN_MAX_FAILS = 30;
 const PIN_FAILS_TTL_SECONDS = 24 * 3600;
 const PIN_FORMAT = /^\d{4}$/;
 
@@ -435,7 +435,11 @@ export async function verifyMeetingPin(meeting, pin) {
   if (!isPinShaped(given)) {
     throw new BoardError(400, 'Enter the 4-digit meeting PIN shown in the meeting room.', 'pin_required');
   }
-  if (crypto.timingSafeEqual(Buffer.from(given), Buffer.from(current))) return { version };
+  const givenBuf = Buffer.from(given);
+  const currentBuf = Buffer.from(String(current ?? ''));
+  // timingSafeEqual throws on a length mismatch, so a stored PIN of the wrong
+  // shape is a wrong PIN (403), never a 500.
+  if (givenBuf.length === currentBuf.length && crypto.timingSafeEqual(givenBuf, currentBuf)) return { version };
   const key = KEYS.boardPinFails(meeting.id);
   // One attempt only: INCR is not idempotent.
   const fails = await withRetry(() => kv.incr(key), 1);
@@ -707,22 +711,29 @@ export async function meetingDetail(meetingId) {
   return { meeting: await adminMeeting(meeting), rows, counts: countRows(rows) };
 }
 
-export function countRows(rows) {
+function countRows(rows) {
   const counts = { roster: rows.length, present: 0, leave: 0, absent: 0 };
   for (const r of rows) counts[r.status] = (counts[r.status] || 0) + 1;
   return counts;
 }
 
-/** A meeting as members see it: without a legacy QR secret. The PIN lives in its own key. */
+// The fields only the secretariat should see on a meeting. Who created it,
+// opened it or closed it says nothing to a board member and names an admin.
+const ADMIN_ONLY_MEETING_FIELDS = ['secret', 'createdBy', 'updatedBy', 'openedBy', 'closedBy', 'reopenedBy'];
+
+/** A meeting as members see it: without the admin-only fields. The PIN lives in its own key. */
 export function publicMeeting(m) {
-  const { secret, ...rest } = m;
-  return rest;
+  const view = { ...m };
+  for (const field of ADMIN_ONLY_MEETING_FIELDS) delete view[field];
+  return view;
 }
 
 /** A meeting as the secretary sees it: with the PIN to show in the room (null unless open). */
 export async function adminMeeting(m, pin) {
   const current = m.status !== 'open' ? null : pin !== undefined ? pin : await getMeetingPin(m.id);
-  return { ...publicMeeting(m), pin: current };
+  // Only a legacy QR secret stays out of every payload; the admin trail stays.
+  const { secret, ...rest } = m;
+  return { ...rest, pin: current };
 }
 
 /** A board member's own meetings and statuses, for their portal. */

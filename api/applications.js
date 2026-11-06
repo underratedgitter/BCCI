@@ -64,8 +64,47 @@ function renewalIntent(next, previous) {
   };
 }
 
+/**
+ * True when this application's renewal already completed: either for the
+ * payment reference the caller sent, or — when a retry no longer carries one,
+ * which is what the admin UI sends — at all. A retry of a completed approval
+ * must read as the same success, not as "no pending renewal".
+ */
+function renewalAlreadyApproved(app, paymentRef) {
+  if (app?.renewalStatus !== 'Approved') return false;
+  const renewals = Array.isArray(app.renewals) ? app.renewals : [];
+  if (paymentRef && (renewals.some((r) => r.paymentRef === paymentRef) || app.paymentRef === paymentRef)) {
+    return true;
+  }
+  return renewals.length > 0 || Boolean(app.lastRenewedAt);
+}
+
+/**
+ * The idempotent answer to a repeated approve-renewal. The confirmation is
+ * re-delivered only if it never went out: the outbox leases the intent, so a
+ * retry can never send it twice.
+ */
+async function renewalAlreadyApprovedResponse(res, app) {
+  const delivery = await deliverEmailIntent(app?.renewalEmailId);
+  return res.status(200).json({
+    success: true,
+    application: app,
+    idempotent: true,
+    alreadyApproved: true,
+    emailSent: Boolean(delivery?.success),
+    message: 'Membership renewal was already approved.',
+  });
+}
+
 // A receipt is base64 in the JSON body, so the cap has to leave room for it.
 const MAX_BODY_SIZE = 3.5 * 1024 * 1024;
+// The transport (server.js MAX_BODY, and Vercel's own limit) refuses anything
+// over 5 MB, so a larger declared body cannot be a real submission. Checked
+// before parsing so a multi-megabyte upload never costs a JSON.parse.
+const MAX_CONTENT_LENGTH = 5 * 1024 * 1024;
+// Invalid forms are refused before the strict submission limit below, but a
+// script that only ever sends invalid forms must still be capped.
+const ATTEMPT_LIMIT = { max: 60, windowSec: 3600 };
 
 function newApplicationId() {
   return `BCCI-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
@@ -199,6 +238,25 @@ async function handler(req, res) {
 
   // ── POST — submit a new application ──────────────────────────────
   if (req.method === 'POST') {
+    // Refuse an oversized body on its declared length, before anything reads
+    // it. A legitimate multi-document submission stays under the 5 MB the
+    // transport accepts; the per-record cap is still applied after parsing.
+    const declaredLength = Number(req.headers?.['content-length']);
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_CONTENT_LENGTH) {
+      return res.status(413).json({
+        error: 'Your payment receipt is too large. Please attach a smaller image.',
+      });
+    }
+
+    // A cheap per-network ceiling before the body is serialised and validated,
+    // so a script sending only invalid forms is still rate limited. It is a
+    // separate, looser key: the stricter submission limit below counts only
+    // forms that actually pass validation.
+    const attempts = await rateLimit(`apply:attempt:${clientIp(req)}`, ATTEMPT_LIMIT);
+    if (!attempts.ok) {
+      return tooManyRequests(res, attempts.retryAfter, 'Too many submission attempts from this network. Please try again later.');
+    }
+
     const body = req.body || {};
     const raw = JSON.stringify(body);
     if (raw.length > MAX_BODY_SIZE) {
@@ -615,6 +673,16 @@ async function handler(req, res) {
         });
       }
 
+      // One payment is awaiting verification already. Accepting a second,
+      // different reference would silently drop the first one — and with it
+      // the payment it documents — so the pending request must be closed first.
+      if (target.renewalStatus === 'Pending Verification' && target.pendingRenewal) {
+        return res.status(409).json({
+          error: 'A renewal payment is already awaiting Secretariat verification. The Secretariat must reject that request before a different payment reference can be submitted.',
+          code: 'renewal_pending',
+        });
+      }
+
       // Member self-service renewal request: requires Secretariat approval
       if (!adminEmail) {
         const updated = await updateApplication(id, (app) => {
@@ -672,19 +740,12 @@ async function handler(req, res) {
 
       const paymentRef = str(req.body.paymentRef || target.pendingRenewal?.paymentRef, 80);
 
-      // Idempotency: if this renewal was already approved with this paymentRef, return idempotent 200
+      // Idempotency: a retry of an approval that already went through — with
+      // the same paymentRef, or with none at all — returns the same success.
+      // Only a record that was never renewed is a genuine "no pending" 409.
       if (target.renewalStatus !== 'Pending Verification' || !target.pendingRenewal) {
-        const alreadyApproved = target.renewalStatus === 'Approved' && (
-          target.renewals?.some(r => r.paymentRef === paymentRef) || target.paymentRef === paymentRef
-        );
-        if (alreadyApproved) {
-          return res.status(200).json({
-            success: true,
-            application: target,
-            idempotent: true,
-            alreadyApproved: true,
-            message: 'Membership renewal was already approved.',
-          });
+        if (renewalAlreadyApproved(target, paymentRef)) {
+          return await renewalAlreadyApprovedResponse(res, target);
         }
         return res.status(409).json({ error: 'There is no pending renewal request to approve.' });
       }
@@ -703,17 +764,9 @@ async function handler(req, res) {
         // Re-read under lock
         const fresh = await getApplication(id);
         if (fresh.renewalStatus !== 'Pending Verification' || !fresh.pendingRenewal) {
-          const alreadyApproved = fresh.renewalStatus === 'Approved' && (
-            fresh.renewals?.some(r => r.paymentRef === paymentRef) || fresh.paymentRef === paymentRef
-          );
-          if (alreadyApproved) {
-            return res.status(200).json({
-              success: true,
-              application: fresh,
-              idempotent: true,
-              alreadyApproved: true,
-              message: 'Membership renewal was already approved.',
-            });
+          // A concurrent request may have completed the same approval first.
+          if (renewalAlreadyApproved(fresh, paymentRef)) {
+            return await renewalAlreadyApprovedResponse(res, fresh);
           }
           return res.status(409).json({ error: 'There is no pending renewal request to approve.' });
         }
@@ -746,11 +799,14 @@ async function handler(req, res) {
           };
         }, renewalIntent);
 
-        await deliverEmailIntent(updated.renewalEmailId);
+        // Reported, not enforced: a failed notification never undoes the
+        // approval the Secretariat just made.
+        const delivery = await deliverEmailIntent(updated.renewalEmailId);
 
         return res.status(200).json({
           success: true,
           application: updated,
+          emailSent: Boolean(delivery?.success),
           message: 'Membership renewal approved and tenure extended by +1 year.',
         });
       } finally {
@@ -784,11 +840,12 @@ async function handler(req, res) {
         };
       }, renewalIntent);
 
-      await deliverEmailIntent(updated.renewalEmailId);
+      const delivery = await deliverEmailIntent(updated.renewalEmailId);
 
       return res.status(200).json({
         success: true,
         application: updated,
+        emailSent: Boolean(delivery?.success),
         message: 'Membership renewal rejected.',
       });
     }
@@ -827,16 +884,18 @@ async function handler(req, res) {
     if (!updated) return res.status(404).json({ error: 'Application not found' });
 
     // Identical decisions reuse the intent: failed sends can retry after
-    // backoff, while a completed send is never repeated.
+    // backoff, while a completed send is never repeated. Whether it went out
+    // is reported to the caller — the decision itself already stands.
+    let emailSent = false;
     if ([STATUS.APPROVED, STATUS.REJECTED].includes(nextStatus)) {
-      await deliverEmailIntent(updated.decisionEmailId);
+      const delivery = await deliverEmailIntent(updated.decisionEmailId);
+      emailSent = Boolean(delivery?.success);
     }
 
-    return res.status(200).json({ success: true, application: updated });
+    return res.status(200).json({ success: true, application: updated, emailSent });
   }
 
   return res.status(405).json({ error: 'Method not allowed' });
 }
 
-export { adminStatsHandler };
 export default withErrorHandling('Applications', handler);
