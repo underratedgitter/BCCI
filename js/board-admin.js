@@ -6,7 +6,7 @@
 // Names and designations are typed by people, so everything is rendered
 // through el() / textContent, never innerHTML.
 
-import { el, dayLabel, timeLabel } from './dom.js?v=1.0.1';
+import { el, dayLabel, timeLabel } from './dom.js?v=1.0.2';
 
 const DESIGNATIONS = [
   'President', 'Vice President', 'Joint Vice President', 'Hon. Secretary', 'Joint Secretary',

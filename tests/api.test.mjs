@@ -389,10 +389,12 @@ check('SEC-03: replay approval with same paymentRef is idempotent → 200', rRep
 check('SEC-03: replay flags alreadyApproved: true', rReplayWithRef.body?.alreadyApproved === true);
 check('SEC-03: repeated approval does NOT add additional years', rReplayWithRef.body?.application?.renewalYears === 2);
 
-// Replay of approve-renewal when renewal is already Approved without pending renewal or matching ref returns 409
+// A retry with no paymentRef after the renewal already went through is the same
+// idempotent success; only a record that was never renewed is a genuine 409.
 const rReplayApprove = await call(applications, { method: 'PATCH', token: adminToken, body: { id: appId, action: 'approve-renewal' } });
-check('SEC-03: approve-renewal without pending renewal or matching ref returns 409 Conflict', rReplayApprove.statusCode === 409);
-check('SEC-03: error explains no pending renewal', rReplayApprove.body?.error?.includes('no pending renewal'));
+check('SEC-03: approve-renewal retry without a ref is idempotent → 200', rReplayApprove.statusCode === 200);
+check('SEC-03: retry without a ref flags alreadyApproved: true', rReplayApprove.body?.alreadyApproved === true);
+check('SEC-03: retry without a ref does NOT add additional years', rReplayApprove.body?.application?.renewalYears === 2);
 
 // Rejection & resurrection prevention
 const rRejectNoPending = await call(applications, { method: 'PATCH', token: adminToken, body: { id: appId, action: 'reject-renewal' } });

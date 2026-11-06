@@ -4,7 +4,7 @@
    All store operations are async — Vercel API + Redis backend.
    ========================================================================== */
 
-import { Store } from './store.js?v=4.0.25';
+import { Store } from './store.js?v=4.0.26';
 
 // ── Membership tiers ───────────────────────────────────────────
 // Built-in plans: label → fee in INR. The form starts with these and swaps in
@@ -2049,7 +2049,7 @@ class App {
     let BoardPortal;
     let parseAttendQr;
     try {
-      ({ BoardPortal, parseAttendQr } = await import('./board-portal.js?v=1.1.5'));
+      ({ BoardPortal, parseAttendQr } = await import('./board-portal.js?v=1.1.6'));
     } catch (err) {
       root.textContent = 'The Board Portal could not load. Check your connection and reload the page.';
       console.error('[Board] portal failed to load:', err);
@@ -2076,7 +2076,7 @@ class App {
       return;
     }
     try {
-      const { BoardAdmin } = await import('./board-admin.js?v=1.1.6');
+      const { BoardAdmin } = await import('./board-admin.js?v=1.1.7');
       this._boardAdmin = new BoardAdmin({
         root,
         store: this.store,
@@ -4603,7 +4603,7 @@ class App {
     try {
       [event, { CheckInDesk }] = await Promise.all([
         this.store.getEventWithAttendees(eventId),
-        import('./checkin.js?v=1.1.1'),
+        import('./checkin.js?v=1.1.2'),
       ]);
     } catch (err) {
       this.showToast(err.message || 'Could not open the check-in desk.', 'error');

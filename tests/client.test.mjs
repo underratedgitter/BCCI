@@ -144,7 +144,7 @@ ck('the card page has a loading state', SRC.includes('card-skeleton'));
 ck('metrics show a placeholder, not a misleading 0', /metricTotal[\s\S]{0,160}textContent = '—'/.test(SRC));
 
 ck('the long form reports progress', SRC.includes('_updateFormProgress') && SRC.includes('required fields complete'));
-ck('progress counts the payment receipt too', SRC.includes("el.name === 'paymentProof'") && SRC.includes('this.currentPaymentProofBase64'));
+ck('progress counts only [required] fields; the receipt-or-UTR rule is not one', !/name="paymentProof"[^>]*\brequired\b/.test(HTML));
 ck('progress counts supporting-document uploads too', SRC.includes("el.type === 'file'") && SRC.includes('this.docFiles[el.name]'));
 ck('progress updates on upload and removal', (SRC.match(/_updateFormProgress\(/g) || []).length >= 5);
 ck('progress resets after a successful submit', /_updateFormProgress\(membershipForm\)/.test(SRC));
@@ -1826,7 +1826,7 @@ console.log('\nModal title safety and published leadership');
 {
   const savedDocument = globalThis.document;
   const savedTimeout = globalThis.setTimeout;
-  const box = { innerHTML: '', classList: { toggle() {} }, addEventListener() {}, removeEventListener() {} };
+  const box = { innerHTML: '', classList: { toggle() {} }, addEventListener() {}, removeEventListener() {}, querySelectorAll: () => [] };
   const backdrop = { classList: { contains: () => false, add() {} } };
   globalThis.document = {
     ...savedDocument,

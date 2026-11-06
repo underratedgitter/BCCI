@@ -64,43 +64,43 @@
     "sha256": "c0a87ff33688258d7ac133ff4ec4ca0e70654c9024b6491e58f73de36c8b68d8"
   },
   "css/membership-card.css": {
-    "version": "3.2.0",
-    "sha256": "af1d664603d7291980d3f8e2097b569247bd9169b103d60c874fde19178736c9"
+    "version": "3.2.1",
+    "sha256": "68432acd5e5c849f71d43bee3ceeef8a6d8700c0eeeb722476cb3772f290a675"
   },
   "css/styles.css": {
-    "version": "3.2.27",
-    "sha256": "e5270a6a258645bfc5b8fff4cca153b2d5fbaccbed54f1c2216d64a24f405443"
+    "version": "3.2.28",
+    "sha256": "954038939cc2ef85ba0bb42c5d2c380587bfded57c1b8d273819011dd2ea5c79"
   },
   "js/app.js": {
-    "version": "5.0.39",
-    "sha256": "ac9a23346eeca9d809a05395563a6635c2416ce254ba84dd371cf636593b0c36"
+    "version": "5.0.40",
+    "sha256": "a8290d77f0ccf1270f0e10847fe06f0e8c377f8a7016078b6397443aab27f181"
   },
   "js/board-admin.js": {
-    "version": "1.1.6",
-    "sha256": "3611efb51e36e0cdca004319e824544fa39e8677576c76ae19c5a3f4ef36a544"
+    "version": "1.1.7",
+    "sha256": "4c8149922c3170296ddcdc43b5e6e3583e6d65c4e4032980637845db5a87a5c0"
   },
   "js/board-portal.js": {
-    "version": "1.1.5",
-    "sha256": "b7816a0a837bd15cab55247b854b5644812db1fafc7c921a98e7893462a92a92"
+    "version": "1.1.6",
+    "sha256": "0c844aede94bd19edf11afd9dec1a06f9a504a6a666fca3ddebe2a802a7ac72e"
   },
   "js/checkin.js": {
-    "version": "1.1.1",
-    "sha256": "f25a918bc1fbcb60020226413a150f5c36c9f3e9778c29c8dae61def51ba3e58"
+    "version": "1.1.2",
+    "sha256": "9455856bd19305c9479e58c8153a8da4d51d4d7b2a8569caa3820e1bf4380f5c"
   },
   "js/dom.js": {
-    "version": "1.0.1",
-    "sha256": "80d0abbd1937996c74e5ab460a28c7987d65e21fbddcfae2afcf030305edcb94"
+    "version": "1.0.2",
+    "sha256": "0e1804c786fe28f0cb81900488868ffe20a2273ae9fa39a55a9b127002198be6"
   },
   "js/leadership.js": {
     "version": "1.0.3",
     "sha256": "56a6289af8242607c5ddc09bdcfb0b5b307c08bcde63385e5506925d6e254fd2"
   },
   "js/qr-scanner.js": {
-    "version": "1.0.0",
-    "sha256": "f6fa3375a3566b257c90419689e4769a0c2c4a3ce7378caf6d821e247443f569"
+    "version": "1.0.1",
+    "sha256": "3bcf58c727958b14415c7cfa2dd318cecaacf580a4d23a9ee7d9c63e53ead19b"
   },
   "js/store.js": {
-    "version": "4.0.25",
-    "sha256": "e9da2ba055f60ac10ba2b1cfbfc4e5c549980f919324ce82ca6be097634711c5"
+    "version": "4.0.26",
+    "sha256": "def6faee07f649e97944a83f74d8bf6698b6ffea75536d441ae7f5043ab594bd"
   }
 }

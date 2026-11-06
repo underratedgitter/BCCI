@@ -9,8 +9,8 @@
 // Signing in (email → 6-digit code) is optional: a signed-in member's scan
 // marks them straight away, and they can see their attendance history.
 
-import { el, dayLabel, timeLabel } from './dom.js?v=1.0.1';
-import { QrScanner } from './qr-scanner.js?v=1.0.0';
+import { el, dayLabel, timeLabel } from './dom.js?v=1.0.2';
+import { QrScanner } from './qr-scanner.js?v=1.0.1';
 
 const ATTEND_IN_TEXT = /[?&]attend=live(?![A-Za-z0-9_-])/;
 const PIN_IN_TEXT = /[?&]pin=(\d{4})(?!\d)/;
