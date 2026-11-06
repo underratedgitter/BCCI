@@ -23,6 +23,10 @@
     "version": "2",
     "sha256": "9ce7837f069095ad619b7e7cbfcb445aa9fe04a0855e745aa2f58a573ab857d8"
   },
+  "assets/jigar-patel.webp": {
+    "version": "1",
+    "sha256": "952d29c14c087d2e62cc386b22c6dda35d84b587c89838ab84619007611cea40"
+  },
   "assets/mahesh-vashi.webp": {
     "version": "2",
     "sha256": "4792fbc47c9204d66a8f30ece701cb5a2eebd569051bc77d42426d0364155891"
@@ -68,8 +72,8 @@
     "sha256": "e5270a6a258645bfc5b8fff4cca153b2d5fbaccbed54f1c2216d64a24f405443"
   },
   "js/app.js": {
-    "version": "5.0.37",
-    "sha256": "ca61c447db1c96b03f4eb29158c53bee51184fb5ecfb916b00bab29c7c50b257"
+    "version": "5.0.38",
+    "sha256": "46438c762953dfc8047b6d90dee2401cea789f7fbcaa0a364650f9960b2d4f58"
   },
   "js/board-admin.js": {
     "version": "1.1.6",
@@ -88,15 +92,15 @@
     "sha256": "80d0abbd1937996c74e5ab460a28c7987d65e21fbddcfae2afcf030305edcb94"
   },
   "js/leadership.js": {
-    "version": "1.0.1",
-    "sha256": "c75cad831aea4fd5b7545564029db7ab7b19b5b4840c7bbebb6e7deb6c7654a2"
+    "version": "1.0.2",
+    "sha256": "b6a96c27919709e7a192c4acb0a2b6a1be85b977805f7a53a93fd56b65a28522"
   },
   "js/qr-scanner.js": {
     "version": "1.0.0",
     "sha256": "f6fa3375a3566b257c90419689e4769a0c2c4a3ce7378caf6d821e247443f569"
   },
   "js/store.js": {
-    "version": "4.0.23",
-    "sha256": "11c0d3b74377416518c1a9ce1a52c3bbd77789742831ddc670d51bb71aefd725"
+    "version": "4.0.24",
+    "sha256": "ac421199921dc78ad10024ab335df6b4c45e46d0c2b179f65e500dcb5e7fb071"
   }
 }

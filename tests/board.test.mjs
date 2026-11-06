@@ -683,9 +683,9 @@ sec('One open meeting, even when two are opened at once');
 sec('Published roster reconciliation (admin only)');
 {
   r = await call('members', { method: 'GET', token: ADMIN });
-  ck('admin sees the 15 published names without inventing portal accounts', r.status === 200 && r.json?.websiteRoster?.length === 15);
+  ck('admin sees the 16 published names without inventing portal accounts', r.status === 200 && r.json?.websiteRoster?.length === 16);
   ck('Mahesh is flagged when no portal profile exists', r.json.websiteRoster.some((w) => w.name === 'DR. MAHESH R. VASHI' && w.portalId === null));
-  ck('Jigar stays unpublished', !r.json.websiteRoster.some((w) => /jigar/i.test(w.name)));
+  ck('Jigar is published and pending a portal profile', r.json.websiteRoster.some((w) => /jigar/i.test(w.name) && w.portalId === null));
   const { member } = await lib.saveMember({ name: 'Mahesh R Vashi', designation: 'CSR & Skill Development', email: 'mahesh-test@example.com', mobile: '9825012345', company: '' });
   r = await call('members', { method: 'GET', token: ADMIN });
   let match = r.json.websiteRoster.find((w) => w.name === 'DR. MAHESH R. VASHI');

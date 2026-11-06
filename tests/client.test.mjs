@@ -1850,7 +1850,7 @@ console.log('\nModal title safety and published leadership');
   const { LEADERSHIP } = await import('../js/leadership.js');
   const leaders = new Store().getLeadership();
   ck('About uses the shared published roster', leaders.length === LEADERSHIP.length && leaders.every((m, i) => m.name === LEADERSHIP[i].name));
-  ck('published roster has 15 unique names and excludes Jigar', leaders.length === 15 && new Set(leaders.map((m) => m.name)).size === 15 && !leaders.some((m) => /jigar/i.test(m.name)));
+  ck('published roster has 16 unique names and includes Jigar', leaders.length === 16 && new Set(leaders.map((m) => m.name)).size === 16 && leaders.some((m) => /jigar/i.test(m.name)));
   const urjit = leaders.find((m) => m.name === 'MR. URJIT BHUPENDRABHAI PATEL');
   ck('Urjit has his supplied full name, portrait and profile without changing his board role',
     urjit?.role === 'Event Management & Exhibitions' && urjit?.image === '/assets/urjit-patel.webp?v=1' &&
